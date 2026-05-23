@@ -1,10 +1,15 @@
 """
-basis_core.policy.rules — concrete Policy implementations.
+basis_core.policy.rules — concrete PolicyRule implementations.
 
-RolePolicy
-──────────
-Evaluates authorization by checking whether the subject holds one of the roles
-mapped to the requested action. The role table is a plain dict:
+Three rule types are provided. They compose under deny-overrides semantics
+in the PolicyEngine. Each returns an explicit PolicyOutcome — never a bare
+boolean and never None. NOT_APPLICABLE means "this rule has no opinion;
+continue to the next rule."
+
+RolePolicyRule
+──────────────
+Maps action names to sets of permitted roles (RBAC). The role table is a
+plain dict:
 
     ROLE_TABLE: dict[str, set[str]] = {
         "write:hvac:setpoint": {"operator", "admin"},
@@ -12,75 +17,100 @@ mapped to the requested action. The role table is a plain dict:
         ...
     }
 
-If the action is in the table and the subject holds a permitted role → ALLOW.
-If the action is in the table and the subject holds no permitted role → DENY.
-If the action is not in the table → None (pass to the next policy).
+  - Action in table, subject holds a permitted role  → ALLOW
+  - Action in table, subject holds no permitted role → DENY
+  - Action not in table                              → NOT_APPLICABLE
 
-This distinction is important: returning None for unknown actions allows
-downstream policies to handle them. Returning DENY for unknown actions would
-prevent any downstream policy from allowing them.
+ResourceTypePolicyRule
+──────────────────────
+Constrains which resource types are permitted. Useful for ensuring that
+an action can only target resources of the expected type.
 
-Extending the policy model
-──────────────────────────
-This module is a starting point. Production deployments will need policies that
-incorporate contextual attributes. Placeholder stubs are included below for
-the most common extension patterns:
+  - resource_id is None                              → NOT_APPLICABLE
+  - Resource type is in the permitted set            → ALLOW
+  - Resource type is not in the permitted set        → DENY
 
-  AttributePolicy   Evaluates subject or resource attributes (ABAC).
-  TimeWindowPolicy  Restricts actions to defined time windows.
-  ZoneScopePolicy   Grants or restricts access based on resource zone.
+ActionPolicyRule
+────────────────
+Assigns explicit outcomes to specific actions. Use to build allowlists
+(ALLOW certain actions) or denylists (DENY certain actions).
 
-These stubs define the interface. Implementations are not provided here.
+  - Action is in the action_outcomes map             → that outcome
+  - Action is not in the map                        → NOT_APPLICABLE
+
+Composing rules
+───────────────
+Rules compose under deny-overrides. Example: restrict operator to
+HVAC resources only, using role + resource-type constraints:
+
+    engine = PolicyEngine(policies=[
+        ResourceTypePolicyRule(permitted_types={ResourceType.HVAC}),
+        RolePolicyRule({"write:hvac:setpoint": {"operator", "admin"}}),
+    ])
+
+With an HVAC resource: ResourceTypePolicyRule → ALLOW; RolePolicyRule may
+ALLOW or DENY based on role. If RolePolicyRule DENYs, that DENY wins.
+
+With a non-HVAC resource: ResourceTypePolicyRule → DENY, which overrides
+any ALLOW from RolePolicyRule. The request is denied regardless of role.
 """
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Any, Optional
 
+from basis_core.domain.identity import IdentityContext
+from basis_core.domain.resource import ResourceType
 from basis_core.domain.subject import Subject
-from basis_core.policy.engine import Decision, Policy
+from basis_core.policy.engine import Decision, PolicyOutcome
 
 
-class RolePolicy:
+class RolePolicyRule:
     """
-    RBAC-style policy: maps action names to sets of permitted roles.
+    RBAC policy rule: maps action names to sets of permitted roles.
 
     Parameters
     ──────────
     role_table   dict[action, set[role_name]]
-                 Actions present in the table are handled by this policy.
-                 Actions absent from the table pass through (return None).
-    policy_name  Label for audit records. Defaults to "RolePolicy".
+                 Actions present in the table are handled by this rule.
+                 Actions absent from the table return NOT_APPLICABLE.
+    rule_name    Label for audit records. Defaults to "RolePolicyRule".
     """
 
     def __init__(
         self,
         role_table: dict[str, set[str]],
-        policy_name: str = "RolePolicy",
+        rule_name: str = "RolePolicyRule",
     ) -> None:
         self._table = {action: frozenset(roles) for action, roles in role_table.items()}
-        self._name  = policy_name
+        self._name  = rule_name
 
     def evaluate(
         self,
         subject: Subject,
         action: str,
         resource_id: Optional[str] = None,
-    ) -> Optional[Decision]:
-        """Evaluate role membership for a known action; pass through unknowns."""
+        identity_context: Optional[IdentityContext] = None,
+        context: Optional[dict[str, Any]] = None,
+    ) -> Decision:
+        """Evaluate role membership for a known action; NOT_APPLICABLE for unknowns."""
         if action not in self._table:
-            return None  # This policy does not cover this action.
+            return Decision(
+                outcome=PolicyOutcome.NOT_APPLICABLE,
+                reason=f"Action '{action}' is not in this rule's role table.",
+                evaluated_by=self._name,
+            )
 
         permitted_roles = self._table[action]
         if subject.has_role(*permitted_roles):
             return Decision(
-                allowed=True,
+                outcome=PolicyOutcome.ALLOW,
                 reason=f"Subject holds a role permitted for '{action}'.",
                 evaluated_by=self._name,
             )
 
         return Decision(
-            allowed=False,
+            outcome=PolicyOutcome.DENY,
             reason=(
                 f"Action '{action}' requires one of {sorted(permitted_roles)}; "
                 f"subject holds {sorted(subject.roles) or ['(none)']}."
@@ -89,43 +119,128 @@ class RolePolicy:
         )
 
 
-class AttributePolicy:
+class ResourceTypePolicyRule:
     """
-    Placeholder for attribute-based policy evaluation (ABAC).
+    Constrains which resource types are permitted targets for an action.
 
-    An AttributePolicy can enforce conditions based on subject attributes
-    (e.g., site, clearance level), resource attributes (e.g., zone, criticality),
-    or environmental context (e.g., operational mode, maintenance window active).
+    Use this to ensure that actions targeting unexpected resource types are
+    rejected at the rule level, independent of role checks.
 
-    Not implemented. Subclass and override evaluate() to provide behavior.
+    Parameters
+    ──────────
+    permitted_types  Set of ResourceType values that are allowed.
+    rule_name        Label for audit records. Defaults to "ResourceTypePolicyRule".
+
+    Outcomes
+    ────────
+    - resource_id is None                         → NOT_APPLICABLE (no resource
+                                                    to check; rule has no opinion)
+    - Resource type prefix is in permitted_types  → ALLOW
+    - Resource type prefix is not in permitted    → DENY
+
+    The resource type is determined from the type prefix of the resource_id
+    string (e.g., "hvac" from "hvac:zone-a"). This does not require
+    constructing a full Resource object.
     """
+
+    def __init__(
+        self,
+        permitted_types: set[ResourceType],
+        rule_name: str = "ResourceTypePolicyRule",
+    ) -> None:
+        self._permitted = frozenset(t.value for t in permitted_types)
+        self._name      = rule_name
 
     def evaluate(
         self,
         subject: Subject,
         action: str,
         resource_id: Optional[str] = None,
-    ) -> Optional[Decision]:
-        """Not implemented. Returns None (pass through) in all cases."""
-        return None
+        identity_context: Optional[IdentityContext] = None,
+        context: Optional[dict[str, Any]] = None,
+    ) -> Decision:
+        if resource_id is None:
+            return Decision(
+                outcome=PolicyOutcome.NOT_APPLICABLE,
+                reason="No resource_id present; resource type check does not apply.",
+                evaluated_by=self._name,
+            )
+
+        type_prefix = resource_id.split(":")[0] if ":" in resource_id else resource_id
+
+        if type_prefix in self._permitted:
+            return Decision(
+                outcome=PolicyOutcome.ALLOW,
+                reason=f"Resource type '{type_prefix}' is in the permitted set.",
+                evaluated_by=self._name,
+            )
+
+        return Decision(
+            outcome=PolicyOutcome.DENY,
+            reason=(
+                f"Resource type '{type_prefix}' is not permitted. "
+                f"Permitted types: {sorted(self._permitted)}."
+            ),
+            evaluated_by=self._name,
+        )
 
 
-class TimeWindowPolicy:
+class ActionPolicyRule:
     """
-    Placeholder for time-of-day or scheduled-window policy evaluation.
+    Assigns explicit outcomes to named actions.
 
-    A TimeWindowPolicy can restrict actions to defined time windows — for
-    example, permitting write commands only during a declared maintenance
-    window, or restricting operator commands to business hours.
+    Use to build allowlists (map actions to ALLOW) or denylists (map actions
+    to DENY). Actions not present in the map return NOT_APPLICABLE.
 
-    Not implemented. Subclass and override evaluate() to provide behavior.
+    Parameters
+    ──────────
+    action_outcomes  dict[action_name, PolicyOutcome]
+                     Explicit outcome for each action this rule governs.
+    rule_name        Label for audit records. Defaults to "ActionPolicyRule".
+
+    Example — allowlist:
+        ActionPolicyRule({
+            "read:sensor:telemetry": PolicyOutcome.ALLOW,
+            "read:hvac:state":       PolicyOutcome.ALLOW,
+        })
+
+    Example — denylist:
+        ActionPolicyRule({
+            "write:policy":   PolicyOutcome.DENY,
+            "read:audit:log": PolicyOutcome.DENY,
+        })
     """
+
+    def __init__(
+        self,
+        action_outcomes: dict[str, PolicyOutcome],
+        rule_name: str = "ActionPolicyRule",
+    ) -> None:
+        self._outcomes = dict(action_outcomes)
+        self._name     = rule_name
 
     def evaluate(
         self,
         subject: Subject,
         action: str,
         resource_id: Optional[str] = None,
-    ) -> Optional[Decision]:
-        """Not implemented. Returns None (pass through) in all cases."""
-        return None
+        identity_context: Optional[IdentityContext] = None,
+        context: Optional[dict[str, Any]] = None,
+    ) -> Decision:
+        if action not in self._outcomes:
+            return Decision(
+                outcome=PolicyOutcome.NOT_APPLICABLE,
+                reason=f"Action '{action}' is not registered in this rule.",
+                evaluated_by=self._name,
+            )
+
+        outcome = self._outcomes[action]
+
+        if outcome == PolicyOutcome.ALLOW:
+            reason = f"Action '{action}' is explicitly permitted by this rule."
+        elif outcome == PolicyOutcome.DENY:
+            reason = f"Action '{action}' is explicitly denied by this rule."
+        else:
+            reason = f"Action '{action}' maps to outcome '{outcome.value}' in this rule."
+
+        return Decision(outcome=outcome, reason=reason, evaluated_by=self._name)

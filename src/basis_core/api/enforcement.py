@@ -38,8 +38,9 @@ import logging
 from basis_core.audit.events import AuditEvent, AuditEventType, AuditOutcome
 from basis_core.audit.writer import AuditWriter
 from basis_core.decisions.models import DecisionOutcome, DecisionRequest, DecisionResponse
+from basis_core.domain.identity import IdentityContext
 from basis_core.domain.subject import Subject
-from basis_core.policy.engine import PolicyEngine
+from basis_core.policy.engine import PolicyEngine, PolicyOutcome
 
 log = logging.getLogger("basis_core.api.enforcement")
 
@@ -72,6 +73,7 @@ class EnforcementPoint:
         self,
         request: DecisionRequest,
         subject: Subject | None = None,
+        identity_context: IdentityContext | None = None,
     ) -> DecisionResponse:
         """
         Evaluate an authorization request and record the decision.
@@ -97,10 +99,17 @@ class EnforcementPoint:
             decision = self._engine.evaluate(
                 eval_subject,
                 request.action,
-                request.resource_id,
+                resource_id=request.resource_id,
+                identity_context=identity_context,
+                context=dict(request.context) if request.context else None,
             )
 
-            outcome = DecisionOutcome.ALLOW if decision.allowed else DecisionOutcome.DENY
+            _outcome_map: dict[PolicyOutcome, DecisionOutcome] = {
+                PolicyOutcome.ALLOW:          DecisionOutcome.ALLOW,
+                PolicyOutcome.DENY:           DecisionOutcome.DENY,
+                PolicyOutcome.NOT_APPLICABLE: DecisionOutcome.NOT_APPLICABLE,
+            }
+            outcome = _outcome_map.get(decision.outcome, DecisionOutcome.DENY)
 
             response = DecisionResponse(
                 request_id=request.request_id,
@@ -123,7 +132,7 @@ class EnforcementPoint:
                 policy_version=self._policy_version,
             )
 
-        self._write_audit(request, response, subject)
+        self._write_audit(request, response, subject, identity_context)
         return response
 
     def _write_audit(
@@ -131,6 +140,7 @@ class EnforcementPoint:
         request: DecisionRequest,
         response: DecisionResponse,
         subject: Subject | None,
+        identity_context: IdentityContext | None = None,
     ) -> None:
         """Write an audit record for the decision. Does not raise."""
         try:

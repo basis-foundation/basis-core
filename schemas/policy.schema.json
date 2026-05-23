@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://basis-core/schemas/policy.schema.json",
   "title": "Policy",
-  "description": "A serializable policy definition. Describes a policy that can be persisted, distributed, or loaded from configuration. The RolePolicy implementation in basis_core.policy.rules corresponds to a 'role_policy' type entry.",
+  "description": "A serializable policy definition. Describes a set of policy rules that can be persisted, distributed, or loaded from configuration. Each rule type corresponds to a concrete PolicyRule implementation in basis_core.policy.rules.",
   "type": "object",
   "required": ["policy_id", "policy_type", "version", "created_at"],
   "additionalProperties": false,
@@ -14,8 +14,8 @@
     },
     "policy_type": {
       "type": "string",
-      "enum": ["role_policy", "attribute_policy", "time_window_policy"],
-      "description": "The kind of policy this definition describes. Determines the expected structure of the rules array."
+      "enum": ["role_policy", "resource_type_policy", "action_policy", "composite_policy"],
+      "description": "The kind of policy this definition describes. Determines the expected structure of the rules array. 'role_policy' maps actions to permitted roles. 'resource_type_policy' constrains permitted resource types. 'action_policy' assigns explicit outcomes to named actions. 'composite_policy' combines multiple rule sets."
     },
     "version": {
       "type": "string",
@@ -35,19 +35,30 @@
       "type": ["string", "null"],
       "description": "Identifier of the principal that created or last modified this policy. Used for policy change audit records."
     },
+    "evaluation_semantics": {
+      "type": "string",
+      "enum": ["deny_overrides"],
+      "default": "deny_overrides",
+      "description": "The aggregation semantics applied when multiple rules are present. Only 'deny_overrides' is supported: a DENY from any rule overrides any ALLOW; if all rules return NOT_APPLICABLE the default is DENY."
+    },
     "rules": {
       "type": "array",
-      "description": "Ordered list of policy rules. Structure depends on policy_type. For role_policy: each rule maps an action to a set of permitted roles. For attribute_policy and time_window_policy: rules include additional conditions.",
+      "description": "Ordered list of policy rules. Structure depends on policy_type.",
       "items": {
         "type": "object",
-        "required": ["action"],
+        "required": ["rule_type"],
         "additionalProperties": false,
         "properties": {
+          "rule_type": {
+            "type": "string",
+            "enum": ["role", "resource_type", "action"],
+            "description": "The type of this rule. Determines which fields are relevant. 'role': action-to-roles mapping. 'resource_type': permitted resource type set. 'action': explicit action-to-outcome mapping."
+          },
           "action": {
             "type": "string",
             "minLength": 1,
             "pattern": "^[a-z][a-z0-9_-]*(:[a-z][a-z0-9_-]*)+$",
-            "description": "Action name this rule governs. Must follow the '{verb}:{domain}[:{object}]' naming convention."
+            "description": "For 'role' rules: the action name this rule governs. Must follow the '{verb}:{domain}[:{object}]' naming convention."
           },
           "permitted_roles": {
             "type": "array",
@@ -56,12 +67,24 @@
               "minLength": 1
             },
             "uniqueItems": true,
-            "description": "For role_policy: role names that are permitted to perform this action. Non-empty items only."
+            "description": "For 'role' rules: role names permitted to perform this action. Non-empty items only."
           },
-          "conditions": {
+          "permitted_resource_types": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["hvac", "sensor", "zone", "device", "gateway"]
+            },
+            "uniqueItems": true,
+            "description": "For 'resource_type' rules: resource type values that are permitted targets. Must match ResourceType enum values."
+          },
+          "action_outcomes": {
             "type": "object",
-            "additionalProperties": { "type": "string" },
-            "description": "For attribute_policy or time_window_policy: additional conditions as key/value pairs. Structure is policy-type-specific."
+            "additionalProperties": {
+              "type": "string",
+              "enum": ["allow", "deny", "not_applicable"]
+            },
+            "description": "For 'action' rules: map of action name to explicit outcome. Each key is an action name; each value is a PolicyOutcome string."
           }
         }
       }

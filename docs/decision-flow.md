@@ -27,10 +27,21 @@ The enforcement point receives the `DecisionRequest`. It constructs a `Subject` 
 
 ### 4. PolicyEngine evaluates the request
 
-The enforcement point calls `PolicyEngine.evaluate(subject, action, resource_id)`. The engine walks its policy chain:
-- Each policy either returns a `Decision` or `None`.
-- The first non-None `Decision` wins.
-- If no policy returns a `Decision`, the engine returns DENY (fail closed).
+The enforcement point calls `PolicyEngine.evaluate(subject, action, resource_id,
+identity_context, context)`. The engine applies deny-overrides semantics across
+all registered rules:
+
+- Each rule returns an explicit `Decision` with a `PolicyOutcome` of ALLOW, DENY,
+  or NOT_APPLICABLE. Rules never return None.
+- If any rule returns DENY, the engine returns that DENY decision immediately.
+  A single explicit denial overrides any number of grants.
+- If any rule returns ALLOW and no rule returned DENY, the engine returns the
+  first ALLOW decision.
+- If all rules return NOT_APPLICABLE, the engine returns a NOT_APPLICABLE
+  decision. The EnforcementPoint resolves this to DENY (default deny).
+
+This means an uncovered action is never silently permitted. Every action
+reachable from an adapter must be covered by at least one rule.
 
 ### 5. AuditEvent is written
 

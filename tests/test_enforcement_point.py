@@ -13,7 +13,7 @@ from basis_core.audit.writer import AuditWriter, NullAuditWriter
 from basis_core.decisions.models import DecisionOutcome, DecisionRequest
 from basis_core.domain.subject import Subject
 from basis_core.policy.engine import PolicyEngine
-from basis_core.policy.rules import RolePolicy
+from basis_core.policy.rules import RolePolicyRule
 
 
 ROLE_TABLE: dict[str, set[str]] = {
@@ -30,7 +30,7 @@ def make_ep(captured: list[AuditEvent] | None = None) -> EnforcementPoint:
                 captured.append(event)
 
     return EnforcementPoint(
-        engine=PolicyEngine(policies=[RolePolicy(ROLE_TABLE)]),
+        engine=PolicyEngine(policies=[RolePolicyRule(ROLE_TABLE)]),
         audit_writer=CapturingWriter(),
         policy_version="test-v1",
     )
