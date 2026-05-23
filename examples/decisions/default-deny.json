@@ -1,0 +1,10 @@
+{
+  "_comment": "Example DecisionResponse — default deny (NOT_APPLICABLE). No policy rule in the chain handled the requested action. The engine returned NOT_APPLICABLE; the enforcement point maps this to a denial. evaluated_by is 'PolicyEngine' — a signal that the action is not covered by any registered rule, which is a configuration error that should be investigated.",
+  "request_id": "a1b2c3d4-0003-0000-0000-000000000003",
+  "outcome": "not_applicable",
+  "reason": "No policy rule is registered for action 'read:sensor:temperature'. Every action that can be requested must be covered by at least one rule in the engine's chain. Default: deny.",
+  "evaluated_by": "PolicyEngine",
+  "policy_version": "v1.0.0",
+  "failure_reason": null,
+  "timestamp": "2026-05-22T14:30:02Z"
+}

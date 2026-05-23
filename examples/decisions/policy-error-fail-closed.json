@@ -1,0 +1,10 @@
+{
+  "_comment": "Example DecisionResponse — policy error fail-closed. A policy rule raised an unhandled exception during evaluation. The engine failed closed (returned DENY with is_error=True). The enforcement point sanitized the reason — the raw exception text appears only in application logs — and set failure_reason=policy_error. The audit record for this decision has outcome=error.",
+  "request_id": "a1b2c3d4-0004-0000-0000-000000000004",
+  "outcome": "deny",
+  "reason": "Policy evaluation encountered an internal error. The request has been denied.",
+  "evaluated_by": "BrokenPolicyRule",
+  "policy_version": "v1.0.0",
+  "failure_reason": "policy_error",
+  "timestamp": "2026-05-22T14:30:03Z"
+}
