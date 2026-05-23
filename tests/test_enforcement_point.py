@@ -9,12 +9,10 @@ from __future__ import annotations
 
 from basis_core.api.enforcement import EnforcementPoint
 from basis_core.audit.events import AuditEvent, AuditOutcome
-from basis_core.audit.writer import AuditWriter, NullAuditWriter
 from basis_core.decisions.models import DecisionOutcome, DecisionRequest
 from basis_core.domain.subject import Subject
 from basis_core.policy.engine import PolicyEngine
 from basis_core.policy.rules import RolePolicyRule
-
 
 ROLE_TABLE: dict[str, set[str]] = {
     "write:hvac:setpoint": {"operator", "admin"},
@@ -46,6 +44,7 @@ def make_request(action: str = "write:hvac:setpoint") -> DecisionRequest:
 
 
 # ── Core behavior ──────────────────────────────────────────────────────────────
+
 
 def test_allowed_request_returns_allow_outcome() -> None:
     ep = make_ep()

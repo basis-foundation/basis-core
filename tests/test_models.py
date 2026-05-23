@@ -17,7 +17,6 @@ Covers:
 from __future__ import annotations
 
 import ast
-import importlib
 import json
 from datetime import datetime, timezone
 from pathlib import Path
@@ -41,8 +40,8 @@ NAIVE_DT = datetime(2026, 5, 22, 14, 30, 0)  # no tzinfo — deliberately naive
 # Subject validation
 # ══════════════════════════════════════════════════════════════════════════════
 
-class TestSubjectValidation:
 
+class TestSubjectValidation:
     def test_empty_id_is_rejected(self) -> None:
         with pytest.raises(ValidationError, match="must not be empty"):
             Subject(id="", name="alice", roles=[])
@@ -108,8 +107,8 @@ class TestSubjectValidation:
 # subject_from_jwt
 # ══════════════════════════════════════════════════════════════════════════════
 
-class TestSubjectFromJwt:
 
+class TestSubjectFromJwt:
     def test_valid_jwt_payload_constructs_subject(self) -> None:
         payload = {
             "sub": "a7b8c9d0-1234-5678-abcd-ef0123456789",
@@ -158,8 +157,8 @@ class TestSubjectFromJwt:
 # Resource validation
 # ══════════════════════════════════════════════════════════════════════════════
 
-class TestResourceValidation:
 
+class TestResourceValidation:
     def test_valid_resource_constructs(self) -> None:
         r = Resource(id="hvac:zone-a", type=ResourceType.HVAC, name="zone-a")
         assert r.id == "hvac:zone-a"
@@ -194,8 +193,8 @@ class TestResourceValidation:
 # IdentityContext validation
 # ══════════════════════════════════════════════════════════════════════════════
 
-class TestIdentityContextValidation:
 
+class TestIdentityContextValidation:
     def _make_subject(self) -> Subject:
         return Subject(id="u1", name="alice", roles=["operator"])
 
@@ -263,8 +262,8 @@ class TestIdentityContextValidation:
 # DecisionRequest validation
 # ══════════════════════════════════════════════════════════════════════════════
 
-class TestDecisionRequestValidation:
 
+class TestDecisionRequestValidation:
     def test_valid_request_constructs(self) -> None:
         req = DecisionRequest(
             subject_id="u1",
@@ -331,8 +330,8 @@ class TestDecisionRequestValidation:
 # DecisionResponse validation
 # ══════════════════════════════════════════════════════════════════════════════
 
-class TestDecisionResponseValidation:
 
+class TestDecisionResponseValidation:
     def test_valid_allow_response_constructs(self) -> None:
         resp = DecisionResponse(
             request_id="req-1",
@@ -439,8 +438,8 @@ class TestDecisionResponseValidation:
 # AuditEvent validation
 # ══════════════════════════════════════════════════════════════════════════════
 
-class TestAuditEventValidation:
 
+class TestAuditEventValidation:
     def test_minimal_audit_event_constructs(self) -> None:
         ev = AuditEvent(action="write:hvac:setpoint")
         assert ev.event_id
@@ -525,6 +524,7 @@ class TestAuditEventValidation:
 # Import boundary verification
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 class TestImportBoundaries:
     """
     Verify statically that no subpackage below api/ imports from basis_core.api.
@@ -558,8 +558,7 @@ class TestImportBoundaries:
             imports = self._collect_imports(py_file)
             for imp in imports:
                 assert not imp.startswith("basis_core.api"), (
-                    f"{py_file.name}: domain/ must not import from basis_core.api, "
-                    f"found '{imp}'"
+                    f"{py_file.name}: domain/ must not import from basis_core.api, found '{imp}'"
                 )
 
     def test_policy_does_not_import_from_api(self) -> None:
@@ -568,8 +567,7 @@ class TestImportBoundaries:
             imports = self._collect_imports(py_file)
             for imp in imports:
                 assert not imp.startswith("basis_core.api"), (
-                    f"{py_file.name}: policy/ must not import from basis_core.api, "
-                    f"found '{imp}'"
+                    f"{py_file.name}: policy/ must not import from basis_core.api, found '{imp}'"
                 )
 
     def test_decisions_does_not_import_from_api(self) -> None:
@@ -578,8 +576,7 @@ class TestImportBoundaries:
             imports = self._collect_imports(py_file)
             for imp in imports:
                 assert not imp.startswith("basis_core.api"), (
-                    f"{py_file.name}: decisions/ must not import from basis_core.api, "
-                    f"found '{imp}'"
+                    f"{py_file.name}: decisions/ must not import from basis_core.api, found '{imp}'"
                 )
 
     def test_audit_does_not_import_from_api(self) -> None:
@@ -588,8 +585,7 @@ class TestImportBoundaries:
             imports = self._collect_imports(py_file)
             for imp in imports:
                 assert not imp.startswith("basis_core.api"), (
-                    f"{py_file.name}: audit/ must not import from basis_core.api, "
-                    f"found '{imp}'"
+                    f"{py_file.name}: audit/ must not import from basis_core.api, found '{imp}'"
                 )
 
     def test_adapters_does_not_import_from_api(self) -> None:
@@ -598,8 +594,7 @@ class TestImportBoundaries:
             imports = self._collect_imports(py_file)
             for imp in imports:
                 assert not imp.startswith("basis_core.api"), (
-                    f"{py_file.name}: adapters/ must not import from basis_core.api, "
-                    f"found '{imp}'"
+                    f"{py_file.name}: adapters/ must not import from basis_core.api, found '{imp}'"
                 )
 
     def test_policy_does_not_import_from_decisions(self) -> None:

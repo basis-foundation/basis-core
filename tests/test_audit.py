@@ -21,22 +21,22 @@ import json
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import pytest
 from pydantic import ValidationError
 
+from basis_core.api.enforcement import EnforcementPoint
 from basis_core.audit.events import AUDIT_SCHEMA_VERSION, AuditEvent, AuditEventType, AuditOutcome
 from basis_core.audit.trace import DecisionTrace, RuleEvaluation
 from basis_core.audit.writer import LogAuditWriter, NullAuditWriter
-from basis_core.decisions.models import DecisionOutcome, DecisionRequest, DecisionResponse
+from basis_core.decisions.models import DecisionOutcome, DecisionRequest
 from basis_core.domain.subject import Subject, SubjectType
 from basis_core.policy.engine import PolicyEngine, PolicyOutcome
-from basis_core.policy.rules import ActionPolicyRule, ResourceTypePolicyRule, RolePolicyRule
-from basis_core.api.enforcement import EnforcementPoint
-
+from basis_core.policy.rules import ActionPolicyRule, RolePolicyRule
 
 # ── Shared helpers ──────────────────────────────────────────────────────────────
+
 
 def make_subject(roles: list[str] | None = None, name: str = "alice") -> Subject:
     return Subject(
@@ -63,8 +63,8 @@ def make_request(
 
 ROLE_TABLE: dict[str, set[str]] = {
     "write:hvac:setpoint": {"operator", "admin"},
-    "read:audit:log":      {"admin"},
-    "read:resources":      {"viewer", "operator", "admin"},
+    "read:audit:log": {"admin"},
+    "read:resources": {"viewer", "operator", "admin"},
 }
 
 
@@ -83,7 +83,9 @@ class CapturingWriter:
         return self.events[-1]
 
 
-def make_ep(writer: CapturingWriter | None = None, rules=None) -> tuple[EnforcementPoint, CapturingWriter]:
+def make_ep(
+    writer: CapturingWriter | None = None, rules=None
+) -> tuple[EnforcementPoint, CapturingWriter]:
     w = writer or CapturingWriter()
     engine = PolicyEngine(policies=rules or [RolePolicyRule(ROLE_TABLE)])
     ep = EnforcementPoint(engine=engine, audit_writer=w, policy_version="v1.1.0")
@@ -92,8 +94,8 @@ def make_ep(writer: CapturingWriter | None = None, rules=None) -> tuple[Enforcem
 
 # ── AuditEvent model validation ─────────────────────────────────────────────────
 
-class TestAuditEventModel:
 
+class TestAuditEventModel:
     def test_minimal_event_constructs(self) -> None:
         event = AuditEvent(action="read:resources")
         assert event.action == "read:resources"
@@ -176,8 +178,8 @@ class TestAuditEventModel:
 
 # ── DecisionTrace and RuleEvaluation ───────────────────────────────────────────
 
-class TestDecisionTrace:
 
+class TestDecisionTrace:
     def test_rule_evaluation_constructs(self) -> None:
         re = RuleEvaluation(rule_name="MyRule", outcome="allow", reason="ok")
         assert re.rule_name == "MyRule"
@@ -235,8 +237,8 @@ class TestDecisionTrace:
 
 # ── EnforcementPoint audit output: all four decision paths ─────────────────────
 
-class TestEnforcementPointAuditPaths:
 
+class TestEnforcementPointAuditPaths:
     def test_allow_decision_produces_correct_audit_event(self) -> None:
         ep, writer = make_ep()
         subject = make_subject(["operator"])
@@ -282,9 +284,7 @@ class TestEnforcementPointAuditPaths:
         allow_rule = ActionPolicyRule(
             {"write:hvac:setpoint": PolicyOutcome.ALLOW}, rule_name="AllowRule"
         )
-        deny_rule = RolePolicyRule(
-            {"write:hvac:setpoint": {"operator"}}, rule_name="RoleRule"
-        )
+        deny_rule = RolePolicyRule({"write:hvac:setpoint": {"operator"}}, rule_name="RoleRule")
         ep, writer = make_ep(rules=[allow_rule, deny_rule])
         subject = make_subject(["viewer"])
         request = make_request("write:hvac:setpoint", roles=["viewer"])
@@ -354,8 +354,8 @@ class TestEnforcementPointAuditPaths:
 
 # ── Audit writer failure: decision must not change ──────────────────────────────
 
-class TestAuditWriterFailure:
 
+class TestAuditWriterFailure:
     class ExplodingWriter:
         def write(self, event: AuditEvent) -> None:
             raise RuntimeError("Storage unavailable")
@@ -391,8 +391,7 @@ class TestAuditWriterFailure:
         )
         with caplog.at_level(logging.ERROR, logger="basis_core.api.enforcement"):
             ep.evaluate(make_request(), subject=make_subject(["operator"]))
-        assert any("audit" in msg.lower() or "write" in msg.lower()
-                   for msg in caplog.messages)
+        assert any("audit" in msg.lower() or "write" in msg.lower() for msg in caplog.messages)
 
     def test_null_writer_discards_silently(self) -> None:
         engine = PolicyEngine(policies=[RolePolicyRule(ROLE_TABLE)])
@@ -403,8 +402,8 @@ class TestAuditWriterFailure:
 
 # ── LogAuditWriter ──────────────────────────────────────────────────────────────
 
-class TestLogAuditWriter:
 
+class TestLogAuditWriter:
     def test_log_writer_emits_json(self, caplog: pytest.LogCaptureFixture) -> None:
         writer = LogAuditWriter()
         event = AuditEvent(
@@ -434,19 +433,18 @@ class TestLogAuditWriter:
 
 # ── Audit import boundaries ─────────────────────────────────────────────────────
 
+
 class TestAuditImportBoundaries:
     """
     Statically verify that the audit package does not import from api or adapters.
     Uses ast.parse() — no module execution required.
     """
 
-    AUDIT_DIR = (
-        Path(__file__).parent.parent / "src" / "basis_core" / "audit"
-    )
+    AUDIT_DIR = Path(__file__).parent.parent / "src" / "basis_core" / "audit"
 
     def _collect_imports(self, path: Path) -> list[str]:
         source = path.read_text(encoding="utf-8")
-        tree   = ast.parse(source, filename=str(path))
+        tree = ast.parse(source, filename=str(path))
         imports: list[str] = []
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):

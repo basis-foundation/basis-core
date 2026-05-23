@@ -41,7 +41,6 @@ from __future__ import annotations
 
 import re
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel, field_validator
 
@@ -53,10 +52,10 @@ _RESOURCE_ID_RE = re.compile(r"^[a-z][a-z0-9_-]*(:[a-z0-9][a-z0-9_:/-]*)$")
 class ResourceType(str, Enum):
     """OT resource classifications used in policy and audit records."""
 
-    HVAC    = "hvac"     # HVAC controller (setpoint, mode, fan speed, …)
-    SENSOR  = "sensor"   # Environmental sensor (CO₂, temperature, occupancy, …)
-    ZONE    = "zone"     # Logical grouping of physical resources
-    DEVICE  = "device"   # Generic OT device not covered by a more specific type
+    HVAC = "hvac"  # HVAC controller (setpoint, mode, fan speed, …)
+    SENSOR = "sensor"  # Environmental sensor (CO₂, temperature, occupancy, …)
+    ZONE = "zone"  # Logical grouping of physical resources
+    DEVICE = "device"  # Generic OT device not covered by a more specific type
     GATEWAY = "gateway"  # Protocol bridge or edge gateway
 
 
@@ -78,12 +77,12 @@ class Resource(BaseModel):
                 Examples: ``{"floor": "2", "criticality": "high"}``
     """
 
-    id:          str
-    type:        ResourceType
-    name:        str
-    zone:        Optional[str]  = None
-    description: Optional[str] = None
-    attrs:       dict[str, str] = {}
+    id: str
+    type: ResourceType
+    name: str
+    zone: str | None = None
+    description: str | None = None
+    attrs: dict[str, str] = {}
 
     model_config = {"frozen": True}
 
@@ -123,9 +122,7 @@ def build_resource_id(resource_type: ResourceType, *parts: str) -> str:
     Raises ValueError if no qualifier parts are provided.
     """
     if not parts:
-        raise ValueError(
-            "build_resource_id requires at least one qualifier part after the type."
-        )
+        raise ValueError("build_resource_id requires at least one qualifier part after the type.")
     return ":".join([resource_type.value] + list(parts))
 
 

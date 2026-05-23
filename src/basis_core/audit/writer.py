@@ -71,7 +71,7 @@ class LogAuditWriter:
         logger: logging.Logger | None = None,
         level: int = logging.INFO,
     ) -> None:
-        self._log   = logger or log
+        self._log = logger or log
         self._level = level
 
     def write(self, event: AuditEvent) -> None:

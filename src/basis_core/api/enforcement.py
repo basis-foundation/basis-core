@@ -59,14 +59,14 @@ from basis_core.policy.engine import Decision, PolicyEngine, PolicyOutcome
 log = logging.getLogger("basis_core.api.enforcement")
 
 _POLICY_OUTCOME_TO_DECISION_OUTCOME: dict[PolicyOutcome, DecisionOutcome] = {
-    PolicyOutcome.ALLOW:          DecisionOutcome.ALLOW,
-    PolicyOutcome.DENY:           DecisionOutcome.DENY,
+    PolicyOutcome.ALLOW: DecisionOutcome.ALLOW,
+    PolicyOutcome.DENY: DecisionOutcome.DENY,
     PolicyOutcome.NOT_APPLICABLE: DecisionOutcome.NOT_APPLICABLE,
 }
 
 _DECISION_OUTCOME_TO_AUDIT_OUTCOME: dict[DecisionOutcome, AuditOutcome] = {
-    DecisionOutcome.ALLOW:          AuditOutcome.ALLOWED,
-    DecisionOutcome.DENY:           AuditOutcome.DENIED,
+    DecisionOutcome.ALLOW: AuditOutcome.ALLOWED,
+    DecisionOutcome.DENY: AuditOutcome.DENIED,
     DecisionOutcome.NOT_APPLICABLE: AuditOutcome.DENIED,  # default deny = denied in audit
 }
 
@@ -91,8 +91,8 @@ class EnforcementPoint:
         audit_writer: AuditWriter,
         policy_version: str | None = None,
     ) -> None:
-        self._engine         = engine
-        self._audit_writer   = audit_writer
+        self._engine = engine
+        self._audit_writer = audit_writer
         self._policy_version = policy_version
 
     def evaluate(
@@ -200,9 +200,8 @@ class EnforcementPoint:
                 ]
                 # short_circuited = engine stopped early because a DENY was found,
                 # meaning the DENY is the last entry and the outcome is DENY.
-                short_circuited = (
-                    decision.outcome == PolicyOutcome.DENY
-                    and len(rule_evals) < len(self._engine._policies)
+                short_circuited = decision.outcome == PolicyOutcome.DENY and len(rule_evals) < len(
+                    self._engine._policies
                 )
                 trace = DecisionTrace(
                     final_outcome=decision.outcome.value,
@@ -215,10 +214,10 @@ class EnforcementPoint:
                 event_type=AuditEventType.AUTHORIZATION_DECISION,
                 # Correlation
                 request_id=request.request_id,
-                decision_id=request.request_id,   # same unless separately assigned
+                decision_id=request.request_id,  # same unless separately assigned
                 correlation_id=correlation_id,
                 # Subject
-                subject_id=subject.id   if subject else request.subject_id,
+                subject_id=subject.id if subject else request.subject_id,
                 subject_name=subject.name if subject else request.subject_id,
                 subject_type=subject.type.value if subject else None,
                 subject_roles=list(subject.roles) if subject else list(request.subject_roles),

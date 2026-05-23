@@ -14,17 +14,15 @@ from __future__ import annotations
 
 import ast
 from pathlib import Path
-from typing import Any, Optional
-
-import pytest
+from typing import Any
 
 from basis_core.domain.resource import ResourceType
 from basis_core.domain.subject import Subject, SubjectType
 from basis_core.policy.engine import Decision, PolicyEngine, PolicyOutcome
 from basis_core.policy.rules import ActionPolicyRule, ResourceTypePolicyRule, RolePolicyRule
 
-
 # ── Shared fixtures ─────────────────────────────────────────────────────────────
+
 
 def make_subject(roles: list[str] | None = None) -> Subject:
     return Subject(
@@ -37,12 +35,12 @@ def make_subject(roles: list[str] | None = None) -> Subject:
 
 # ── RolePolicyRule ──────────────────────────────────────────────────────────────
 
-class TestRolePolicyRule:
 
+class TestRolePolicyRule:
     ROLE_TABLE: dict[str, set[str]] = {
         "write:hvac:setpoint": {"operator", "admin"},
-        "read:audit:log":      {"admin"},
-        "read:resources":      {"viewer", "operator", "admin"},
+        "read:audit:log": {"admin"},
+        "read:resources": {"viewer", "operator", "admin"},
     }
 
     def rule(self) -> RolePolicyRule:
@@ -100,111 +98,119 @@ class TestRolePolicyRule:
     def test_resource_id_is_accepted_but_not_used(self) -> None:
         """RolePolicyRule does not use resource_id — outcome is the same either way."""
         rule = self.rule()
-        with_resource    = rule.evaluate(make_subject(["operator"]), "write:hvac:setpoint",
-                                         resource_id="hvac:zone-a")
+        with_resource = rule.evaluate(
+            make_subject(["operator"]), "write:hvac:setpoint", resource_id="hvac:zone-a"
+        )
         without_resource = rule.evaluate(make_subject(["operator"]), "write:hvac:setpoint")
         assert with_resource.outcome == without_resource.outcome
 
 
 # ── ResourceTypePolicyRule ──────────────────────────────────────────────────────
 
-class TestResourceTypePolicyRule:
 
+class TestResourceTypePolicyRule:
     def rule(self) -> ResourceTypePolicyRule:
         return ResourceTypePolicyRule(permitted_types={ResourceType.HVAC})
 
     def test_allows_permitted_resource_type(self) -> None:
         result = self.rule().evaluate(
-            make_subject(["operator"]), "write:hvac:setpoint",
+            make_subject(["operator"]),
+            "write:hvac:setpoint",
             resource_id="hvac:zone-a",
         )
         assert result.outcome == PolicyOutcome.ALLOW
 
     def test_denies_non_permitted_resource_type(self) -> None:
         result = self.rule().evaluate(
-            make_subject(["operator"]), "write:hvac:setpoint",
+            make_subject(["operator"]),
+            "write:hvac:setpoint",
             resource_id="device:chiller-1",
         )
         assert result.outcome == PolicyOutcome.DENY
 
     def test_denies_sensor_resource_when_only_hvac_permitted(self) -> None:
         result = self.rule().evaluate(
-            make_subject(["admin"]), "read:sensor:telemetry",
+            make_subject(["admin"]),
+            "read:sensor:telemetry",
             resource_id="sensor:co2:lobby",
         )
         assert result.outcome == PolicyOutcome.DENY
 
     def test_not_applicable_when_no_resource_id(self) -> None:
         result = self.rule().evaluate(
-            make_subject(["operator"]), "write:hvac:setpoint",
+            make_subject(["operator"]),
+            "write:hvac:setpoint",
             resource_id=None,
         )
         assert result.outcome == PolicyOutcome.NOT_APPLICABLE
 
     def test_deny_reason_names_disallowed_type(self) -> None:
         result = self.rule().evaluate(
-            make_subject(["operator"]), "write:device:setpoint",
+            make_subject(["operator"]),
+            "write:device:setpoint",
             resource_id="device:chiller-1",
         )
         assert "device" in result.reason
         assert "hvac" in result.reason
 
     def test_multiple_permitted_types(self) -> None:
-        rule = ResourceTypePolicyRule(
-            permitted_types={ResourceType.HVAC, ResourceType.SENSOR}
+        rule = ResourceTypePolicyRule(permitted_types={ResourceType.HVAC, ResourceType.SENSOR})
+        assert (
+            rule.evaluate(
+                make_subject(), "read:sensor:telemetry", resource_id="sensor:co2:lobby"
+            ).outcome
+            == PolicyOutcome.ALLOW
         )
-        assert rule.evaluate(
-            make_subject(), "read:sensor:telemetry", resource_id="sensor:co2:lobby"
-        ).outcome == PolicyOutcome.ALLOW
-        assert rule.evaluate(
-            make_subject(), "read:hvac:state", resource_id="hvac:zone-a"
-        ).outcome == PolicyOutcome.ALLOW
-        assert rule.evaluate(
-            make_subject(), "read:device:state", resource_id="device:chiller-1"
-        ).outcome == PolicyOutcome.DENY
+        assert (
+            rule.evaluate(make_subject(), "read:hvac:state", resource_id="hvac:zone-a").outcome
+            == PolicyOutcome.ALLOW
+        )
+        assert (
+            rule.evaluate(
+                make_subject(), "read:device:state", resource_id="device:chiller-1"
+            ).outcome
+            == PolicyOutcome.DENY
+        )
 
     def test_custom_rule_name(self) -> None:
         rule = ResourceTypePolicyRule(
             permitted_types={ResourceType.HVAC},
             rule_name="HVACOnlyRule",
         )
-        result = rule.evaluate(make_subject(), "write:hvac:setpoint",
-                               resource_id="hvac:zone-a")
+        result = rule.evaluate(make_subject(), "write:hvac:setpoint", resource_id="hvac:zone-a")
         assert result.evaluated_by == "HVACOnlyRule"
 
 
 # ── ActionPolicyRule ────────────────────────────────────────────────────────────
 
-class TestActionPolicyRule:
 
+class TestActionPolicyRule:
     def allowlist_rule(self) -> ActionPolicyRule:
-        return ActionPolicyRule({
-            "read:sensor:telemetry": PolicyOutcome.ALLOW,
-            "read:hvac:state":       PolicyOutcome.ALLOW,
-        })
+        return ActionPolicyRule(
+            {
+                "read:sensor:telemetry": PolicyOutcome.ALLOW,
+                "read:hvac:state": PolicyOutcome.ALLOW,
+            }
+        )
 
     def denylist_rule(self) -> ActionPolicyRule:
-        return ActionPolicyRule({
-            "write:policy":   PolicyOutcome.DENY,
-            "read:audit:log": PolicyOutcome.DENY,
-        })
+        return ActionPolicyRule(
+            {
+                "write:policy": PolicyOutcome.DENY,
+                "read:audit:log": PolicyOutcome.DENY,
+            }
+        )
 
     def test_allows_explicitly_allowed_action(self) -> None:
-        result = self.allowlist_rule().evaluate(
-            make_subject(["viewer"]), "read:sensor:telemetry"
-        )
+        result = self.allowlist_rule().evaluate(make_subject(["viewer"]), "read:sensor:telemetry")
         assert result.outcome == PolicyOutcome.ALLOW
 
     def test_denies_explicitly_denied_action(self) -> None:
-        result = self.denylist_rule().evaluate(
-            make_subject(["operator"]), "write:policy"
-        )
+        result = self.denylist_rule().evaluate(make_subject(["operator"]), "write:policy")
         assert result.outcome == PolicyOutcome.DENY
 
     def test_not_applicable_for_unregistered_action(self) -> None:
-        result = self.allowlist_rule().evaluate(
-            make_subject(["admin"]), "write:hvac:setpoint"
-        )
+        result = self.allowlist_rule().evaluate(make_subject(["admin"]), "write:hvac:setpoint")
         assert result.outcome == PolicyOutcome.NOT_APPLICABLE
 
     def test_allow_reason_is_present(self) -> None:
@@ -230,26 +236,30 @@ class TestActionPolicyRule:
 
 # ── PolicyEngine deny-overrides semantics ──────────────────────────────────────
 
-class TestPolicyEngineDenyOverrides:
 
+class TestPolicyEngineDenyOverrides:
     def test_allow_when_matching_allow_rule(self) -> None:
-        engine = PolicyEngine(policies=[
-            RolePolicyRule({"write:hvac:setpoint": {"operator"}}),
-        ])
+        engine = PolicyEngine(
+            policies=[
+                RolePolicyRule({"write:hvac:setpoint": {"operator"}}),
+            ]
+        )
         result = engine.evaluate(make_subject(["operator"]), "write:hvac:setpoint")
         assert result.outcome == PolicyOutcome.ALLOW
 
     def test_deny_when_matching_deny_rule(self) -> None:
-        engine = PolicyEngine(policies=[
-            RolePolicyRule({"write:hvac:setpoint": {"operator"}}),
-        ])
+        engine = PolicyEngine(
+            policies=[
+                RolePolicyRule({"write:hvac:setpoint": {"operator"}}),
+            ]
+        )
         result = engine.evaluate(make_subject(["viewer"]), "write:hvac:setpoint")
         assert result.outcome == PolicyOutcome.DENY
 
     def test_deny_overrides_allow(self) -> None:
         """A DENY from any rule wins, regardless of rule order."""
         allow_rule = ActionPolicyRule({"write:hvac:setpoint": PolicyOutcome.ALLOW})
-        deny_rule  = RolePolicyRule({"write:hvac:setpoint": {"operator"}})
+        deny_rule = RolePolicyRule({"write:hvac:setpoint": {"operator"}})
         # allow_rule first: ALLOW. deny_rule second: DENY for viewer. DENY must win.
         engine = PolicyEngine(policies=[allow_rule, deny_rule])
         result = engine.evaluate(make_subject(["viewer"]), "write:hvac:setpoint")
@@ -257,16 +267,18 @@ class TestPolicyEngineDenyOverrides:
 
     def test_deny_overrides_allow_reversed_order(self) -> None:
         """Verify deny-overrides holds when DENY rule appears before ALLOW rule."""
-        deny_rule  = RolePolicyRule({"write:hvac:setpoint": {"operator"}})
+        deny_rule = RolePolicyRule({"write:hvac:setpoint": {"operator"}})
         allow_rule = ActionPolicyRule({"write:hvac:setpoint": PolicyOutcome.ALLOW})
         engine = PolicyEngine(policies=[deny_rule, allow_rule])
         result = engine.evaluate(make_subject(["viewer"]), "write:hvac:setpoint")
         assert result.outcome == PolicyOutcome.DENY
 
     def test_default_deny_when_no_rule_applies(self) -> None:
-        engine = PolicyEngine(policies=[
-            RolePolicyRule({"write:hvac:setpoint": {"operator"}}),
-        ])
+        engine = PolicyEngine(
+            policies=[
+                RolePolicyRule({"write:hvac:setpoint": {"operator"}}),
+            ]
+        )
         result = engine.evaluate(make_subject(["admin"]), "completely:unknown:action")
         assert result.outcome == PolicyOutcome.NOT_APPLICABLE
         assert result.allowed is False
@@ -289,25 +301,24 @@ class TestPolicyEngineDenyOverrides:
 
     def test_resource_type_deny_overrides_role_allow(self) -> None:
         """ResourceTypePolicyRule DENY overrides RolePolicyRule ALLOW."""
-        engine = PolicyEngine(policies=[
-            ResourceTypePolicyRule(permitted_types={ResourceType.HVAC}),
-            RolePolicyRule({"write:device:setpoint": {"operator", "admin"}}),
-        ])
+        engine = PolicyEngine(
+            policies=[
+                ResourceTypePolicyRule(permitted_types={ResourceType.HVAC}),
+                RolePolicyRule({"write:device:setpoint": {"operator", "admin"}}),
+            ]
+        )
         # Operator has the role, but the resource is a 'device' (not HVAC) → DENY
         result = engine.evaluate(
-            make_subject(["operator"]), "write:device:setpoint",
+            make_subject(["operator"]),
+            "write:device:setpoint",
             resource_id="device:chiller-1",
         )
         assert result.outcome == PolicyOutcome.DENY
 
     def test_both_allow_returns_first_allow(self) -> None:
         """When multiple rules ALLOW, the first ALLOW's evaluated_by is used."""
-        rule1 = ActionPolicyRule(
-            {"read:resources": PolicyOutcome.ALLOW}, rule_name="AllowRule1"
-        )
-        rule2 = ActionPolicyRule(
-            {"read:resources": PolicyOutcome.ALLOW}, rule_name="AllowRule2"
-        )
+        rule1 = ActionPolicyRule({"read:resources": PolicyOutcome.ALLOW}, rule_name="AllowRule1")
+        rule2 = ActionPolicyRule({"read:resources": PolicyOutcome.ALLOW}, rule_name="AllowRule2")
         engine = PolicyEngine(policies=[rule1, rule2])
         result = engine.evaluate(make_subject(), "read:resources")
         assert result.outcome == PolicyOutcome.ALLOW
@@ -315,11 +326,13 @@ class TestPolicyEngineDenyOverrides:
 
     def test_engine_is_stateless(self) -> None:
         """Successive calls return independent decisions; engine holds no per-call state."""
-        engine = PolicyEngine(policies=[
-            RolePolicyRule({"write:hvac:setpoint": {"operator"}}),
-        ])
+        engine = PolicyEngine(
+            policies=[
+                RolePolicyRule({"write:hvac:setpoint": {"operator"}}),
+            ]
+        )
         result_a = engine.evaluate(make_subject(["operator"]), "write:hvac:setpoint")
-        result_b = engine.evaluate(make_subject(["viewer"]),   "write:hvac:setpoint")
+        result_b = engine.evaluate(make_subject(["viewer"]), "write:hvac:setpoint")
         result_c = engine.evaluate(make_subject(["operator"]), "write:hvac:setpoint")
         assert result_a.outcome == PolicyOutcome.ALLOW
         assert result_b.outcome == PolicyOutcome.DENY
@@ -330,15 +343,15 @@ class TestPolicyEngineDenyOverrides:
 
         class ContextCheckingRule:
             def __init__(self) -> None:
-                self.received_context: Optional[dict[str, Any]] = None
+                self.received_context: dict[str, Any] | None = None
 
             def evaluate(
                 self,
                 subject: Subject,
                 action: str,
-                resource_id: Optional[str] = None,
+                resource_id: str | None = None,
                 identity_context: object = None,
-                context: Optional[dict[str, Any]] = None,
+                context: dict[str, Any] | None = None,
             ) -> Decision:
                 self.received_context = context
                 return Decision(
@@ -348,13 +361,14 @@ class TestPolicyEngineDenyOverrides:
                 )
 
         checker = ContextCheckingRule()
-        engine  = PolicyEngine(policies=[checker])
-        ctx     = {"site": "bldg-a", "maintenance_window": "true"}
+        engine = PolicyEngine(policies=[checker])
+        ctx = {"site": "bldg-a", "maintenance_window": "true"}
         engine.evaluate(make_subject(), "read:resources", context=ctx)
         assert checker.received_context == ctx
 
 
 # ── Import boundary: policy must not import api, audit, or adapters ────────────
+
 
 class TestPolicyImportBoundaries:
     """
@@ -362,13 +376,11 @@ class TestPolicyImportBoundaries:
     or adapters. Uses ast.parse() — no module execution required.
     """
 
-    POLICY_DIR = (
-        Path(__file__).parent.parent / "src" / "basis_core" / "policy"
-    )
+    POLICY_DIR = Path(__file__).parent.parent / "src" / "basis_core" / "policy"
 
     def _collect_imports(self, path: Path) -> list[str]:
         source = path.read_text(encoding="utf-8")
-        tree   = ast.parse(source, filename=str(path))
+        tree = ast.parse(source, filename=str(path))
         imports: list[str] = []
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
