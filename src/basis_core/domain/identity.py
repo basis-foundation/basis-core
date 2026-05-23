@@ -13,6 +13,14 @@ policy engine. IdentityContext is the wire-level representation used to carry
 verified claims across trust boundaries. They share the same underlying data;
 they serve different roles in the architecture.
 
+Validation rules
+────────────────
+- ``token`` must be non-empty. An empty token string cannot represent a
+  verified credential.
+- ``issued_at`` must be timezone-aware. Naive datetimes are rejected to
+  prevent ambiguity when comparing across system clocks.
+- ``expires_at``, if provided, must be timezone-aware for the same reason.
+
 Design notes
 ────────────
 - IdentityContext is immutable once created.
@@ -28,10 +36,10 @@ Design notes
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from basis_core.domain.subject import Subject
 
@@ -44,9 +52,12 @@ class IdentityContext(BaseModel):
     ──────
     subject         The verified subject. Immutable once constructed.
     token           Original integrity-protected credential (JWT, signed token).
-                    Downstream components verify this before trusting the fields.
+                    Must be non-empty. Downstream components verify this before
+                    trusting the deserialized fields.
     issued_at       Time the credential was issued (from the token).
-    expires_at      Time the credential expires. None if no expiry is set.
+                    Must be timezone-aware.
+    expires_at      Time the credential expires. Must be timezone-aware if
+                    provided. None if no expiry is set.
     propagated_from Identity of the component that forwarded this context, if
                     the context was relayed through an intermediary.
     """
@@ -54,14 +65,39 @@ class IdentityContext(BaseModel):
     subject:          Subject
     token:            str
     issued_at:        datetime
-    expires_at:       Optional[datetime]  = None
-    propagated_from:  Optional[str]       = None
+    expires_at:       Optional[datetime] = None
+    propagated_from:  Optional[str]      = None
 
     model_config = {"frozen": True}
 
+    @field_validator("token", mode="after")
+    @classmethod
+    def token_must_not_be_empty(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError(
+                "token must not be empty. An IdentityContext requires a "
+                "non-empty integrity-protected credential."
+            )
+        return v
+
+    @field_validator("issued_at", "expires_at", mode="after")
+    @classmethod
+    def must_be_timezone_aware(cls, v: Optional[datetime]) -> Optional[datetime]:
+        if v is not None and v.tzinfo is None:
+            raise ValueError(
+                "datetime fields on IdentityContext must be timezone-aware. "
+                "Use datetime.now(timezone.utc) or attach tzinfo explicitly."
+            )
+        return v
+
     def is_expired(self, at: Optional[datetime] = None) -> bool:
-        """Return True if the context has expired at the given time (default: now)."""
+        """
+        Return True if the context has expired at the given time.
+
+        Defaults to the current UTC time. The ``at`` argument, if provided,
+        must be timezone-aware.
+        """
         if self.expires_at is None:
             return False
-        check_time = at or datetime.utcnow()
+        check_time = at if at is not None else datetime.now(timezone.utc)
         return check_time >= self.expires_at

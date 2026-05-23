@@ -24,19 +24,45 @@ The distinction between DENY and NOT_APPLICABLE is useful for diagnosis:
 DENY means a policy evaluated the request and refused it; NOT_APPLICABLE
 means the request fell outside the scope of any registered policy. Both
 should be audited, but they indicate different operational conditions.
+
+Validation rules
+────────────────
+- ``subject_id`` must be non-empty.
+- ``action`` must be non-empty and match the naming convention:
+  ``{verb}:{domain}[:{object}]`` — colon-separated, lowercase segments,
+  at least two segments.
+- ``subject_roles`` are normalized on construction: whitespace stripped,
+  empty strings discarded, duplicates removed, result sorted.
+- ``timestamp`` must be timezone-aware. The default factory produces UTC.
+  Explicitly constructed timestamps must include tzinfo.
+- ``request_id`` and ``evaluated_by`` in DecisionResponse must be non-empty.
+- ``reason`` in DecisionResponse must be non-empty.
 """
 
 from __future__ import annotations
 
+import re
 import uuid
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+# Action names follow the pattern: two or more colon-separated lowercase segments.
+# Each segment: starts with a letter, followed by letters/digits/hyphens/underscores.
+_ACTION_RE = re.compile(r"^[a-z][a-z0-9_-]*(:[a-z][a-z0-9_-]*)+$")
 
 
 class DecisionOutcome(str, Enum):
+    """
+    Explicit set of possible authorization decision outcomes.
+
+    Using an enum (rather than a plain string) makes exhaustive handling
+    enforceable by type checkers and prevents callers from accidentally
+    comparing against a misspelled literal.
+    """
+
     ALLOW          = "allow"
     DENY           = "deny"
     NOT_APPLICABLE = "not_applicable"
@@ -49,14 +75,18 @@ class DecisionRequest(BaseModel):
     Fields
     ──────
     request_id    Unique identifier for correlation with the audit record.
-    subject_id    Stable identifier of the requesting subject.
+                  Auto-generated if not provided. Must be non-empty if set.
+    subject_id    Stable identifier of the requesting subject. Non-empty.
     subject_roles Role names held by the subject at request time.
+                  Normalized: sorted, deduplicated, whitespace-stripped.
     subject_attrs Additional subject attributes for ABAC conditions.
     resource_id   Normalized resource identifier (e.g., "hvac:zone-a").
-    action        Action name (e.g., "write:hvac:setpoint").
+                  Optional. None when the request is not resource-specific.
+    action        Action name, e.g. "write:hvac:setpoint". Non-empty. Must
+                  follow the "{verb}:{domain}[:{object}]" convention.
     context       Arbitrary key/value context for policy conditions.
                   Examples: ``{"site": "bldg-a", "maintenance_window": "true"}``
-    timestamp     Time the request was constructed.
+    timestamp     Time the request was constructed. Must be timezone-aware.
     """
 
     request_id:    str            = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -70,6 +100,44 @@ class DecisionRequest(BaseModel):
         default_factory=lambda: datetime.now(timezone.utc)
     )
 
+    @field_validator("request_id", "subject_id", mode="after")
+    @classmethod
+    def ids_must_not_be_empty(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("must not be empty or whitespace-only")
+        return v
+
+    @field_validator("action", mode="after")
+    @classmethod
+    def validate_action_format(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("action must not be empty or whitespace-only")
+        if not _ACTION_RE.match(v):
+            raise ValueError(
+                f"action {v!r} does not match the required format "
+                "'{verb}:{domain}[:{object}]' (e.g. 'write:hvac:setpoint', "
+                "'read:audit:log'). Segments must be lowercase and separated by colons."
+            )
+        return v
+
+    @field_validator("subject_roles", mode="before")
+    @classmethod
+    def normalize_roles(cls, v: object) -> list[str]:
+        """Strip whitespace, discard empty strings, deduplicate, sort."""
+        if not isinstance(v, list):
+            return v  # type: ignore[return-value]
+        return sorted({r.strip() for r in v if isinstance(r, str) and r.strip()})
+
+    @field_validator("timestamp", mode="after")
+    @classmethod
+    def timestamp_must_be_tz_aware(cls, v: datetime) -> datetime:
+        if v.tzinfo is None:
+            raise ValueError(
+                "DecisionRequest.timestamp must be timezone-aware. "
+                "Use datetime.now(timezone.utc) or attach tzinfo explicitly."
+            )
+        return v
+
 
 class DecisionResponse(BaseModel):
     """
@@ -77,13 +145,17 @@ class DecisionResponse(BaseModel):
 
     Fields
     ──────
-    request_id    Echoes the request_id from the DecisionRequest.
-    outcome       ALLOW, DENY, or NOT_APPLICABLE.
-    reason        Human-readable explanation of the outcome.
-    evaluated_by  Name of the policy that produced this decision.
+    request_id     Echoes the request_id from the DecisionRequest.
+                   Non-empty; used for audit correlation.
+    outcome        Explicit DecisionOutcome value. Never a bare string.
+    reason         Human-readable explanation of the outcome. Non-empty.
+                   ALLOW: brief confirmation of what permitted the action.
+                   DENY:  what was required vs. what the subject held.
+    evaluated_by   Name of the policy that produced this decision. Non-empty.
+                   Appears in audit records.
     policy_version Version identifier of the policy set in effect at
-                  evaluation time. Used for audit correlation.
-    timestamp     Time the decision was produced.
+                   evaluation time. Used for audit correlation.
+    timestamp      Time the decision was produced. Timezone-aware.
     """
 
     request_id:     str
@@ -94,6 +166,23 @@ class DecisionResponse(BaseModel):
     timestamp:      datetime       = Field(
         default_factory=lambda: datetime.now(timezone.utc)
     )
+
+    @field_validator("request_id", "reason", "evaluated_by", mode="after")
+    @classmethod
+    def must_not_be_empty(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("must not be empty or whitespace-only")
+        return v
+
+    @field_validator("timestamp", mode="after")
+    @classmethod
+    def timestamp_must_be_tz_aware(cls, v: datetime) -> datetime:
+        if v.tzinfo is None:
+            raise ValueError(
+                "DecisionResponse.timestamp must be timezone-aware. "
+                "Use datetime.now(timezone.utc) or attach tzinfo explicitly."
+            )
+        return v
 
     @property
     def allowed(self) -> bool:

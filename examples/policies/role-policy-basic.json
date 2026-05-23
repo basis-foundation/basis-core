@@ -1,0 +1,59 @@
+{
+  "_comment": "Example policy definition — role_policy type. Maps action names to sets of permitted roles. This is the serialized form of the RolePolicy Python implementation in basis_core.policy.rules. The version string appears in DecisionResponse.policy_version and AuditEvent.policy_version for correlation.",
+  "policy_id": "basis-core-default-role-policy",
+  "policy_type": "role_policy",
+  "version": "v1.0.0",
+  "description": "Default role-based access policy for a single-zone BASIS deployment. Viewer may read; operator may read and write control actions; admin may do everything including audit log access.",
+  "created_at": "2026-05-22T00:00:00Z",
+  "created_by": "system",
+  "rules": [
+    {
+      "action": "read:sensor:telemetry",
+      "permitted_roles": ["viewer", "operator", "admin"]
+    },
+    {
+      "action": "subscribe:telemetry",
+      "permitted_roles": ["viewer", "operator", "admin"]
+    },
+    {
+      "action": "read:resources",
+      "permitted_roles": ["viewer", "operator", "admin"]
+    },
+    {
+      "action": "read:hvac:state",
+      "permitted_roles": ["viewer", "operator", "admin"]
+    },
+    {
+      "action": "write:hvac:setpoint",
+      "permitted_roles": ["operator", "admin"]
+    },
+    {
+      "action": "write:hvac:mode",
+      "permitted_roles": ["operator", "admin"]
+    },
+    {
+      "action": "read:device:state",
+      "permitted_roles": ["viewer", "operator", "admin"]
+    },
+    {
+      "action": "write:device:setpoint",
+      "permitted_roles": ["operator", "admin"]
+    },
+    {
+      "action": "execute:device:command",
+      "permitted_roles": ["operator", "admin"]
+    },
+    {
+      "action": "read:audit:log",
+      "permitted_roles": ["admin"]
+    },
+    {
+      "action": "read:policy",
+      "permitted_roles": ["admin"]
+    },
+    {
+      "action": "write:policy",
+      "permitted_roles": ["admin"]
+    }
+  ]
+}

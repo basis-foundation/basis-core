@@ -12,6 +12,15 @@ autonomous software agents. Only some of these are wired to authentication
 paths in any given deployment; the others exist so the model can accommodate
 them without a breaking change when they are introduced.
 
+Validation rules
+────────────────
+- ``id`` must be a non-empty, non-whitespace string.
+- ``name`` must be a non-empty, non-whitespace string.
+- ``roles`` are normalized: whitespace stripped, empty strings discarded,
+  duplicates removed, result sorted. Normalization ensures that role sets
+  compare and hash consistently regardless of the order or spacing in the
+  source credential.
+
 Design notes
 ────────────
 - Subject is frozen (immutable). It is constructed once during credential
@@ -28,7 +37,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 
 class SubjectType(str, Enum):
@@ -48,20 +57,38 @@ class Subject(BaseModel):
     Fields
     ──────
     id      Stable unique identifier. For HUMAN subjects: JWT ``sub`` claim.
+            Must be non-empty. Immutable once set.
     name    Human-readable label. For HUMAN subjects: ``preferred_username``.
+            Must be non-empty. Immutable once set.
     type    SubjectType value. Determines which authentication path applied.
-    roles   Granted role names. For HUMAN subjects: from ``realm_access.roles``.
+    roles   Granted role names. Normalized: sorted, deduplicated, stripped.
+            For HUMAN subjects: from ``realm_access.roles``.
     attrs   Arbitrary additional claims useful for ABAC policy conditions.
             Examples: ``{"site": "building-a", "clearance": "l2"}``
     """
 
     id:    str
     name:  str
-    type:  SubjectType = SubjectType.HUMAN
-    roles: list[str]   = []
+    type:  SubjectType    = SubjectType.HUMAN
+    roles: list[str]      = []
     attrs: dict[str, str] = {}
 
     model_config = {"frozen": True}
+
+    @field_validator("id", "name", mode="after")
+    @classmethod
+    def must_not_be_empty(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("must not be empty or whitespace-only")
+        return v
+
+    @field_validator("roles", mode="before")
+    @classmethod
+    def normalize_roles(cls, v: object) -> list[str]:
+        """Strip whitespace, discard empty strings, deduplicate, sort."""
+        if not isinstance(v, list):
+            return v  # type: ignore[return-value]  # let Pydantic handle type errors
+        return sorted({r.strip() for r in v if isinstance(r, str) and r.strip()})
 
     def has_role(self, *roles: str) -> bool:
         """Return True if the subject holds at least one of the given roles."""
@@ -87,17 +114,34 @@ def subject_from_jwt(payload: dict) -> Subject:
           "email": "alice@example.com"   # optional
         }
 
+    Raises ValueError if the payload does not contain a usable ``sub`` claim
+    or ``preferred_username``. Callers should validate the token before calling
+    this function and treat a missing ``sub`` as an authentication failure.
+
     Other SubjectType values are constructed directly (not via this function)
     because their source representations differ from JWT claims.
     """
+    subject_id   = payload.get("sub", "").strip()
+    subject_name = payload.get("preferred_username", "").strip()
+
+    if not subject_id:
+        raise ValueError(
+            "JWT payload is missing a non-empty 'sub' claim. "
+            "Token validation must occur before Subject construction."
+        )
+    if not subject_name:
+        raise ValueError(
+            "JWT payload is missing a non-empty 'preferred_username' claim."
+        )
+
     roles: list[str] = payload.get("realm_access", {}).get("roles", [])
     attrs: dict[str, str] = {}
     if email := payload.get("email"):
-        attrs["email"] = email
+        attrs["email"] = str(email)
 
     return Subject(
-        id=payload.get("sub", "unknown"),
-        name=payload.get("preferred_username", "unknown"),
+        id=subject_id,
+        name=subject_name,
         type=SubjectType.HUMAN,
         roles=roles,
         attrs=attrs,
