@@ -39,38 +39,37 @@ outlive the code that generates them. Once an action name is in production use:
 
 from __future__ import annotations
 
-
 # ── Telemetry ──────────────────────────────────────────────────────────────────
 
-READ_SENSOR_TELEMETRY   = "read:sensor:telemetry"
-SUBSCRIBE_TELEMETRY     = "subscribe:telemetry"
-DISCONNECT_TELEMETRY    = "disconnect:telemetry"   # Audit-record only; not enforced
+READ_SENSOR_TELEMETRY = "read:sensor:telemetry"
+SUBSCRIBE_TELEMETRY = "subscribe:telemetry"
+DISCONNECT_TELEMETRY = "disconnect:telemetry"  # Audit-record only; not enforced
 
 # ── HVAC control ──────────────────────────────────────────────────────────────
 
-READ_HVAC_STATE         = "read:hvac:state"
-WRITE_HVAC_SETPOINT     = "write:hvac:setpoint"
-WRITE_HVAC_MODE         = "write:hvac:mode"
+READ_HVAC_STATE = "read:hvac:state"
+WRITE_HVAC_SETPOINT = "write:hvac:setpoint"
+WRITE_HVAC_MODE = "write:hvac:mode"
 
 # ── Generic device commands ───────────────────────────────────────────────────
 
-READ_DEVICE_STATE       = "read:device:state"
-WRITE_DEVICE_SETPOINT   = "write:device:setpoint"
-EXECUTE_DEVICE_COMMAND  = "execute:device:command"
+READ_DEVICE_STATE = "read:device:state"
+WRITE_DEVICE_SETPOINT = "write:device:setpoint"
+EXECUTE_DEVICE_COMMAND = "execute:device:command"
 
 # ── Zone operations ───────────────────────────────────────────────────────────
 
-READ_ZONE_STATE         = "read:zone:state"
+READ_ZONE_STATE = "read:zone:state"
 
 # ── Resource registry ─────────────────────────────────────────────────────────
 
-READ_RESOURCES          = "read:resources"
+READ_RESOURCES = "read:resources"
 
 # ── Audit log ─────────────────────────────────────────────────────────────────
 
-READ_AUDIT_LOG          = "read:audit:log"
+READ_AUDIT_LOG = "read:audit:log"
 
 # ── Identity and policy management ────────────────────────────────────────────
 
-READ_POLICY             = "read:policy"
-WRITE_POLICY            = "write:policy"
+READ_POLICY = "read:policy"
+WRITE_POLICY = "write:policy"

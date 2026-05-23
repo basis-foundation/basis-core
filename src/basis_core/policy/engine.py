@@ -62,7 +62,7 @@ from __future__ import annotations
 
 import logging
 from enum import Enum
-from typing import Any, Optional, Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from basis_core.domain.identity import IdentityContext
 from basis_core.domain.subject import Subject
@@ -81,8 +81,8 @@ class PolicyOutcome(str, Enum):
                    NOT_APPLICABLE, the engine applies default deny.
     """
 
-    ALLOW          = "allow"
-    DENY           = "deny"
+    ALLOW = "allow"
+    DENY = "deny"
     NOT_APPLICABLE = "not_applicable"
 
 
@@ -117,9 +117,9 @@ class Decision:
         evaluated_by: str,
         evaluated_rules: list[tuple[str, str, str]] | None = None,
     ) -> None:
-        self.outcome         = outcome
-        self.reason          = reason
-        self.evaluated_by    = evaluated_by
+        self.outcome = outcome
+        self.reason = reason
+        self.evaluated_by = evaluated_by
         self.evaluated_rules = evaluated_rules or []
 
     @property
@@ -158,11 +158,10 @@ class PolicyRule(Protocol):
         self,
         subject: Subject,
         action: str,
-        resource_id: Optional[str] = None,
-        identity_context: Optional[IdentityContext] = None,
-        context: Optional[dict[str, Any]] = None,
-    ) -> Decision:
-        ...
+        resource_id: str | None = None,
+        identity_context: IdentityContext | None = None,
+        context: dict[str, Any] | None = None,
+    ) -> Decision: ...
 
 
 class PolicyEngine:
@@ -201,9 +200,9 @@ class PolicyEngine:
         self,
         subject: Subject,
         action: str,
-        resource_id: Optional[str] = None,
-        identity_context: Optional[IdentityContext] = None,
-        context: Optional[dict[str, Any]] = None,
+        resource_id: str | None = None,
+        identity_context: IdentityContext | None = None,
+        context: dict[str, Any] | None = None,
     ) -> Decision:
         """
         Evaluate a subject's request to perform an action on a resource.
@@ -216,7 +215,7 @@ class PolicyEngine:
         # (rule_name, outcome_value, reason) tuple using plain strings so the
         # audit package does not need to import PolicyOutcome.
         evaluations: list[tuple[str, str, str]] = []
-        first_allow: Optional[Decision] = None
+        first_allow: Decision | None = None
 
         for rule in self._policies:
             try:
@@ -231,7 +230,9 @@ class PolicyEngine:
                 log.exception(
                     "PolicyEngine: rule %s raised during evaluation "
                     "(action=%r, subject=%s) — treating as DENY",
-                    type(rule).__name__, action, str(subject),
+                    type(rule).__name__,
+                    action,
+                    str(subject),
                 )
                 err_entry = (type(rule).__name__, PolicyOutcome.DENY.value, str(exc))
                 evaluations.append(err_entry)
@@ -242,14 +243,15 @@ class PolicyEngine:
                     evaluated_rules=evaluations,
                 )
 
-            evaluations.append(
-                (decision.evaluated_by, decision.outcome.value, decision.reason)
-            )
+            evaluations.append((decision.evaluated_by, decision.outcome.value, decision.reason))
 
             if decision.outcome == PolicyOutcome.DENY:
                 log.debug(
                     "rule=%-28s  subject=%-16s  action=%-32s  resource=%-16s  DENY",
-                    decision.evaluated_by, str(subject), action, resource_id or "—",
+                    decision.evaluated_by,
+                    str(subject),
+                    action,
+                    resource_id or "—",
                 )
                 # Deny overrides — stop immediately; attach full trace so far.
                 return Decision(
@@ -265,7 +267,10 @@ class PolicyEngine:
         if first_allow is not None:
             log.debug(
                 "rule=%-28s  subject=%-16s  action=%-32s  resource=%-16s  ALLOW",
-                first_allow.evaluated_by, str(subject), action, resource_id or "—",
+                first_allow.evaluated_by,
+                str(subject),
+                action,
+                resource_id or "—",
             )
             return Decision(
                 outcome=PolicyOutcome.ALLOW,
@@ -277,7 +282,8 @@ class PolicyEngine:
         # No rule handled this request — default deny.
         log.warning(
             "PolicyEngine: no rule covered action=%r subject=%s — NOT_APPLICABLE (default deny)",
-            action, str(subject),
+            action,
+            str(subject),
         )
         return Decision(
             outcome=PolicyOutcome.NOT_APPLICABLE,

@@ -45,7 +45,6 @@ import re
 import uuid
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -63,8 +62,8 @@ class DecisionOutcome(str, Enum):
     comparing against a misspelled literal.
     """
 
-    ALLOW          = "allow"
-    DENY           = "deny"
+    ALLOW = "allow"
+    DENY = "deny"
     NOT_APPLICABLE = "not_applicable"
 
 
@@ -89,16 +88,14 @@ class DecisionRequest(BaseModel):
     timestamp     Time the request was constructed. Must be timezone-aware.
     """
 
-    request_id:    str            = Field(default_factory=lambda: str(uuid.uuid4()))
-    subject_id:    str
-    subject_roles: list[str]      = []
+    request_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    subject_id: str
+    subject_roles: list[str] = []
     subject_attrs: dict[str, str] = {}
-    resource_id:   Optional[str]  = None
-    action:        str
-    context:       dict[str, str] = {}
-    timestamp:     datetime       = Field(
-        default_factory=lambda: datetime.now(timezone.utc)
-    )
+    resource_id: str | None = None
+    action: str
+    context: dict[str, str] = {}
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     @field_validator("request_id", "subject_id", mode="after")
     @classmethod
@@ -158,14 +155,12 @@ class DecisionResponse(BaseModel):
     timestamp      Time the decision was produced. Timezone-aware.
     """
 
-    request_id:     str
-    outcome:        DecisionOutcome
-    reason:         str
-    evaluated_by:   str
-    policy_version: Optional[str]  = None
-    timestamp:      datetime       = Field(
-        default_factory=lambda: datetime.now(timezone.utc)
-    )
+    request_id: str
+    outcome: DecisionOutcome
+    reason: str
+    evaluated_by: str
+    policy_version: str | None = None
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     @field_validator("request_id", "reason", "evaluated_by", mode="after")
     @classmethod

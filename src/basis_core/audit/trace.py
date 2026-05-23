@@ -53,8 +53,8 @@ class RuleEvaluation(BaseModel):
     """
 
     rule_name: str
-    outcome:   str   # "allow" | "deny" | "not_applicable"
-    reason:    str
+    outcome: str  # "allow" | "deny" | "not_applicable"
+    reason: str
 
     model_config = {"frozen": True}
 
@@ -74,16 +74,13 @@ class DecisionTrace(BaseModel):
                      Remaining rules were not evaluated.
     """
 
-    final_outcome:   str                   # "allow" | "deny" | "not_applicable"
-    evaluated_rules: list[RuleEvaluation]  = []
-    short_circuited: bool                  = False
+    final_outcome: str  # "allow" | "deny" | "not_applicable"
+    evaluated_rules: list[RuleEvaluation] = []
+    short_circuited: bool = False
 
     model_config = {"frozen": True}
 
     @property
     def matched_rule_names(self) -> list[str]:
         """Names of rules that returned allow or deny (not not_applicable)."""
-        return [
-            r.rule_name for r in self.evaluated_rules
-            if r.outcome != "not_applicable"
-        ]
+        return [r.rule_name for r in self.evaluated_rules if r.outcome != "not_applicable"]

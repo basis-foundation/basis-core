@@ -35,7 +35,6 @@ Design notes
 from __future__ import annotations
 
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel, field_validator
 
@@ -43,11 +42,11 @@ from pydantic import BaseModel, field_validator
 class SubjectType(str, Enum):
     """Classification of who or what is performing an action."""
 
-    HUMAN   = "human"    # Authenticated human operator via OIDC/JWT
-    DEVICE  = "device"   # Physical OT device with its own identity credential
+    HUMAN = "human"  # Authenticated human operator via OIDC/JWT
+    DEVICE = "device"  # Physical OT device with its own identity credential
     SERVICE = "service"  # Internal service or adapter process
     GATEWAY = "gateway"  # Protocol bridge (BACnet/IP, Modbus TCP, OPC-UA, …)
-    AGENT   = "agent"    # Autonomous software agent acting on behalf of a subject
+    AGENT = "agent"  # Autonomous software agent acting on behalf of a subject
 
 
 class Subject(BaseModel):
@@ -67,10 +66,10 @@ class Subject(BaseModel):
             Examples: ``{"site": "building-a", "clearance": "l2"}``
     """
 
-    id:    str
-    name:  str
-    type:  SubjectType    = SubjectType.HUMAN
-    roles: list[str]      = []
+    id: str
+    name: str
+    type: SubjectType = SubjectType.HUMAN
+    roles: list[str] = []
     attrs: dict[str, str] = {}
 
     model_config = {"frozen": True}
@@ -98,7 +97,7 @@ class Subject(BaseModel):
         return f"{self.type.value}:{self.name}"
 
 
-def subject_from_jwt(payload: dict) -> Subject:
+def subject_from_jwt(payload: dict[str, object]) -> Subject:
     """
     Construct a Subject from a decoded OIDC/JWT token payload.
 
@@ -121,8 +120,8 @@ def subject_from_jwt(payload: dict) -> Subject:
     Other SubjectType values are constructed directly (not via this function)
     because their source representations differ from JWT claims.
     """
-    subject_id   = payload.get("sub", "").strip()
-    subject_name = payload.get("preferred_username", "").strip()
+    subject_id = str(payload.get("sub") or "").strip()
+    subject_name = str(payload.get("preferred_username") or "").strip()
 
     if not subject_id:
         raise ValueError(
@@ -130,11 +129,15 @@ def subject_from_jwt(payload: dict) -> Subject:
             "Token validation must occur before Subject construction."
         )
     if not subject_name:
-        raise ValueError(
-            "JWT payload is missing a non-empty 'preferred_username' claim."
-        )
+        raise ValueError("JWT payload is missing a non-empty 'preferred_username' claim.")
 
-    roles: list[str] = payload.get("realm_access", {}).get("roles", [])
+    roles: list[str] = []
+    realm_access = payload.get("realm_access")
+    if isinstance(realm_access, dict):
+        raw_roles = realm_access.get("roles", [])
+        if isinstance(raw_roles, list):
+            roles = [r for r in raw_roles if isinstance(r, str)]
+
     attrs: dict[str, str] = {}
     if email := payload.get("email"):
         attrs["email"] = str(email)

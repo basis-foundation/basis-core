@@ -28,7 +28,7 @@ These are added by applications that use the library.
 pip install basis-core
 ```
 
-Requires Python 3.11+. Runtime dependency: [pydantic](https://docs.pydantic.dev/) ≥ 2.0.
+Requires Python 3.10+. Runtime dependency: [pydantic](https://docs.pydantic.dev/) ≥ 2.0.
 
 ## Quick start
 
@@ -38,14 +38,14 @@ from basis_core.audit.writer import LogAuditWriter
 from basis_core.decisions.models import DecisionRequest
 from basis_core.domain.subject import Subject
 from basis_core.policy.engine import PolicyEngine
-from basis_core.policy.rules import RolePolicy
+from basis_core.policy.rules import RolePolicyRule
 
 ROLE_TABLE = {
     "write:hvac:setpoint": {"operator", "admin"},
     "read:audit:log":      {"admin"},
 }
 
-engine = PolicyEngine(policies=[RolePolicy(ROLE_TABLE)])
+engine = PolicyEngine(policies=[RolePolicyRule(ROLE_TABLE)])
 ep = EnforcementPoint(engine=engine, audit_writer=LogAuditWriter())
 
 subject = Subject(id="u1", name="alice", roles=["operator"])
@@ -71,12 +71,14 @@ pip install -e ".[dev]"
 # Run tests
 pytest
 
-# Lint and format
+# Format check (matches CI)
+ruff format --check src tests
+
+# Lint
 ruff check src tests
-ruff format src tests
 
 # Type check
-mypy
+mypy src
 ```
 
 ## Repository context

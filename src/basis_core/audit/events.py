@@ -42,7 +42,6 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -56,19 +55,19 @@ class AuditEventType(str, Enum):
     """High-level category for an audit record."""
 
     AUTHORIZATION_DECISION = "authorization_decision"
-    POLICY_CHANGE          = "policy_change"
-    IDENTITY_EVENT         = "identity_event"
-    EMERGENCY_OVERRIDE     = "emergency_override"
-    ADAPTER_EVENT          = "adapter_event"
-    SYSTEM_EVENT           = "system_event"
+    POLICY_CHANGE = "policy_change"
+    IDENTITY_EVENT = "identity_event"
+    EMERGENCY_OVERRIDE = "emergency_override"
+    ADAPTER_EVENT = "adapter_event"
+    SYSTEM_EVENT = "system_event"
 
 
 class AuditOutcome(str, Enum):
     """Outcome recorded for authorization decision events."""
 
     ALLOWED = "allowed"
-    DENIED  = "denied"
-    ERROR   = "error"
+    DENIED = "denied"
+    ERROR = "error"
 
 
 class AuditEvent(BaseModel):
@@ -127,41 +126,39 @@ class AuditEvent(BaseModel):
     """
 
     # — Identification —
-    event_id:       str            = Field(default_factory=lambda: str(uuid.uuid4()))
-    event_type:     AuditEventType = AuditEventType.AUTHORIZATION_DECISION
-    timestamp:      datetime       = Field(
-        default_factory=lambda: datetime.now(timezone.utc)
-    )
-    schema_version: str            = AUDIT_SCHEMA_VERSION
+    event_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    event_type: AuditEventType = AuditEventType.AUTHORIZATION_DECISION
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    schema_version: str = AUDIT_SCHEMA_VERSION
 
     # — Correlation —
-    request_id:     Optional[str]  = None
-    decision_id:    Optional[str]  = None
-    correlation_id: Optional[str]  = None
+    request_id: str | None = None
+    decision_id: str | None = None
+    correlation_id: str | None = None
 
     # — Subject —
-    subject_id:     Optional[str]  = None
-    subject_name:   Optional[str]  = None
-    subject_type:   Optional[str]  = None
-    subject_roles:  list[str]      = []
+    subject_id: str | None = None
+    subject_name: str | None = None
+    subject_type: str | None = None
+    subject_roles: list[str] = []
 
     # — Resource and action —
-    action:         str
-    resource_id:    Optional[str]  = None
-    resource_type:  Optional[str]  = None
+    action: str
+    resource_id: str | None = None
+    resource_type: str | None = None
 
     # — Decision —
-    outcome:        Optional[AuditOutcome]  = None
-    reason:         Optional[str]           = None
-    evaluated_by:   Optional[str]           = None
-    policy_version: Optional[str]           = None
-    matched_rules:  list[str]               = []
+    outcome: AuditOutcome | None = None
+    reason: str | None = None
+    evaluated_by: str | None = None
+    policy_version: str | None = None
+    matched_rules: list[str] = []
 
     # — Traceability —
-    trace:          Optional[DecisionTrace] = None
+    trace: DecisionTrace | None = None
 
     # — Miscellaneous —
-    detail:         dict           = {}
+    detail: dict[str, object] = {}
 
     model_config = {"frozen": True}
 

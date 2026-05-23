@@ -57,7 +57,7 @@ any ALLOW from RolePolicyRule. The request is denied regardless of role.
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
 from basis_core.domain.identity import IdentityContext
 from basis_core.domain.resource import ResourceType
@@ -83,15 +83,15 @@ class RolePolicyRule:
         rule_name: str = "RolePolicyRule",
     ) -> None:
         self._table = {action: frozenset(roles) for action, roles in role_table.items()}
-        self._name  = rule_name
+        self._name = rule_name
 
     def evaluate(
         self,
         subject: Subject,
         action: str,
-        resource_id: Optional[str] = None,
-        identity_context: Optional[IdentityContext] = None,
-        context: Optional[dict[str, Any]] = None,
+        resource_id: str | None = None,
+        identity_context: IdentityContext | None = None,
+        context: dict[str, Any] | None = None,
     ) -> Decision:
         """Evaluate role membership for a known action; NOT_APPLICABLE for unknowns."""
         if action not in self._table:
@@ -149,15 +149,15 @@ class ResourceTypePolicyRule:
         rule_name: str = "ResourceTypePolicyRule",
     ) -> None:
         self._permitted = frozenset(t.value for t in permitted_types)
-        self._name      = rule_name
+        self._name = rule_name
 
     def evaluate(
         self,
         subject: Subject,
         action: str,
-        resource_id: Optional[str] = None,
-        identity_context: Optional[IdentityContext] = None,
-        context: Optional[dict[str, Any]] = None,
+        resource_id: str | None = None,
+        identity_context: IdentityContext | None = None,
+        context: dict[str, Any] | None = None,
     ) -> Decision:
         if resource_id is None:
             return Decision(
@@ -217,15 +217,15 @@ class ActionPolicyRule:
         rule_name: str = "ActionPolicyRule",
     ) -> None:
         self._outcomes = dict(action_outcomes)
-        self._name     = rule_name
+        self._name = rule_name
 
     def evaluate(
         self,
         subject: Subject,
         action: str,
-        resource_id: Optional[str] = None,
-        identity_context: Optional[IdentityContext] = None,
-        context: Optional[dict[str, Any]] = None,
+        resource_id: str | None = None,
+        identity_context: IdentityContext | None = None,
+        context: dict[str, Any] | None = None,
     ) -> Decision:
         if action not in self._outcomes:
             return Decision(

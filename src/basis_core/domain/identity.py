@@ -37,7 +37,6 @@ Design notes
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Optional
 
 from pydantic import BaseModel, field_validator
 
@@ -62,11 +61,11 @@ class IdentityContext(BaseModel):
                     the context was relayed through an intermediary.
     """
 
-    subject:          Subject
-    token:            str
-    issued_at:        datetime
-    expires_at:       Optional[datetime] = None
-    propagated_from:  Optional[str]      = None
+    subject: Subject
+    token: str
+    issued_at: datetime
+    expires_at: datetime | None = None
+    propagated_from: str | None = None
 
     model_config = {"frozen": True}
 
@@ -82,7 +81,7 @@ class IdentityContext(BaseModel):
 
     @field_validator("issued_at", "expires_at", mode="after")
     @classmethod
-    def must_be_timezone_aware(cls, v: Optional[datetime]) -> Optional[datetime]:
+    def must_be_timezone_aware(cls, v: datetime | None) -> datetime | None:
         if v is not None and v.tzinfo is None:
             raise ValueError(
                 "datetime fields on IdentityContext must be timezone-aware. "
@@ -90,7 +89,7 @@ class IdentityContext(BaseModel):
             )
         return v
 
-    def is_expired(self, at: Optional[datetime] = None) -> bool:
+    def is_expired(self, at: datetime | None = None) -> bool:
         """
         Return True if the context has expired at the given time.
 

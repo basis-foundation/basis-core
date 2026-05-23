@@ -24,7 +24,7 @@ Design constraints
 
 from __future__ import annotations
 
-from typing import Optional, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 from pydantic import BaseModel
 
@@ -52,13 +52,13 @@ class NormalizedEvent(BaseModel):
                   forwarded to downstream handlers and audit detail.
     """
 
-    adapter_id:  str
-    protocol:    str
-    subject_id:  Optional[str]  = None
-    resource_id: Optional[str]  = None
-    action:      str
-    context:     dict[str, str] = {}
-    payload:     dict           = {}
+    adapter_id: str
+    protocol: str
+    subject_id: str | None = None
+    resource_id: str | None = None
+    action: str
+    context: dict[str, str] = {}
+    payload: dict[str, object] = {}
 
 
 @runtime_checkable
@@ -76,7 +76,7 @@ class AdapterBase(Protocol):
     """
 
     adapter_id: str
-    protocol:   str
+    protocol: str
 
     def start(self) -> None:
         """Activate the adapter. Called once during application startup."""
