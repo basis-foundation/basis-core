@@ -22,11 +22,27 @@ This document describes the conditions under which the authorization boundary be
 
 **Condition**: `AuditWriter.write()` raises an exception.
 
-**Library behavior**: The exception is caught and logged as an error. The `DecisionResponse` is returned to the caller unchanged. The decision is not reversed.
+**Library behavior**: The exception is caught and logged as an error. The
+`DecisionResponse` is returned to the caller unchanged. The decision is not
+reversed.
 
-**Consequence**: The audit record for this decision is not written. The failure is logged but the operation completes. This trade-off is intentional: an audit infrastructure failure should not prevent an authorized operator from taking action. But the failure is an operational incident that must be detected and investigated.
+**Why the decision stands**: Audit is evidence, not enforcement. The policy
+engine has already evaluated the request and produced a decision. That decision
+is correct based on the policy and the subject's credentials at that moment.
+Reversing it because the audit infrastructure failed would mean denying an
+authorized operator access during an infrastructure incident — the opposite of
+operational continuity.
 
-**What deployments must do**: Monitor for audit write failures. An audit gap is a signal that the audit pipeline needs attention, not a silent condition.
+**Consequence**: The audit record for this decision is not written. This is an
+audit gap — a decision that occurred but left no record. Audit gaps must be
+treated as operational incidents: detected by monitoring, investigated, and
+resolved.
+
+**What deployments must do**: Monitor for audit write failures. An audit gap is
+a signal that the audit pipeline needs attention. Design monitoring to detect the
+absence of expected audit records in a time window, not just the presence of
+error log lines — log lines may also be lost if the logging pipeline is the
+failure point.
 
 ## EnforcementPoint: evaluation raises an exception
 

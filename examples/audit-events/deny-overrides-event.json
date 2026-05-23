@@ -1,0 +1,39 @@
+{
+  "_comment": "Example AuditEvent — authorization_decision demonstrating deny-overrides semantics. Alice (operator) attempts to write an HVAC setpoint. ResourceTypePolicyRule evaluates first and returns ALLOW (hvac type is permitted). RolePolicyRule is never reached because ResourceTypePolicyRule ALLOW does not stop evaluation — but in this example a second rule is a denylist that explicitly denies this action, overriding the ALLOW. The trace shows both rules evaluated, with the DENY from ActionPolicyRule winning.",
+  "event_id": "e3000000-0000-0000-0000-000000000003",
+  "event_type": "authorization_decision",
+  "timestamp": "2026-05-22T14:30:02Z",
+  "schema_version": "1.1",
+  "request_id": "a1b2c3d4-0003-0000-0000-000000000003",
+  "decision_id": "a1b2c3d4-0003-0000-0000-000000000003",
+  "correlation_id": "http-trace-abc123",
+  "subject_id": "a7b8c9d0-1234-5678-abcd-ef0123456789",
+  "subject_name": "alice",
+  "subject_type": "human",
+  "subject_roles": ["operator"],
+  "action": "write:hvac:setpoint",
+  "resource_id": "hvac:zone-a",
+  "resource_type": "hvac",
+  "outcome": "denied",
+  "reason": "Action 'write:hvac:setpoint' is explicitly denied by this rule.",
+  "evaluated_by": "ActionPolicyRule",
+  "policy_version": "v1.1.0",
+  "matched_rules": ["ResourceTypePolicyRule", "ActionPolicyRule"],
+  "trace": {
+    "final_outcome": "deny",
+    "short_circuited": true,
+    "evaluated_rules": [
+      {
+        "rule_name": "ResourceTypePolicyRule",
+        "outcome": "allow",
+        "reason": "Resource type 'hvac' is in the permitted set."
+      },
+      {
+        "rule_name": "ActionPolicyRule",
+        "outcome": "deny",
+        "reason": "Action 'write:hvac:setpoint' is explicitly denied by this rule."
+      }
+    ]
+  },
+  "detail": {}
+}
