@@ -1,85 +1,150 @@
 """
-basis_core.policy.engine — policy evaluation engine and Policy protocol.
+basis_core.policy.engine — policy evaluation engine and PolicyRule protocol.
 
-PolicyEngine evaluates authorization requests by walking a list of Policy
-implementations in order. The first policy to return a non-None Decision wins.
-If no policy handles the request, the engine returns a DENY decision. This
-fail-closed default is intentional: an unrecognized action should never
-silently succeed.
+PolicyEngine evaluates authorization requests by walking a list of PolicyRule
+implementations under a deny-overrides semantics:
 
-Chain-of-responsibility pattern
-────────────────────────────────
-Each Policy in the chain either:
-  - Returns a Decision  → evaluation stops; this decision is used.
-  - Returns None        → "I have no opinion; pass to the next policy."
+  1. Every rule is evaluated for the request.
+  2. If any rule returns DENY, the engine returns DENY immediately (fail closed).
+  3. If any rule returns ALLOW (and no DENY occurred), the engine returns ALLOW.
+  4. If all rules return NOT_APPLICABLE, the engine returns NOT_APPLICABLE,
+     which the EnforcementPoint treats as DENY (default deny).
 
-Returning None is correct when a policy does not recognize the action or
-does not apply to the given subject/resource combination. A policy must not
-return DENY for requests it does not recognize; doing so prevents downstream
-policies from allowing them.
+This differs from chain-of-responsibility ("first match wins"). Deny-overrides
+guarantees that an explicit prohibition cannot be bypassed by reordering rules.
 
-Adding new policy types
-───────────────────────
-Prepend higher-precedence policies to the list. For example:
+PolicyOutcome
+─────────────
+Three values cover the full evaluation space:
 
-    PolicyEngine(policies=[
-        EmergencyOverridePolicy(),   # Future: bypass normal policy in alarm state
-        ZoneScopePolicy(),           # Future: zone-scoped role grants
-        TimeWindowPolicy(),          # Future: time-of-day restrictions
-        RolePolicy(ROLE_TABLE),      # Current: RBAC role assignments
+  ALLOW          A rule positively permits the request.
+  DENY           A rule positively prohibits the request.
+  NOT_APPLICABLE This rule has no opinion; the request is outside its scope.
+                 A rule must return NOT_APPLICABLE (not DENY) for requests it
+                 does not recognize. Returning DENY for unknowns would block
+                 actions that other rules are meant to allow.
+
+Evaluation guarantees
+─────────────────────
+  Deny wins.       A single DENY overrides any number of ALLOWs.
+  Default deny.    A request covered by no rule returns NOT_APPLICABLE, which
+                   the EnforcementPoint resolves to DENY.
+  Stateless.       The engine holds no mutable state after construction. It is
+                   safe to share across requests and threads, provided the rule
+                   implementations it holds are also stateless.
+  Fail closed.     Exceptions inside rule evaluation cause the engine to return
+                   DENY and log the failure.
+
+Adding new rule types
+─────────────────────
+Implement the PolicyRule protocol:
+
+    class MyRule:
+        def evaluate(
+            self,
+            subject: Subject,
+            action: str,
+            resource_id: Optional[str] = None,
+            identity_context: Optional[IdentityContext] = None,
+            context: Optional[dict[str, Any]] = None,
+        ) -> Decision:
+            ...
+
+Inject into the engine at construction:
+
+    engine = PolicyEngine(policies=[
+        MyRule(),
+        RolePolicyRule(ROLE_TABLE),
     ])
-
-The order determines which policy wins when multiple policies could apply.
 """
 
 from __future__ import annotations
 
 import logging
-from typing import Optional, Protocol, runtime_checkable
+from enum import Enum
+from typing import Any, Optional, Protocol, runtime_checkable
 
+from basis_core.domain.identity import IdentityContext
 from basis_core.domain.subject import Subject
 
 log = logging.getLogger("basis_core.policy.engine")
 
 
+class PolicyOutcome(str, Enum):
+    """
+    The outcome produced by a single policy rule evaluation.
+
+    ALLOW          The rule positively permits the request.
+    DENY           The rule positively prohibits the request.
+    NOT_APPLICABLE The rule has no opinion on this request. The engine
+                   continues to the next rule. If all rules return
+                   NOT_APPLICABLE, the engine applies default deny.
+    """
+
+    ALLOW          = "allow"
+    DENY           = "deny"
+    NOT_APPLICABLE = "not_applicable"
+
+
 class Decision:
     """
-    The outcome of a single policy evaluation.
+    The outcome of a single policy rule evaluation, with context for audit records.
 
     Attributes
     ──────────
-    allowed      True if the action is permitted.
+    outcome      PolicyOutcome value for this decision.
     reason       Human-readable explanation. Always present.
                  ALLOW: brief confirmation of what permitted the action.
                  DENY:  what was required vs. what the subject held.
-    evaluated_by Name of the Policy class that produced this decision.
+                 NOT_APPLICABLE: why this rule does not apply.
+    evaluated_by Name of the rule class that produced this decision.
                  Appears in audit records and debug output.
+    allowed      Convenience property. True only when outcome is ALLOW.
     """
 
-    __slots__ = ("allowed", "reason", "evaluated_by")
+    __slots__ = ("outcome", "reason", "evaluated_by")
 
-    def __init__(self, *, allowed: bool, reason: str, evaluated_by: str) -> None:
-        self.allowed      = allowed
+    def __init__(
+        self,
+        *,
+        outcome: PolicyOutcome,
+        reason: str,
+        evaluated_by: str,
+    ) -> None:
+        self.outcome      = outcome
         self.reason       = reason
         self.evaluated_by = evaluated_by
 
+    @property
+    def allowed(self) -> bool:
+        """True only when outcome is ALLOW."""
+        return self.outcome == PolicyOutcome.ALLOW
+
     def __repr__(self) -> str:
-        verdict = "ALLOW" if self.allowed else "DENY"
         return (
-            f"Decision({verdict}, "
+            f"Decision({self.outcome.value.upper()}, "
             f"policy={self.evaluated_by!r}, "
             f"reason={self.reason!r})"
         )
 
 
 @runtime_checkable
-class Policy(Protocol):
+class PolicyRule(Protocol):
     """
-    Interface all policy implementations must satisfy.
+    Interface all policy rule implementations must satisfy.
 
-    evaluate() returns:
-      Decision  — this policy has an opinion (allow or deny).
-      None      — this policy does not apply; pass to the next policy.
+    evaluate() returns a Decision with an explicit PolicyOutcome:
+      ALLOW          — this rule permits the request.
+      DENY           — this rule prohibits the request.
+      NOT_APPLICABLE — this rule does not cover this request; the engine
+                       continues to the next rule.
+
+    Rules must never return None. Use NOT_APPLICABLE for requests outside
+    the rule's scope.
+
+    Rules must be stateless. They must not modify system state, make
+    network calls, or perform I/O during evaluate(). State needed for
+    evaluation (e.g., a role table) is loaded at construction time.
     """
 
     def evaluate(
@@ -87,30 +152,40 @@ class Policy(Protocol):
         subject: Subject,
         action: str,
         resource_id: Optional[str] = None,
-    ) -> Optional[Decision]:
+        identity_context: Optional[IdentityContext] = None,
+        context: Optional[dict[str, Any]] = None,
+    ) -> Decision:
         ...
 
 
 class PolicyEngine:
     """
-    Evaluates authorization requests against a list of Policy implementations.
+    Evaluates authorization requests against a list of PolicyRule implementations
+    using deny-overrides semantics.
 
     Usage
     ─────
-        engine = PolicyEngine(policies=[RolePolicy(ROLE_TABLE)])
+        engine = PolicyEngine(policies=[RolePolicyRule(ROLE_TABLE)])
         decision = engine.evaluate(subject, "write:hvac:setpoint", "hvac:zone-a")
         if not decision.allowed:
             raise Forbidden(decision.reason)
 
-    The engine is stateless after construction. It is safe to share across
-    requests and threads, provided the Policy implementations it holds are
-    also stateless (or safely concurrent).
+    Evaluation order
+    ────────────────
+    1. All rules are evaluated for the request.
+    2. If any rule returns DENY, that decision is returned immediately.
+    3. If any rule returns ALLOW (and no DENY occurred), the first ALLOW is
+       returned.
+    4. If all rules return NOT_APPLICABLE, a NOT_APPLICABLE decision is returned.
+       The EnforcementPoint treats NOT_APPLICABLE as DENY (default deny).
+
+    The engine is stateless after construction.
     """
 
-    def __init__(self, policies: list[Policy]) -> None:
+    def __init__(self, policies: list[PolicyRule]) -> None:
         self._policies = list(policies)
         log.info(
-            "PolicyEngine initialized — %d policy(ies): %s",
+            "PolicyEngine initialized — %d rule(s): %s",
             len(self._policies),
             [type(p).__name__ for p in self._policies],
         )
@@ -120,34 +195,67 @@ class PolicyEngine:
         subject: Subject,
         action: str,
         resource_id: Optional[str] = None,
+        identity_context: Optional[IdentityContext] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> Decision:
         """
         Evaluate a subject's request to perform an action on a resource.
 
-        Returns the first non-None Decision from the chain, or a default
-        DENY if no policy claims the action.
+        Applies deny-overrides semantics across all registered rules.
+        Returns NOT_APPLICABLE if no rule covers the action (which the
+        EnforcementPoint resolves to DENY by default).
         """
-        for policy in self._policies:
-            decision = policy.evaluate(subject, action, resource_id)
-            if decision is not None:
-                log.debug(
-                    "policy=%-24s  subject=%-16s  action=%-32s  resource=%-16s  %s",
-                    decision.evaluated_by,
-                    str(subject),
-                    action,
-                    resource_id or "—",
-                    "ALLOW" if decision.allowed else "DENY",
-                )
-                return decision
+        first_allow: Optional[Decision] = None
 
-        # Fail closed: no policy handled this action.
-        reason = (
-            f"No policy is registered for action '{action}'. "
-            "Every action that can be requested must be covered by at least "
-            "one policy in the engine's chain."
-        )
+        for rule in self._policies:
+            try:
+                decision = rule.evaluate(
+                    subject,
+                    action,
+                    resource_id=resource_id,
+                    identity_context=identity_context,
+                    context=context,
+                )
+            except Exception as exc:
+                log.exception(
+                    "PolicyEngine: rule %s raised during evaluation "
+                    "(action=%r, subject=%s) — treating as DENY",
+                    type(rule).__name__, action, str(subject),
+                )
+                return Decision(
+                    outcome=PolicyOutcome.DENY,
+                    reason=f"Rule evaluation error in {type(rule).__name__}: {exc}",
+                    evaluated_by=type(rule).__name__,
+                )
+
+            if decision.outcome == PolicyOutcome.DENY:
+                log.debug(
+                    "rule=%-28s  subject=%-16s  action=%-32s  resource=%-16s  DENY",
+                    decision.evaluated_by, str(subject), action, resource_id or "—",
+                )
+                return decision  # Deny overrides — stop immediately.
+
+            if decision.outcome == PolicyOutcome.ALLOW and first_allow is None:
+                first_allow = decision
+
+        if first_allow is not None:
+            log.debug(
+                "rule=%-28s  subject=%-16s  action=%-32s  resource=%-16s  ALLOW",
+                first_allow.evaluated_by, str(subject), action, resource_id or "—",
+            )
+            return first_allow
+
+        # No rule handled this request — default deny.
         log.warning(
-            "PolicyEngine: no policy covered action='%s' subject='%s'",
+            "PolicyEngine: no rule covered action=%r subject=%s — NOT_APPLICABLE (default deny)",
             action, str(subject),
         )
-        return Decision(allowed=False, reason=reason, evaluated_by="PolicyEngine")
+        return Decision(
+            outcome=PolicyOutcome.NOT_APPLICABLE,
+            reason=(
+                f"No policy rule is registered for action '{action}'. "
+                "Every action that can be requested must be covered by at least "
+                "one rule in the engine's chain. Default: deny."
+            ),
+            evaluated_by="PolicyEngine",
+        )

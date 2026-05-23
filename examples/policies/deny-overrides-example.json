@@ -1,0 +1,28 @@
+{
+  "_comment": "Example demonstrating deny-overrides semantics with a composite rule set. A viewer-role subject requests 'write:hvac:setpoint' targeting 'hvac:zone-a'. Rule 1 (resource_type): 'hvac' is in the permitted set → ALLOW. Rule 2 (role): 'write:hvac:setpoint' requires operator or admin; subject holds viewer → DENY. Deny-overrides: the DENY from Rule 2 overrides the ALLOW from Rule 1. Final decision: DENY. This example shows that ALLOW from one rule cannot be used to bypass an explicit DENY from another, regardless of rule order.",
+  "policy_id": "deny-overrides-example",
+  "policy_type": "composite_policy",
+  "version": "v1.0.0",
+  "evaluation_semantics": "deny_overrides",
+  "description": "Illustrates deny-overrides behavior: a resource-type check ALLOWs the HVAC target, but the role check DENYs a viewer attempting a write. The DENY wins.",
+  "created_at": "2026-05-22T00:00:00Z",
+  "created_by": "system",
+  "rules": [
+    {
+      "rule_type": "resource_type",
+      "permitted_resource_types": ["hvac"]
+    },
+    {
+      "rule_type": "role",
+      "action": "write:hvac:setpoint",
+      "permitted_roles": ["operator", "admin"]
+    }
+  ],
+  "_evaluation_trace": {
+    "_comment": "Trace of outcomes for: subject_roles=['viewer'], action='write:hvac:setpoint', resource_id='hvac:zone-a'",
+    "rule_1_resource_type": "ALLOW (type 'hvac' is in permitted set)",
+    "rule_2_role": "DENY (viewer not in ['admin', 'operator'])",
+    "aggregated_outcome": "DENY (deny-overrides: any DENY wins)",
+    "final_decision": "deny"
+  }
+}
