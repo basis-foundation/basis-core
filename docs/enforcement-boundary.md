@@ -2,7 +2,7 @@
 
 The enforcement boundary is the interface between "a request to do something" and "a confirmed authorization decision." It is the point where policy evaluation, identity context, and audit recording converge.
 
-In basis_core, the enforcement boundary is implemented by `EnforcementPoint` in `basis_core.api.enforcement`.
+In basis_core, the enforcement boundary is implemented by `EnforcementPoint` in `basis_core.enforcement.enforcement`.
 
 ## What the enforcement boundary is
 

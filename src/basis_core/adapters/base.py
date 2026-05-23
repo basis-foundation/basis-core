@@ -13,7 +13,7 @@ protocol.
 
 Design constraints
 ──────────────────
-- Adapter implementations must not import from basis_core.api.
+- Adapter implementations must not import from basis_core.enforcement.
 - Adapters must not perform authorization evaluation. They normalize.
 - The adapter_id is a stable identifier that appears in audit records.
   It must not change after an adapter is deployed to production.

@@ -397,10 +397,10 @@ class TestPolicyImportBoundaries:
             imports.extend(self._collect_imports(path))
         return imports
 
-    def test_policy_does_not_import_from_api(self) -> None:
+    def test_policy_does_not_import_from_enforcement(self) -> None:
         imports = self._all_policy_imports()
-        api_imports = [m for m in imports if "basis_core.api" in m]
-        assert api_imports == [], f"policy imports from api: {api_imports}"
+        enf_imports = [m for m in imports if "basis_core.enforcement" in m]
+        assert enf_imports == [], f"policy imports from enforcement: {enf_imports}"
 
     def test_policy_does_not_import_from_audit(self) -> None:
         imports = self._all_policy_imports()

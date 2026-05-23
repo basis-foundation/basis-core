@@ -17,7 +17,7 @@ Adapters are the boundary between field-protocol representations and the basis-c
 
 ## What an adapter must not do
 
-- **Import from `basis_core.api`.** Adapters depend on the library; they do not import from the HTTP layer.
+- **Import from `basis_core.enforcement`.** Adapters normalize events into `DecisionRequest` objects and pass them to an `EnforcementPoint`. The `EnforcementPoint` instance is provided by the application layer, not imported directly by the adapter.
 - **Expose protocol-specific fields in `DecisionRequest`.** A BACnet object identifier must not appear as a field in a DecisionRequest. It belongs in `NormalizedEvent.payload` as context, not as a field the policy engine reasons about.
 - **Make authorization decisions based on protocol membership.** An adapter for BACnet must not assume that any message arriving on the BACnet interface is from a trusted source.
 - **Modify the Subject.** The Subject constructed from verified credentials must be passed to the EnforcementPoint unchanged.
