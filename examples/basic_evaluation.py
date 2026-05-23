@@ -11,12 +11,12 @@ Run:
 
 from __future__ import annotations
 
-from basis_core.api.enforcement import EnforcementPoint
+from basis_core.enforcement.enforcement import EnforcementPoint
 from basis_core.audit.writer import LogAuditWriter
 from basis_core.decisions.models import DecisionRequest
 from basis_core.domain.subject import Subject
 from basis_core.policy.engine import PolicyEngine
-from basis_core.policy.rules import RolePolicy
+from basis_core.policy.rules import RolePolicyRule
 
 # ── Policy configuration ──────────────────────────────────────────────────────
 
@@ -28,7 +28,7 @@ ROLE_TABLE: dict[str, set[str]] = {
 
 # ── Assemble the enforcement point ────────────────────────────────────────────
 
-engine = PolicyEngine(policies=[RolePolicy(ROLE_TABLE)])
+engine = PolicyEngine(policies=[RolePolicyRule(ROLE_TABLE)])
 writer = LogAuditWriter()
 ep = EnforcementPoint(engine=engine, audit_writer=writer, policy_version="example-v1")
 

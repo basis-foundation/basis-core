@@ -527,7 +527,7 @@ class TestAuditEventValidation:
 
 class TestImportBoundaries:
     """
-    Verify statically that no subpackage below api/ imports from basis_core.api.
+    Verify statically that inner packages do not import from basis_core.enforcement.
 
     Uses ast.parse() to inspect source files without executing them, so this
     test does not depend on import order or module loading state.
@@ -535,7 +535,7 @@ class TestImportBoundaries:
 
     SRC_ROOT = Path(__file__).parent.parent / "src" / "basis_core"
 
-    # Subpackages that must not import from basis_core.api
+    # Subpackages that must not import from basis_core.enforcement
     RESTRICTED_PACKAGES = ["domain", "policy", "decisions", "audit", "adapters"]
 
     def _collect_imports(self, path: Path) -> list[str]:
@@ -552,50 +552,28 @@ class TestImportBoundaries:
                     imports.append(node.module)
         return imports
 
-    def test_domain_does_not_import_from_api(self) -> None:
-        pkg_dir = self.SRC_ROOT / "domain"
+    def _assert_no_enforcement_import(self, pkg: str, pkg_dir: Path) -> None:
         for py_file in pkg_dir.glob("*.py"):
-            imports = self._collect_imports(py_file)
-            for imp in imports:
-                assert not imp.startswith("basis_core.api"), (
-                    f"{py_file.name}: domain/ must not import from basis_core.api, found '{imp}'"
+            for imp in self._collect_imports(py_file):
+                assert not imp.startswith("basis_core.enforcement"), (
+                    f"{py_file.name}: {pkg}/ must not import"
+                    f" from basis_core.enforcement, found '{imp}'"
                 )
 
-    def test_policy_does_not_import_from_api(self) -> None:
-        pkg_dir = self.SRC_ROOT / "policy"
-        for py_file in pkg_dir.glob("*.py"):
-            imports = self._collect_imports(py_file)
-            for imp in imports:
-                assert not imp.startswith("basis_core.api"), (
-                    f"{py_file.name}: policy/ must not import from basis_core.api, found '{imp}'"
-                )
+    def test_domain_does_not_import_from_enforcement(self) -> None:
+        self._assert_no_enforcement_import("domain", self.SRC_ROOT / "domain")
 
-    def test_decisions_does_not_import_from_api(self) -> None:
-        pkg_dir = self.SRC_ROOT / "decisions"
-        for py_file in pkg_dir.glob("*.py"):
-            imports = self._collect_imports(py_file)
-            for imp in imports:
-                assert not imp.startswith("basis_core.api"), (
-                    f"{py_file.name}: decisions/ must not import from basis_core.api, found '{imp}'"
-                )
+    def test_policy_does_not_import_from_enforcement(self) -> None:
+        self._assert_no_enforcement_import("policy", self.SRC_ROOT / "policy")
 
-    def test_audit_does_not_import_from_api(self) -> None:
-        pkg_dir = self.SRC_ROOT / "audit"
-        for py_file in pkg_dir.glob("*.py"):
-            imports = self._collect_imports(py_file)
-            for imp in imports:
-                assert not imp.startswith("basis_core.api"), (
-                    f"{py_file.name}: audit/ must not import from basis_core.api, found '{imp}'"
-                )
+    def test_decisions_does_not_import_from_enforcement(self) -> None:
+        self._assert_no_enforcement_import("decisions", self.SRC_ROOT / "decisions")
 
-    def test_adapters_does_not_import_from_api(self) -> None:
-        pkg_dir = self.SRC_ROOT / "adapters"
-        for py_file in pkg_dir.glob("*.py"):
-            imports = self._collect_imports(py_file)
-            for imp in imports:
-                assert not imp.startswith("basis_core.api"), (
-                    f"{py_file.name}: adapters/ must not import from basis_core.api, found '{imp}'"
-                )
+    def test_audit_does_not_import_from_enforcement(self) -> None:
+        self._assert_no_enforcement_import("audit", self.SRC_ROOT / "audit")
+
+    def test_adapters_does_not_import_from_enforcement(self) -> None:
+        self._assert_no_enforcement_import("adapters", self.SRC_ROOT / "adapters")
 
     def test_policy_does_not_import_from_decisions(self) -> None:
         """policy/ must not import decisions/ — it reasons about domain types only."""

@@ -1,5 +1,5 @@
 """
-Tests for basis_core.api.enforcement — EnforcementPoint.
+Tests for basis_core.enforcement.enforcement — EnforcementPoint.
 
 Covers:
   - Core allow / deny / default-deny / deny-overrides behavior.
@@ -18,7 +18,6 @@ from typing import Any
 
 import pytest
 
-from basis_core.api.enforcement import EnforcementPoint
 from basis_core.audit.events import AuditEvent, AuditOutcome
 from basis_core.decisions.models import (
     DecisionOutcome,
@@ -26,6 +25,7 @@ from basis_core.decisions.models import (
     FailureReason,
 )
 from basis_core.domain.subject import Subject
+from basis_core.enforcement.enforcement import EnforcementPoint
 from basis_core.policy.engine import Decision, PolicyEngine, PolicyOutcome
 from basis_core.policy.rules import RolePolicyRule
 
@@ -361,7 +361,7 @@ def test_enforcement_module_does_not_import_protocol_packages() -> None:
     protocol-neutrality constraint on the enforcement boundary.
     """
     # Reload to ensure we see the current import state, not a cached module.
-    module = importlib.import_module("basis_core.api.enforcement")
+    module = importlib.import_module("basis_core.enforcement.enforcement")
     # Collect all modules imported by the enforcement module itself.
     enforcement_file = getattr(module, "__file__", "")
     forbidden_prefixes = ("bacnet", "modbus", "mqtt", "opcua", "pymodbus", "pybacnet")

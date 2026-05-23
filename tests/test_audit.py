@@ -26,12 +26,12 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
-from basis_core.api.enforcement import EnforcementPoint
 from basis_core.audit.events import AUDIT_SCHEMA_VERSION, AuditEvent, AuditEventType, AuditOutcome
 from basis_core.audit.trace import DecisionTrace, RuleEvaluation
 from basis_core.audit.writer import LogAuditWriter, NullAuditWriter
 from basis_core.decisions.models import DecisionOutcome, DecisionRequest
 from basis_core.domain.subject import Subject, SubjectType
+from basis_core.enforcement.enforcement import EnforcementPoint
 from basis_core.policy.engine import PolicyEngine, PolicyOutcome
 from basis_core.policy.rules import ActionPolicyRule, RolePolicyRule
 
@@ -389,7 +389,7 @@ class TestAuditWriterFailure:
             engine=engine,
             audit_writer=self.ExplodingWriter(),
         )
-        with caplog.at_level(logging.ERROR, logger="basis_core.api.enforcement"):
+        with caplog.at_level(logging.ERROR, logger="basis_core.enforcement.enforcement"):
             ep.evaluate(make_request(), subject=make_subject(["operator"]))
         assert any("audit" in msg.lower() or "write" in msg.lower() for msg in caplog.messages)
 
@@ -461,10 +461,10 @@ class TestAuditImportBoundaries:
             imports.extend(self._collect_imports(path))
         return imports
 
-    def test_audit_does_not_import_from_api(self) -> None:
+    def test_audit_does_not_import_from_enforcement(self) -> None:
         imports = self._all_audit_imports()
-        bad = [m for m in imports if "basis_core.api" in m]
-        assert bad == [], f"audit imports from api: {bad}"
+        bad = [m for m in imports if "basis_core.enforcement" in m]
+        assert bad == [], f"audit imports from enforcement: {bad}"
 
     def test_audit_does_not_import_from_adapters(self) -> None:
         imports = self._all_audit_imports()
