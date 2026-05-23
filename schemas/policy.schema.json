@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://basis-core/schemas/policy.schema.json",
   "title": "Policy",
-  "description": "A serializable policy definition. This schema describes the structure of a policy that can be persisted, distributed, or loaded from configuration. The RolePolicy implementation in basis_core.policy.rules corresponds to a 'role_policy' type entry.",
+  "description": "A serializable policy definition. Describes a policy that can be persisted, distributed, or loaded from configuration. The RolePolicy implementation in basis_core.policy.rules corresponds to a 'role_policy' type entry.",
   "type": "object",
   "required": ["policy_id", "policy_type", "version", "created_at"],
   "additionalProperties": false,
@@ -10,51 +10,58 @@
     "policy_id": {
       "type": "string",
       "minLength": 1,
-      "description": "Stable identifier for this policy definition."
+      "description": "Stable identifier for this policy definition. Treat as an external identifier — do not rename after the policy is deployed."
     },
     "policy_type": {
       "type": "string",
       "enum": ["role_policy", "attribute_policy", "time_window_policy"],
-      "description": "The kind of policy this definition describes."
+      "description": "The kind of policy this definition describes. Determines the expected structure of the rules array."
     },
     "version": {
       "type": "string",
       "minLength": 1,
-      "description": "Version identifier. Used in DecisionResponse and AuditEvent for correlation."
+      "description": "Version identifier. Appears in DecisionResponse.policy_version and AuditEvent.policy_version for correlation. Non-empty."
     },
     "description": {
       "type": ["string", "null"],
-      "description": "Human-readable description of this policy's purpose."
+      "description": "Human-readable description of this policy's purpose and the operational context it governs. Informational only."
     },
     "created_at": {
       "type": "string",
       "format": "date-time",
-      "description": "ISO 8601 UTC timestamp of when this policy version was created."
+      "description": "ISO 8601 UTC timestamp of when this policy version was created or last modified. Must include timezone offset."
     },
     "created_by": {
       "type": ["string", "null"],
-      "description": "Identifier of the principal that created or last modified this policy."
+      "description": "Identifier of the principal that created or last modified this policy. Used for policy change audit records."
     },
     "rules": {
       "type": "array",
-      "description": "List of policy rules. Structure depends on policy_type.",
+      "description": "Ordered list of policy rules. Structure depends on policy_type. For role_policy: each rule maps an action to a set of permitted roles. For attribute_policy and time_window_policy: rules include additional conditions.",
       "items": {
         "type": "object",
         "required": ["action"],
+        "additionalProperties": false,
         "properties": {
           "action": {
             "type": "string",
-            "description": "Action name this rule applies to."
+            "minLength": 1,
+            "pattern": "^[a-z][a-z0-9_-]*(:[a-z][a-z0-9_-]*)+$",
+            "description": "Action name this rule governs. Must follow the '{verb}:{domain}[:{object}]' naming convention."
           },
           "permitted_roles": {
             "type": "array",
-            "items": { "type": "string" },
-            "description": "For role_policy: roles that are permitted to perform this action."
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "uniqueItems": true,
+            "description": "For role_policy: role names that are permitted to perform this action. Non-empty items only."
           },
           "conditions": {
             "type": "object",
             "additionalProperties": { "type": "string" },
-            "description": "For attribute_policy or time_window_policy: additional conditions."
+            "description": "For attribute_policy or time_window_policy: additional conditions as key/value pairs. Structure is policy-type-specific."
           }
         }
       }

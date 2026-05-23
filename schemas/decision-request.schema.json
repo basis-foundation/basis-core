@@ -9,46 +9,51 @@
   "properties": {
     "request_id": {
       "type": "string",
-      "format": "uuid",
-      "description": "Unique identifier for this request. Used to correlate the request with its DecisionResponse and AuditEvent."
+      "minLength": 1,
+      "description": "Unique identifier for this request. UUID v4 recommended. Used to correlate the request with its DecisionResponse and AuditEvent. Must be non-empty."
     },
     "subject_id": {
       "type": "string",
       "minLength": 1,
-      "description": "Stable identifier of the requesting subject. For human subjects: JWT sub claim. For device subjects: device certificate CN or device identifier."
+      "description": "Stable identifier of the requesting subject. For human subjects: JWT sub claim (UUID). For device subjects: device certificate CN or device identifier. Must be non-empty."
     },
     "subject_roles": {
       "type": "array",
-      "items": { "type": "string" },
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true,
       "default": [],
-      "description": "Role names held by the subject at request time."
+      "description": "Normalized role names held by the subject at request time. Items must be non-empty. Duplicates are not permitted — the Python model normalizes roles to a sorted, deduplicated set on construction."
     },
     "subject_attrs": {
       "type": "object",
       "additionalProperties": { "type": "string" },
       "default": {},
-      "description": "Additional subject attributes for ABAC policy conditions. Keys and values are strings."
+      "description": "Additional subject attributes for ABAC policy conditions. All keys and values are strings."
     },
     "resource_id": {
       "type": ["string", "null"],
-      "pattern": "^[a-z][a-z0-9_-]*:[a-z0-9_:/-]+$",
-      "description": "Normalized resource identifier in the format '{type}:{qualifier[:{subqualifier}...]}'. Examples: 'hvac:zone-a', 'sensor:co2:lobby', 'device:chiller-1'."
+      "pattern": "^[a-z][a-z0-9_-]*(:[a-z0-9][a-z0-9_:/-]*)$",
+      "description": "Normalized resource identifier in the format '{type}:{qualifier[:{subqualifier}...]}'. Examples: 'hvac:zone-a', 'sensor:co2:lobby', 'device:chiller-1'. Null when the request is not resource-specific."
     },
     "action": {
       "type": "string",
+      "minLength": 1,
       "pattern": "^[a-z][a-z0-9_-]*(:[a-z][a-z0-9_-]*)+$",
-      "description": "Action name in the format '{verb}:{domain}[:{object}]'. Examples: 'write:hvac:setpoint', 'read:audit:log', 'subscribe:telemetry'."
+      "description": "Action name in the format '{verb}:{domain}[:{object}]' with at least two colon-separated segments. Examples: 'write:hvac:setpoint', 'read:audit:log', 'subscribe:telemetry'. Must be non-empty."
     },
     "context": {
       "type": "object",
       "additionalProperties": { "type": "string" },
       "default": {},
-      "description": "Key/value context for policy conditions. Examples: site, maintenance_window, operational_mode."
+      "description": "Key/value context for policy conditions. Examples: site, maintenance_window, operational_mode. All values are strings."
     },
     "timestamp": {
       "type": "string",
       "format": "date-time",
-      "description": "ISO 8601 UTC timestamp of when the request was constructed."
+      "description": "ISO 8601 UTC timestamp of when the request was constructed. Must include timezone offset (e.g. '2026-05-22T14:30:00Z' or '2026-05-22T14:30:00+00:00'). Timezone-naive timestamps are rejected by the Python model."
     }
   }
 }

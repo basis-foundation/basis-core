@@ -1,0 +1,19 @@
+{
+  "_comment": "Example AuditEvent — authorization_decision with 'denied' outcome. Records a rejected attempt by a viewer-role subject to write an HVAC setpoint. The reason field is sufficient for an auditor to determine why the decision was made without consulting additional records.",
+  "event_id": "e2000000-0000-0000-0000-000000000002",
+  "event_type": "authorization_decision",
+  "timestamp": "2026-05-22T14:30:01Z",
+  "subject_id": "b8c9d0e1-2345-6789-bcde-f01234567890",
+  "subject_name": "bob",
+  "subject_type": "human",
+  "subject_roles": ["viewer"],
+  "action": "write:hvac:setpoint",
+  "resource_id": "hvac:zone-a",
+  "resource_type": "hvac",
+  "outcome": "denied",
+  "reason": "Action 'write:hvac:setpoint' requires one of ['admin', 'operator']; subject holds ['viewer'].",
+  "evaluated_by": "RolePolicy",
+  "policy_version": "v1.0.0",
+  "request_id": "a1b2c3d4-0002-0000-0000-000000000002",
+  "detail": {}
+}

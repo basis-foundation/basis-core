@@ -8,8 +8,8 @@ to the audit writer, and that both ALLOW and DENY decisions are recorded.
 from __future__ import annotations
 
 from basis_core.api.enforcement import EnforcementPoint
-from basis_core.audit.events import AuditOutcome
-from basis_core.audit.writer import AuditEvent, AuditWriter, NullAuditWriter
+from basis_core.audit.events import AuditEvent, AuditOutcome
+from basis_core.audit.writer import AuditWriter, NullAuditWriter
 from basis_core.decisions.models import DecisionOutcome, DecisionRequest
 from basis_core.domain.subject import Subject
 from basis_core.policy.engine import PolicyEngine

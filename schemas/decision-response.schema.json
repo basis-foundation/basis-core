@@ -2,39 +2,39 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://basis-core/schemas/decision-response.schema.json",
   "title": "DecisionResponse",
-  "description": "The result of an authorization evaluation returned by the EnforcementPoint. The request_id echoes the corresponding DecisionRequest for correlation.",
+  "description": "The result of an authorization evaluation returned by the EnforcementPoint. The request_id echoes the corresponding DecisionRequest for correlation. All string fields that carry semantic meaning are non-empty.",
   "type": "object",
   "required": ["request_id", "outcome", "reason", "evaluated_by", "timestamp"],
   "additionalProperties": false,
   "properties": {
     "request_id": {
       "type": "string",
-      "format": "uuid",
-      "description": "Echoes the request_id from the corresponding DecisionRequest."
+      "minLength": 1,
+      "description": "Echoes the request_id from the corresponding DecisionRequest. Non-empty. Used to correlate responses with requests and audit records."
     },
     "outcome": {
       "type": "string",
       "enum": ["allow", "deny", "not_applicable"],
-      "description": "The authorization decision. 'allow': proceed. 'deny': reject. 'not_applicable': no policy covered the request (enforcement point should treat as deny)."
+      "description": "The authorization decision. 'allow': the action is permitted, enforcement point proceeds. 'deny': the action is not permitted, enforcement point rejects. 'not_applicable': no policy covered the request; enforcement point treats as deny."
     },
     "reason": {
       "type": "string",
       "minLength": 1,
-      "description": "Human-readable explanation of the outcome. For allow: brief confirmation. For deny: what was required vs. what the subject held."
+      "description": "Human-readable explanation of the outcome. Non-empty. For 'allow': brief confirmation of what permitted the action. For 'deny': what was required vs. what the subject held."
     },
     "evaluated_by": {
       "type": "string",
       "minLength": 1,
-      "description": "Name of the policy or component that produced this decision. Appears in audit records."
+      "description": "Name of the policy or component that produced this decision. Non-empty. Appears verbatim in audit records. For chain-of-responsibility evaluation, this is the name of the first policy that returned a Decision."
     },
     "policy_version": {
       "type": ["string", "null"],
-      "description": "Version identifier of the policy set in effect at evaluation time. Used to correlate decisions with the policy configuration that produced them."
+      "description": "Version identifier of the policy set in effect at evaluation time. Used to correlate decisions with the policy configuration that produced them. Null if the enforcement point was not configured with a policy version."
     },
     "timestamp": {
       "type": "string",
       "format": "date-time",
-      "description": "ISO 8601 UTC timestamp of when the decision was produced."
+      "description": "ISO 8601 UTC timestamp of when the decision was produced. Must include timezone offset. Timezone-naive timestamps are rejected by the Python model."
     }
   }
 }

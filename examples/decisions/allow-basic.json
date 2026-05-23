@@ -1,0 +1,9 @@
+{
+  "_comment": "Example DecisionResponse — ALLOW outcome. An operator was permitted to write an HVAC setpoint. The request_id correlates this response with the DecisionRequest and the AuditEvent that records the decision.",
+  "request_id": "a1b2c3d4-0001-0000-0000-000000000001",
+  "outcome": "allow",
+  "reason": "Subject holds a role permitted for 'write:hvac:setpoint'.",
+  "evaluated_by": "RolePolicy",
+  "policy_version": "v1.0.0",
+  "timestamp": "2026-05-22T14:30:00Z"
+}
