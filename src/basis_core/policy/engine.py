@@ -88,21 +88,26 @@ class PolicyOutcome(str, Enum):
 
 class Decision:
     """
-    The outcome of a single policy rule evaluation, with context for audit records.
+    The outcome of a policy evaluation, with context for audit records.
 
     Attributes
     ──────────
-    outcome      PolicyOutcome value for this decision.
-    reason       Human-readable explanation. Always present.
-                 ALLOW: brief confirmation of what permitted the action.
-                 DENY:  what was required vs. what the subject held.
-                 NOT_APPLICABLE: why this rule does not apply.
-    evaluated_by Name of the rule class that produced this decision.
-                 Appears in audit records and debug output.
-    allowed      Convenience property. True only when outcome is ALLOW.
+    outcome          PolicyOutcome value for this decision.
+    reason           Human-readable explanation. Always present.
+                     ALLOW: brief confirmation of what permitted the action.
+                     DENY:  what was required vs. what the subject held.
+                     NOT_APPLICABLE: why this rule does not apply.
+    evaluated_by     Name of the rule class that produced this decision.
+                     Appears in audit records and debug output.
+    evaluated_rules  Ordered list of per-rule evaluation records collected by
+                     the PolicyEngine. Each entry is a (rule_name, outcome_value,
+                     reason) tuple using plain strings for outcome_value so that
+                     audit consumers do not need to import PolicyOutcome.
+                     Empty for Decision objects created directly by rules.
+    allowed          Convenience property. True only when outcome is ALLOW.
     """
 
-    __slots__ = ("outcome", "reason", "evaluated_by")
+    __slots__ = ("outcome", "reason", "evaluated_by", "evaluated_rules")
 
     def __init__(
         self,
@@ -110,10 +115,12 @@ class Decision:
         outcome: PolicyOutcome,
         reason: str,
         evaluated_by: str,
+        evaluated_rules: list[tuple[str, str, str]] | None = None,
     ) -> None:
-        self.outcome      = outcome
-        self.reason       = reason
-        self.evaluated_by = evaluated_by
+        self.outcome         = outcome
+        self.reason          = reason
+        self.evaluated_by    = evaluated_by
+        self.evaluated_rules = evaluated_rules or []
 
     @property
     def allowed(self) -> bool:
@@ -205,6 +212,10 @@ class PolicyEngine:
         Returns NOT_APPLICABLE if no rule covers the action (which the
         EnforcementPoint resolves to DENY by default).
         """
+        # Collect per-rule evaluation records for traceability. Each entry is a
+        # (rule_name, outcome_value, reason) tuple using plain strings so the
+        # audit package does not need to import PolicyOutcome.
+        evaluations: list[tuple[str, str, str]] = []
         first_allow: Optional[Decision] = None
 
         for rule in self._policies:
@@ -222,18 +233,31 @@ class PolicyEngine:
                     "(action=%r, subject=%s) — treating as DENY",
                     type(rule).__name__, action, str(subject),
                 )
+                err_entry = (type(rule).__name__, PolicyOutcome.DENY.value, str(exc))
+                evaluations.append(err_entry)
                 return Decision(
                     outcome=PolicyOutcome.DENY,
                     reason=f"Rule evaluation error in {type(rule).__name__}: {exc}",
                     evaluated_by=type(rule).__name__,
+                    evaluated_rules=evaluations,
                 )
+
+            evaluations.append(
+                (decision.evaluated_by, decision.outcome.value, decision.reason)
+            )
 
             if decision.outcome == PolicyOutcome.DENY:
                 log.debug(
                     "rule=%-28s  subject=%-16s  action=%-32s  resource=%-16s  DENY",
                     decision.evaluated_by, str(subject), action, resource_id or "—",
                 )
-                return decision  # Deny overrides — stop immediately.
+                # Deny overrides — stop immediately; attach full trace so far.
+                return Decision(
+                    outcome=PolicyOutcome.DENY,
+                    reason=decision.reason,
+                    evaluated_by=decision.evaluated_by,
+                    evaluated_rules=evaluations,
+                )
 
             if decision.outcome == PolicyOutcome.ALLOW and first_allow is None:
                 first_allow = decision
@@ -243,7 +267,12 @@ class PolicyEngine:
                 "rule=%-28s  subject=%-16s  action=%-32s  resource=%-16s  ALLOW",
                 first_allow.evaluated_by, str(subject), action, resource_id or "—",
             )
-            return first_allow
+            return Decision(
+                outcome=PolicyOutcome.ALLOW,
+                reason=first_allow.reason,
+                evaluated_by=first_allow.evaluated_by,
+                evaluated_rules=evaluations,
+            )
 
         # No rule handled this request — default deny.
         log.warning(
@@ -258,4 +287,5 @@ class PolicyEngine:
                 "one rule in the engine's chain. Default: deny."
             ),
             evaluated_by="PolicyEngine",
+            evaluated_rules=evaluations,
         )

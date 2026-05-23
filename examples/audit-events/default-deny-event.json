@@ -1,0 +1,34 @@
+{
+  "_comment": "Example AuditEvent — authorization_decision with 'denied' outcome from default deny. Carol (admin) requests an action not covered by any registered rule. All rules return not_applicable. The engine returns NOT_APPLICABLE (default deny). The EnforcementPoint records this as 'denied' in the audit record. The trace shows all rules returned not_applicable, and short_circuited is false because evaluation ran to completion. matched_rules is empty because no rule had an opinion.",
+  "event_id": "e4000000-0000-0000-0000-000000000004",
+  "event_type": "authorization_decision",
+  "timestamp": "2026-05-22T14:30:03Z",
+  "schema_version": "1.1",
+  "request_id": "a1b2c3d4-0004-0000-0000-000000000004",
+  "decision_id": "a1b2c3d4-0004-0000-0000-000000000004",
+  "correlation_id": null,
+  "subject_id": "c9d0e1f2-3456-789a-cdef-012345678901",
+  "subject_name": "carol",
+  "subject_type": "human",
+  "subject_roles": ["admin"],
+  "action": "invoke:experimental:feature",
+  "resource_id": null,
+  "resource_type": null,
+  "outcome": "denied",
+  "reason": "No policy rule is registered for action 'invoke:experimental:feature'. Every action that can be requested must be covered by at least one rule in the engine's chain. Default: deny.",
+  "evaluated_by": "PolicyEngine",
+  "policy_version": "v1.1.0",
+  "matched_rules": [],
+  "trace": {
+    "final_outcome": "not_applicable",
+    "short_circuited": false,
+    "evaluated_rules": [
+      {
+        "rule_name": "RolePolicyRule",
+        "outcome": "not_applicable",
+        "reason": "Action 'invoke:experimental:feature' is not in this rule's role table."
+      }
+    ]
+  },
+  "detail": {}
+}

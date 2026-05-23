@@ -1,8 +1,12 @@
 {
-  "_comment": "Example AuditEvent — authorization_decision with 'allowed' outcome. Records the full context of a permitted HVAC setpoint write: who (alice, operator role), what resource, what action, which policy evaluated it, and the policy version in effect. The request_id links this record to the DecisionRequest and DecisionResponse.",
+  "_comment": "Example AuditEvent — authorization_decision with 'allowed' outcome. Alice (operator) writes an HVAC setpoint. RolePolicyRule evaluates the action, finds operator in the permitted set, and returns ALLOW. No other rule denied. The trace shows the full per-rule evaluation history.",
   "event_id": "e1000000-0000-0000-0000-000000000001",
   "event_type": "authorization_decision",
   "timestamp": "2026-05-22T14:30:00Z",
+  "schema_version": "1.1",
+  "request_id": "a1b2c3d4-0001-0000-0000-000000000001",
+  "decision_id": "a1b2c3d4-0001-0000-0000-000000000001",
+  "correlation_id": null,
   "subject_id": "a7b8c9d0-1234-5678-abcd-ef0123456789",
   "subject_name": "alice",
   "subject_type": "human",
@@ -12,8 +16,19 @@
   "resource_type": "hvac",
   "outcome": "allowed",
   "reason": "Subject holds a role permitted for 'write:hvac:setpoint'.",
-  "evaluated_by": "RolePolicy",
-  "policy_version": "v1.0.0",
-  "request_id": "a1b2c3d4-0001-0000-0000-000000000001",
+  "evaluated_by": "RolePolicyRule",
+  "policy_version": "v1.1.0",
+  "matched_rules": ["RolePolicyRule"],
+  "trace": {
+    "final_outcome": "allow",
+    "short_circuited": false,
+    "evaluated_rules": [
+      {
+        "rule_name": "RolePolicyRule",
+        "outcome": "allow",
+        "reason": "Subject holds a role permitted for 'write:hvac:setpoint'."
+      }
+    ]
+  },
   "detail": {}
 }

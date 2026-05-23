@@ -45,9 +45,21 @@ reachable from an adapter must be covered by at least one rule.
 
 ### 5. AuditEvent is written
 
-Before returning the response to the caller, the enforcement point writes an `AuditEvent` containing the full context of the decision: subject, resource, action, outcome, policy version, and timestamp. This happens regardless of the outcome — ALLOW and DENY decisions are both recorded.
+Before returning the response to the caller, the enforcement point writes an
+`AuditEvent` containing the full context of the decision. This happens on every
+decision path — ALLOW, DENY, default-deny (NOT_APPLICABLE), and error. The event
+includes:
 
-A failure to write the audit record is itself logged as an error. It does not change the decision outcome.
+- Subject context (id, name, type, roles at decision time).
+- Resource and action as they appeared in the DecisionRequest.
+- Final outcome, reason, and evaluated_by (the rule that determined the outcome).
+- `matched_rules` — names of rules that returned ALLOW or DENY.
+- `decision_id` and `correlation_id` for cross-system tracing.
+- A `DecisionTrace` embedding the full per-rule evaluation history.
+
+A failure to write the audit record is caught and logged as an error. It does
+not change the decision outcome. The authorization decision stands regardless of
+audit infrastructure state.
 
 ### 6. DecisionResponse is returned
 
