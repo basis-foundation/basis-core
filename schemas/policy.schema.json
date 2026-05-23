@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://basis-core/schemas/policy.schema.json",
+  "title": "Policy",
+  "description": "A serializable policy definition. This schema describes the structure of a policy that can be persisted, distributed, or loaded from configuration. The RolePolicy implementation in basis_core.policy.rules corresponds to a 'role_policy' type entry.",
+  "type": "object",
+  "required": ["policy_id", "policy_type", "version", "created_at"],
+  "additionalProperties": false,
+  "properties": {
+    "policy_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Stable identifier for this policy definition."
+    },
+    "policy_type": {
+      "type": "string",
+      "enum": ["role_policy", "attribute_policy", "time_window_policy"],
+      "description": "The kind of policy this definition describes."
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Version identifier. Used in DecisionResponse and AuditEvent for correlation."
+    },
+    "description": {
+      "type": ["string", "null"],
+      "description": "Human-readable description of this policy's purpose."
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 UTC timestamp of when this policy version was created."
+    },
+    "created_by": {
+      "type": ["string", "null"],
+      "description": "Identifier of the principal that created or last modified this policy."
+    },
+    "rules": {
+      "type": "array",
+      "description": "List of policy rules. Structure depends on policy_type.",
+      "items": {
+        "type": "object",
+        "required": ["action"],
+        "properties": {
+          "action": {
+            "type": "string",
+            "description": "Action name this rule applies to."
+          },
+          "permitted_roles": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "For role_policy: roles that are permitted to perform this action."
+          },
+          "conditions": {
+            "type": "object",
+            "additionalProperties": { "type": "string" },
+            "description": "For attribute_policy or time_window_policy: additional conditions."
+          }
+        }
+      }
+    }
+  }
+}

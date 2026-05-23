@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://basis-core/schemas/decision-request.schema.json",
+  "title": "DecisionRequest",
+  "description": "A normalized authorization request submitted to the policy engine. Protocol-specific fields must not appear here; adapters are responsible for normalization before this structure is constructed.",
+  "type": "object",
+  "required": ["request_id", "subject_id", "action", "timestamp"],
+  "additionalProperties": false,
+  "properties": {
+    "request_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique identifier for this request. Used to correlate the request with its DecisionResponse and AuditEvent."
+    },
+    "subject_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Stable identifier of the requesting subject. For human subjects: JWT sub claim. For device subjects: device certificate CN or device identifier."
+    },
+    "subject_roles": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": [],
+      "description": "Role names held by the subject at request time."
+    },
+    "subject_attrs": {
+      "type": "object",
+      "additionalProperties": { "type": "string" },
+      "default": {},
+      "description": "Additional subject attributes for ABAC policy conditions. Keys and values are strings."
+    },
+    "resource_id": {
+      "type": ["string", "null"],
+      "pattern": "^[a-z][a-z0-9_-]*:[a-z0-9_:/-]+$",
+      "description": "Normalized resource identifier in the format '{type}:{qualifier[:{subqualifier}...]}'. Examples: 'hvac:zone-a', 'sensor:co2:lobby', 'device:chiller-1'."
+    },
+    "action": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]*(:[a-z][a-z0-9_-]*)+$",
+      "description": "Action name in the format '{verb}:{domain}[:{object}]'. Examples: 'write:hvac:setpoint', 'read:audit:log', 'subscribe:telemetry'."
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": { "type": "string" },
+      "default": {},
+      "description": "Key/value context for policy conditions. Examples: site, maintenance_window, operational_mode."
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 UTC timestamp of when the request was constructed."
+    }
+  }
+}

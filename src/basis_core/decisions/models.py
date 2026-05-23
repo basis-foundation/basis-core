@@ -1,0 +1,101 @@
+"""
+basis_core.decisions.models — the authorization boundary data contract.
+
+DecisionRequest and DecisionResponse are the normalized structures that cross
+the enforcement boundary. Enforcement points construct a DecisionRequest from
+whatever representation the upstream component provided, submit it to the
+policy engine, and receive a DecisionResponse.
+
+Neither structure contains protocol-specific fields. Protocol adapters are
+responsible for constructing a DecisionRequest from a normalized event before
+the enforcement point evaluates it. The policy engine never sees raw protocol
+frames.
+
+DecisionOutcome
+───────────────
+Three values cover the full decision space:
+
+  ALLOW          The request is permitted. Enforcement point proceeds.
+  DENY           The request is not permitted. Enforcement point rejects.
+  NOT_APPLICABLE No applicable policy was found. Enforcement point applies
+                 its configured default (typically DENY).
+
+The distinction between DENY and NOT_APPLICABLE is useful for diagnosis:
+DENY means a policy evaluated the request and refused it; NOT_APPLICABLE
+means the request fell outside the scope of any registered policy. Both
+should be audited, but they indicate different operational conditions.
+"""
+
+from __future__ import annotations
+
+import uuid
+from datetime import datetime, timezone
+from enum import Enum
+from typing import Optional
+
+from pydantic import BaseModel, Field
+
+
+class DecisionOutcome(str, Enum):
+    ALLOW          = "allow"
+    DENY           = "deny"
+    NOT_APPLICABLE = "not_applicable"
+
+
+class DecisionRequest(BaseModel):
+    """
+    A normalized authorization request submitted to the policy engine.
+
+    Fields
+    ──────
+    request_id    Unique identifier for correlation with the audit record.
+    subject_id    Stable identifier of the requesting subject.
+    subject_roles Role names held by the subject at request time.
+    subject_attrs Additional subject attributes for ABAC conditions.
+    resource_id   Normalized resource identifier (e.g., "hvac:zone-a").
+    action        Action name (e.g., "write:hvac:setpoint").
+    context       Arbitrary key/value context for policy conditions.
+                  Examples: ``{"site": "bldg-a", "maintenance_window": "true"}``
+    timestamp     Time the request was constructed.
+    """
+
+    request_id:    str            = Field(default_factory=lambda: str(uuid.uuid4()))
+    subject_id:    str
+    subject_roles: list[str]      = []
+    subject_attrs: dict[str, str] = {}
+    resource_id:   Optional[str]  = None
+    action:        str
+    context:       dict[str, str] = {}
+    timestamp:     datetime       = Field(
+        default_factory=lambda: datetime.now(timezone.utc)
+    )
+
+
+class DecisionResponse(BaseModel):
+    """
+    The result of an authorization evaluation.
+
+    Fields
+    ──────
+    request_id    Echoes the request_id from the DecisionRequest.
+    outcome       ALLOW, DENY, or NOT_APPLICABLE.
+    reason        Human-readable explanation of the outcome.
+    evaluated_by  Name of the policy that produced this decision.
+    policy_version Version identifier of the policy set in effect at
+                  evaluation time. Used for audit correlation.
+    timestamp     Time the decision was produced.
+    """
+
+    request_id:     str
+    outcome:        DecisionOutcome
+    reason:         str
+    evaluated_by:   str
+    policy_version: Optional[str]  = None
+    timestamp:      datetime       = Field(
+        default_factory=lambda: datetime.now(timezone.utc)
+    )
+
+    @property
+    def allowed(self) -> bool:
+        """Convenience accessor. True only when outcome is ALLOW."""
+        return self.outcome == DecisionOutcome.ALLOW

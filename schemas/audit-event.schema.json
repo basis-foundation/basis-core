@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://basis-core/schemas/audit-event.schema.json",
+  "title": "AuditEvent",
+  "description": "Normalized record of a security-relevant system event. All authorization decisions, policy changes, identity lifecycle events, and emergency overrides are represented as AuditEvent records. Field names are stable external identifiers — they must not be renamed once in production use.",
+  "type": "object",
+  "required": ["event_id", "event_type", "action", "timestamp"],
+  "additionalProperties": false,
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique identifier for this audit record. UUID v4."
+    },
+    "event_type": {
+      "type": "string",
+      "enum": [
+        "authorization_decision",
+        "policy_change",
+        "identity_event",
+        "emergency_override",
+        "adapter_event",
+        "system_event"
+      ],
+      "description": "Category of the event. Used for filtering and routing in the audit pipeline."
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 UTC timestamp of when the event occurred (not the time it was written to storage)."
+    },
+    "subject_id": {
+      "type": ["string", "null"],
+      "description": "Stable identifier of the subject. Null for system events with no associated principal."
+    },
+    "subject_name": {
+      "type": ["string", "null"],
+      "description": "Human-readable subject label."
+    },
+    "subject_type": {
+      "type": ["string", "null"],
+      "enum": ["human", "device", "service", "gateway", "agent", null],
+      "description": "SubjectType value."
+    },
+    "subject_roles": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": [],
+      "description": "Roles held by the subject at the time of the event."
+    },
+    "action": {
+      "type": "string",
+      "description": "Action name. Stable external identifier — appears verbatim in stored records."
+    },
+    "resource_id": {
+      "type": ["string", "null"],
+      "description": "Normalized resource identifier. Null if the event is not resource-specific."
+    },
+    "resource_type": {
+      "type": ["string", "null"],
+      "description": "ResourceType value (e.g., 'hvac', 'sensor', 'device'). Null if not applicable."
+    },
+    "outcome": {
+      "type": ["string", "null"],
+      "enum": ["allowed", "denied", "error", null],
+      "description": "Outcome for authorization_decision events."
+    },
+    "reason": {
+      "type": ["string", "null"],
+      "description": "Human-readable explanation of the outcome."
+    },
+    "evaluated_by": {
+      "type": ["string", "null"],
+      "description": "Name of the policy or component that produced this decision."
+    },
+    "policy_version": {
+      "type": ["string", "null"],
+      "description": "Version of the policy set in effect at evaluation time."
+    },
+    "request_id": {
+      "type": ["string", "null"],
+      "format": "uuid",
+      "description": "DecisionRequest.request_id for correlation with the request and response records."
+    },
+    "detail": {
+      "type": "object",
+      "description": "Arbitrary key/value context. Command parameters, error information, adapter metadata. Structure is event-type-specific."
+    }
+  }
+}

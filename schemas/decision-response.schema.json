@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://basis-core/schemas/decision-response.schema.json",
+  "title": "DecisionResponse",
+  "description": "The result of an authorization evaluation returned by the EnforcementPoint. The request_id echoes the corresponding DecisionRequest for correlation.",
+  "type": "object",
+  "required": ["request_id", "outcome", "reason", "evaluated_by", "timestamp"],
+  "additionalProperties": false,
+  "properties": {
+    "request_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Echoes the request_id from the corresponding DecisionRequest."
+    },
+    "outcome": {
+      "type": "string",
+      "enum": ["allow", "deny", "not_applicable"],
+      "description": "The authorization decision. 'allow': proceed. 'deny': reject. 'not_applicable': no policy covered the request (enforcement point should treat as deny)."
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Human-readable explanation of the outcome. For allow: brief confirmation. For deny: what was required vs. what the subject held."
+    },
+    "evaluated_by": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Name of the policy or component that produced this decision. Appears in audit records."
+    },
+    "policy_version": {
+      "type": ["string", "null"],
+      "description": "Version identifier of the policy set in effect at evaluation time. Used to correlate decisions with the policy configuration that produced them."
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 UTC timestamp of when the decision was produced."
+    }
+  }
+}
