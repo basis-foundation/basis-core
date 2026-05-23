@@ -67,6 +67,31 @@ class DecisionOutcome(str, Enum):
     NOT_APPLICABLE = "not_applicable"
 
 
+class FailureReason(str, Enum):
+    """
+    Reason code for a safe-deny produced by an enforcement boundary failure.
+
+    These values are set on DecisionResponse.failure_reason when the denial
+    was not produced by normal policy evaluation but by a system-level failure.
+    None means the decision was produced by normal policy evaluation.
+
+    MALFORMED_REQUEST   The request could not be parsed or validated. The
+                        enforcement point never reached policy evaluation.
+    POLICY_ERROR        An exception was raised during policy rule evaluation.
+                        The policy engine failed closed: DENY returned.
+    AUDIT_ERROR         The audit write failed after a valid decision was made.
+                        The decision itself is unchanged; this code is available
+                        for future use where the EP could signal the audit gap.
+    INTERNAL_ERROR      An unexpected exception occurred inside the enforcement
+                        point before or after policy evaluation.
+    """
+
+    MALFORMED_REQUEST = "malformed_request"
+    POLICY_ERROR = "policy_error"
+    AUDIT_ERROR = "audit_error"
+    INTERNAL_ERROR = "internal_error"
+
+
 class DecisionRequest(BaseModel):
     """
     A normalized authorization request submitted to the policy engine.
@@ -142,17 +167,20 @@ class DecisionResponse(BaseModel):
 
     Fields
     ──────
-    request_id     Echoes the request_id from the DecisionRequest.
-                   Non-empty; used for audit correlation.
-    outcome        Explicit DecisionOutcome value. Never a bare string.
-    reason         Human-readable explanation of the outcome. Non-empty.
-                   ALLOW: brief confirmation of what permitted the action.
-                   DENY:  what was required vs. what the subject held.
-    evaluated_by   Name of the policy that produced this decision. Non-empty.
-                   Appears in audit records.
-    policy_version Version identifier of the policy set in effect at
-                   evaluation time. Used for audit correlation.
-    timestamp      Time the decision was produced. Timezone-aware.
+    request_id      Echoes the request_id from the DecisionRequest.
+                    Non-empty; used for audit correlation.
+    outcome         Explicit DecisionOutcome value. Never a bare string.
+    reason          Human-readable explanation of the outcome. Non-empty.
+                    ALLOW: brief confirmation of what permitted the action.
+                    DENY:  what was required vs. what the subject held.
+    evaluated_by    Name of the policy that produced this decision. Non-empty.
+                    Appears in audit records.
+    policy_version  Version identifier of the policy set in effect at
+                    evaluation time. Used for audit correlation.
+    failure_reason  Set when the denial was caused by an enforcement boundary
+                    failure rather than normal policy evaluation. None for
+                    decisions produced by the policy engine. See FailureReason.
+    timestamp       Time the decision was produced. Timezone-aware.
     """
 
     request_id: str
@@ -160,6 +188,7 @@ class DecisionResponse(BaseModel):
     reason: str
     evaluated_by: str
     policy_version: str | None = None
+    failure_reason: FailureReason | None = None
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     @field_validator("request_id", "reason", "evaluated_by", mode="after")

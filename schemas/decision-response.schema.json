@@ -31,6 +31,11 @@
       "type": ["string", "null"],
       "description": "Version identifier of the policy set in effect at evaluation time. Used to correlate decisions with the policy configuration that produced them. Null if the enforcement point was not configured with a policy version."
     },
+    "failure_reason": {
+      "type": ["string", "null"],
+      "enum": ["malformed_request", "policy_error", "audit_error", "internal_error", null],
+      "description": "Set when the denial was caused by an enforcement boundary failure rather than normal policy evaluation. Null for decisions produced by the policy engine. 'malformed_request': request failed validation before evaluation. 'policy_error': exception during policy rule evaluation, engine failed closed. 'audit_error': reserved; audit write failed but decision is unaffected. 'internal_error': unexpected exception inside the enforcement point."
+    },
     "timestamp": {
       "type": "string",
       "format": "date-time",

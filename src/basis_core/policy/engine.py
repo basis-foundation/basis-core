@@ -104,10 +104,14 @@ class Decision:
                      reason) tuple using plain strings for outcome_value so that
                      audit consumers do not need to import PolicyOutcome.
                      Empty for Decision objects created directly by rules.
+    is_error         True when this decision was produced by the engine catching
+                     an exception inside a rule, rather than by a normal rule
+                     evaluation path. The enforcement point uses this flag to
+                     sanitize the caller-visible reason and set FailureReason.
     allowed          Convenience property. True only when outcome is ALLOW.
     """
 
-    __slots__ = ("outcome", "reason", "evaluated_by", "evaluated_rules")
+    __slots__ = ("outcome", "reason", "evaluated_by", "evaluated_rules", "is_error")
 
     def __init__(
         self,
@@ -116,11 +120,13 @@ class Decision:
         reason: str,
         evaluated_by: str,
         evaluated_rules: list[tuple[str, str, str]] | None = None,
+        is_error: bool = False,
     ) -> None:
         self.outcome = outcome
         self.reason = reason
         self.evaluated_by = evaluated_by
         self.evaluated_rules = evaluated_rules or []
+        self.is_error = is_error
 
     @property
     def allowed(self) -> bool:
@@ -241,6 +247,7 @@ class PolicyEngine:
                     reason=f"Rule evaluation error in {type(rule).__name__}: {exc}",
                     evaluated_by=type(rule).__name__,
                     evaluated_rules=evaluations,
+                    is_error=True,
                 )
 
             evaluations.append((decision.evaluated_by, decision.outcome.value, decision.reason))

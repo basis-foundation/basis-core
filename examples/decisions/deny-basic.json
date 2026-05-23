@@ -1,9 +1,10 @@
 {
-  "_comment": "Example DecisionResponse — DENY outcome. A viewer-role subject attempted to write an HVAC setpoint, which requires operator or admin. The reason field documents what was required vs. what the subject held.",
+  "_comment": "Example DecisionResponse — DENY outcome. A viewer-role subject attempted to write an HVAC setpoint, which requires operator or admin. The reason field documents what was required vs. what the subject held. failure_reason is null: the decision was produced by normal policy evaluation.",
   "request_id": "a1b2c3d4-0002-0000-0000-000000000002",
   "outcome": "deny",
   "reason": "Action 'write:hvac:setpoint' requires one of ['admin', 'operator']; subject holds ['viewer'].",
-  "evaluated_by": "RolePolicy",
+  "evaluated_by": "RolePolicyRule",
   "policy_version": "v1.0.0",
+  "failure_reason": null,
   "timestamp": "2026-05-22T14:30:01Z"
 }

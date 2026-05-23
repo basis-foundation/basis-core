@@ -23,7 +23,9 @@ If the adapter cannot determine identity context (for example, for a device-orig
 
 ### 3. DecisionRequest is submitted to the EnforcementPoint
 
-The enforcement point receives the `DecisionRequest`. It constructs a `Subject` from the request fields (or uses a pre-constructed `Subject` if the caller provides one from an authenticated session).
+The enforcement point receives the `DecisionRequest` (or a raw dict that it validates into one). It constructs a `Subject` from the request fields, or uses a pre-constructed `Subject` if the caller provides one from an authenticated session.
+
+If the request fails validation, the enforcement point returns a safe DENY immediately with `failure_reason=MALFORMED_REQUEST`. Policy evaluation does not occur.
 
 ### 4. PolicyEngine evaluates the request
 
@@ -63,7 +65,13 @@ audit infrastructure state.
 
 ### 6. DecisionResponse is returned
 
-The `DecisionResponse` carries the outcome (ALLOW, DENY, or NOT_APPLICABLE), the reason, and the evaluated-by field identifying which policy produced the decision.
+The `DecisionResponse` carries:
+
+- `outcome` — ALLOW, DENY, or NOT_APPLICABLE (treated as DENY by callers).
+- `reason` — Human-readable explanation. Never contains raw exception text.
+- `evaluated_by` — Rule or component that produced the decision.
+- `request_id` — Echoed for correlation with the audit record.
+- `failure_reason` — `None` for normal decisions. Set to a `FailureReason` code (MALFORMED_REQUEST, POLICY_ERROR, INTERNAL_ERROR) when the denial was caused by an enforcement boundary failure rather than policy evaluation.
 
 ### 7. Adapter applies the decision
 
