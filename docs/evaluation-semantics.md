@@ -145,7 +145,7 @@ This guarantee is a precondition for the audit record being a reliable reflectio
 
 ## What constitutes a breaking change to evaluation semantics
 
-The following changes to evaluation behavior are breaking changes to the kernel contract. They require a major version increment, an ADR, and a defined migration path.
+The following changes to evaluation behavior are breaking changes to the kernel contract. They require a major version increment, an ADR, and a defined migration path. Invariants 5 (determinism) and 6 (fail-closed) in `docs/kernel-constitution.md` establish the constitutional basis for why evaluation semantics must remain stable.
 
 **Changes to outcome resolution:**
 - Changing DENY to not short-circuit (would allow later rules to override a DENY).
