@@ -31,6 +31,10 @@ Validation rules
 - ``action`` must be non-empty and match the naming convention:
   ``{verb}:{domain}[:{object}]`` — colon-separated, lowercase segments,
   at least two segments.
+- ``resource_id``, when provided (non-None), must match the normalized
+  resource identifier pattern ``{type}:{qualifier[:{subqualifier}...]}``.
+  This is the same constraint enforced by the JSON Schema. None is valid
+  for resource-independent requests.
 - ``subject_roles`` are normalized on construction: whitespace stripped,
   empty strings discarded, duplicates removed, result sorted.
 - ``timestamp`` must be timezone-aware. The default factory produces UTC.
@@ -51,6 +55,14 @@ from pydantic import BaseModel, Field, field_validator
 # Action names follow the pattern: two or more colon-separated lowercase segments.
 # Each segment: starts with a letter, followed by letters/digits/hyphens/underscores.
 _ACTION_RE = re.compile(r"^[a-z][a-z0-9_-]*(:[a-z][a-z0-9_-]*)+$")
+
+# Resource identifiers follow the pattern: {type}:{qualifier[:{subqualifier}...]}.
+# Type prefix: starts with a lowercase letter, followed by lowercase letters, digits,
+# hyphens, or underscores. Each qualifier segment starts with a lowercase letter or
+# digit and may include letters, digits, underscores, colons, hyphens, and slashes.
+# This pattern is identical to the one in domain/resource.py and in
+# decision-request.schema.json. Both are authoritative; keep them in sync.
+_RESOURCE_ID_RE = re.compile(r"^[a-z][a-z0-9_-]*(:[a-z0-9][a-z0-9_:/-]*)$")
 
 
 class DecisionOutcome(str, Enum):
@@ -106,6 +118,9 @@ class DecisionRequest(BaseModel):
     subject_attrs Additional subject attributes for ABAC conditions.
     resource_id   Normalized resource identifier (e.g., "hvac:zone-a").
                   Optional. None when the request is not resource-specific.
+                  When provided, must match the ``{type}:{qualifier}`` pattern
+                  (same constraint as the JSON Schema). Appears verbatim in
+                  audit records and must match policy resource references.
     action        Action name, e.g. "write:hvac:setpoint". Non-empty. Must
                   follow the "{verb}:{domain}[:{object}]" convention.
     context       Arbitrary key/value context for policy conditions.
@@ -139,6 +154,20 @@ class DecisionRequest(BaseModel):
                 f"action {v!r} does not match the required format "
                 "'{verb}:{domain}[:{object}]' (e.g. 'write:hvac:setpoint', "
                 "'read:audit:log'). Segments must be lowercase and separated by colons."
+            )
+        return v
+
+    @field_validator("resource_id", mode="after")
+    @classmethod
+    def validate_resource_id_format(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        if not _RESOURCE_ID_RE.match(v):
+            raise ValueError(
+                f"resource_id {v!r} does not match the required format "
+                "'{type}:{qualifier}' (e.g. 'hvac:zone-a', 'sensor:co2:lobby', "
+                "'device:chiller-1'). Type prefix and all qualifier segments must "
+                "be lowercase. Segments are separated by colons."
             )
         return v
 

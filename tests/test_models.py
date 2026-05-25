@@ -327,6 +327,108 @@ class TestDecisionRequestValidation:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# DecisionRequest.resource_id format validation
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+class TestDecisionRequestResourceIdValidation:
+    """
+    resource_id is an external compatibility contract: it appears verbatim in
+    audit records and must match resource references in deployed policies.
+    The Python model enforces the same pattern as the JSON Schema so that
+    malformed identifiers are caught at construction time rather than after
+    reaching the audit record.
+
+    Pattern: ``^[a-z][a-z0-9_-]*(:[a-z0-9][a-z0-9_:/-]*)$``
+    """
+
+    def _make(self, resource_id: str | None) -> DecisionRequest:
+        return DecisionRequest(
+            subject_id="u1",
+            action="write:hvac:setpoint",
+            resource_id=resource_id,
+        )
+
+    # ── Valid resource_id values ────────────────────────────────────────────
+
+    def test_none_is_valid(self) -> None:
+        """None is the correct value for resource-independent requests."""
+        req = self._make(None)
+        assert req.resource_id is None
+
+    def test_type_qualifier_pair_is_valid(self) -> None:
+        req = self._make("hvac:zone-a")
+        assert req.resource_id == "hvac:zone-a"
+
+    def test_three_segment_identifier_is_valid(self) -> None:
+        req = self._make("sensor:co2:lobby")
+        assert req.resource_id == "sensor:co2:lobby"
+
+    def test_device_identifier_with_hyphen_is_valid(self) -> None:
+        req = self._make("device:chiller-1")
+        assert req.resource_id == "device:chiller-1"
+
+    def test_gateway_identifier_is_valid(self) -> None:
+        req = self._make("gateway:bacnet-gw-01")
+        assert req.resource_id == "gateway:bacnet-gw-01"
+
+    def test_zone_identifier_is_valid(self) -> None:
+        req = self._make("zone:floor-2")
+        assert req.resource_id == "zone:floor-2"
+
+    def test_four_segment_identifier_is_valid(self) -> None:
+        req = self._make("sensor:temp:floor-2:north")
+        assert req.resource_id == "sensor:temp:floor-2:north"
+
+    def test_identifier_with_underscore_is_valid(self) -> None:
+        req = self._make("device:pump_1")
+        assert req.resource_id == "device:pump_1"
+
+    # ── Invalid resource_id values ──────────────────────────────────────────
+
+    def test_uppercase_type_is_rejected(self) -> None:
+        """Type prefix must be lowercase."""
+        with pytest.raises(ValidationError, match="resource_id"):
+            self._make("HVAC:zone-a")
+
+    def test_mixed_case_is_rejected(self) -> None:
+        with pytest.raises(ValidationError, match="resource_id"):
+            self._make("Hvac:zone-a")
+
+    def test_missing_colon_is_rejected(self) -> None:
+        """resource_id requires at least one colon-separated qualifier."""
+        with pytest.raises(ValidationError, match="resource_id"):
+            self._make("hvac")
+
+    def test_trailing_colon_is_rejected(self) -> None:
+        """Qualifier segment must be non-empty."""
+        with pytest.raises(ValidationError, match="resource_id"):
+            self._make("hvac:")
+
+    def test_double_colon_is_rejected(self) -> None:
+        """Empty qualifier segment is not allowed."""
+        with pytest.raises(ValidationError, match="resource_id"):
+            self._make("hvac::zone-a")
+
+    def test_leading_colon_is_rejected(self) -> None:
+        """Type prefix must start with a lowercase letter."""
+        with pytest.raises(ValidationError, match="resource_id"):
+            self._make(":zone-a")
+
+    def test_space_in_qualifier_is_rejected(self) -> None:
+        with pytest.raises(ValidationError, match="resource_id"):
+            self._make("hvac: zone-a")
+
+    def test_uppercase_qualifier_is_rejected(self) -> None:
+        with pytest.raises(ValidationError, match="resource_id"):
+            self._make("hvac:Zone-A")
+
+    def test_empty_string_is_rejected(self) -> None:
+        with pytest.raises(ValidationError, match="resource_id"):
+            self._make("")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # DecisionResponse validation
 # ══════════════════════════════════════════════════════════════════════════════
 

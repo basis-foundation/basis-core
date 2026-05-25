@@ -16,6 +16,8 @@ A Resource is the target of the action. It carries a normalized identifier that 
 
 The normalized identifier is what appears in policy rules and audit records. A policy that grants access to `hvac:zone-a` applies regardless of whether that resource is served by a BACnet adapter, a Modbus adapter, or any other protocol. The adapter is responsible for mapping the protocol-native address to the normalized resource identifier before the request reaches the enforcement point.
 
+The `{type}:{qualifier}` format is enforced at both the schema and model level. `DecisionRequest` rejects malformed `resource_id` values at construction time using the same pattern as `decision-request.schema.json`. This means invalid identifiers are caught before they can reach the audit record or a policy evaluation.
+
 Resource type classifications (`hvac`, `sensor`, `device`, `zone`, `gateway`) reflect OT domain concepts, not protocol identities. Adding a new protocol means adding a new adapter; it does not require a new ResourceType.
 
 ## Action
