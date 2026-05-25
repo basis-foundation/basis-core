@@ -31,7 +31,7 @@ For raw-dict failures, an audit record is not written because a valid `AuditEven
 - Sets `failure_reason=POLICY_ERROR` on the `DecisionResponse`.
 - Writes an `AuditEvent` with `outcome=ERROR` and `failure_reason` in the detail.
 
-The caller receives a DENY with a clean reason string. The raw exception is available only in application logs.
+The caller receives a DENY with a clean reason string. The raw exception is available only in application logs. See `docs/evaluation-semantics.md` for the precise specification of what appears in `evaluated_rules` and the `is_error` flag when an exception occurs.
 
 **Note**: Individual policy implementations should also catch exceptions internally if they perform any fallible operation. The engine's catch is a last resort, not a design pattern.
 

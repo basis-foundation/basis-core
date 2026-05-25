@@ -1,6 +1,6 @@
 # Decision Flow
 
-This document traces the path of an authorization request from field-protocol message to decision record.
+This document traces the path of an authorization request from field-protocol message to decision record. For the precise behavioral specification of step 4 (the engine's evaluation algorithm, short-circuit rules, and trace contents), see `docs/evaluation-semantics.md`.
 
 ## Stages
 
