@@ -1,0 +1,10 @@
+{
+  "request_id": "a1b2c3d4-0001-0000-0000-000000000001",
+  "subject_id": "a7b8c9d0-1234-5678-abcd-ef0123456789",
+  "subject_roles": ["operator"],
+  "subject_attrs": {},
+  "resource_id": "hvac:zone-a",
+  "action": "write:hvac:setpoint",
+  "context": {},
+  "timestamp": "2026-05-22T14:30:00Z"
+}

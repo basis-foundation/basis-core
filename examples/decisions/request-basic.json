@@ -1,0 +1,11 @@
+{
+  "_comment": "Example DecisionRequest — a normalized authorization request submitted to the policy engine. Alice (operator) requests permission to write an HVAC setpoint on zone-a. The request_id correlates this request with its DecisionResponse and AuditEvent. Protocol-specific fields must not appear here; the adapter is responsible for normalizing the field-protocol message into this structure before submitting it to the EnforcementPoint.",
+  "request_id": "a1b2c3d4-0001-0000-0000-000000000001",
+  "subject_id": "a7b8c9d0-1234-5678-abcd-ef0123456789",
+  "subject_roles": ["operator"],
+  "subject_attrs": {},
+  "resource_id": "hvac:zone-a",
+  "action": "write:hvac:setpoint",
+  "context": {},
+  "timestamp": "2026-05-22T14:30:00Z"
+}
