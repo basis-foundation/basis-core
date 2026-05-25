@@ -103,17 +103,27 @@ The `examples/` directory contains annotated examples that use `_comment` and si
 
 The Pydantic models in `src/basis_core/` must remain aligned with their corresponding schemas. The test suite in `tests/test_schema_validation.py` verifies this by serializing model instances and validating the output against each schema.
 
-Known alignment notes:
+**DecisionRequest.resource_id**: The `DecisionRequest` model enforces the same `{type}:{qualifier}` pattern as the JSON Schema using a `field_validator`. Non-null values are rejected at model construction time if they do not match `^[a-z][a-z0-9_-]*(:[a-z0-9][a-z0-9_:/-]*)$`. `None` is accepted for resource-independent requests. This constraint is intentional: `resource_id` appears verbatim in audit records and must match the resource references in deployed policies. The schema and model are aligned; the schema is authoritative for the format definition.
 
-**DecisionRequest.resource_id**: The schema enforces the `{type}:{qualifier}` pattern for non-null values. The `DecisionRequest` model does not replicate this regex at the model level — resource validation is handled separately by the `Resource` domain type and `build_resource_id()` in `src/basis_core/domain/resource.py`. Callers constructing a `DecisionRequest` directly with a freeform `resource_id` string may produce a payload that fails schema validation. The enforcement point does not validate `resource_id` format at the boundary. This is a known gap: if the caller does not go through the `Resource` type, an invalid `resource_id` can reach the audit record.
-
-**AuditEvent.subject_type**: The schema restricts `subject_type` to the enum values `human`, `device`, `service`, `gateway`, `agent`, or null. The `AuditEvent` model accepts any string (or null) for this field. The model does not replicate the enum constraint, meaning a model instance with an out-of-range `subject_type` would pass model construction but fail schema validation. This is intentional: the model is designed to be forward-compatible with future subject types not yet listed in the schema.
+**AuditEvent.subject_type** *(open compatibility decision)*: The schema restricts `subject_type` to the enum values `human`, `device`, `service`, `gateway`, `agent`, or null. The `AuditEvent` model accepts any string (or null) for this field. This is intentional: the model is designed to be forward-compatible with subject types not yet listed in the schema. A model instance with an unlisted `subject_type` will pass model construction but fail schema validation. Callers should only supply values in the schema enum until the schema is explicitly extended. See the open compatibility questions section.
 
 **Policy schema**: No Pydantic model corresponds to the `policy.schema.json` schema in this repository. The schema describes serialized policy configuration documents, which are loaded and parsed by application code outside the kernel. The schema exists as the canonical specification for that format. Schema-valid fixture examples are in `schemas/examples/policy.json`.
 
 ---
 
 ## Open compatibility questions
+
+### AuditEvent.subject_type enum vs. model open-string
+
+The `audit-event.schema.json` restricts `subject_type` to the enum `[human, device, service, gateway, agent, null]`. The `AuditEvent` Python model accepts any string to remain forward-compatible with subject types that may be introduced before the schema is updated.
+
+**Open question**: Should the model be tightened to mirror the schema enum, or should the schema be loosened to `type: ["string", "null"]` to match the model's open-string behavior?
+
+The trade-off: schema-side strictness catches invalid subject types in payloads from external producers; model-side openness avoids a breaking model change when new subject types are added. Because `subject_type` is not used by the policy engine for evaluation logic — it is informational context in the audit record — the practical risk of an unlisted value is low. The current open-string model is intentional and should only be changed when the ecosystem's subject type vocabulary is considered stable.
+
+Track this as `OPEN: audit-subject-type-alignment` in the basis-architecture issue tracker.
+
+---
 
 ### Schema $id field values
 
