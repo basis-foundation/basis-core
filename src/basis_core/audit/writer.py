@@ -42,10 +42,64 @@ log = logging.getLogger("basis_core.audit")
 
 @runtime_checkable
 class AuditWriter(Protocol):
-    """Interface for audit record persistence backends."""
+    """
+    Interface for audit record persistence backends.
+
+    Any object with a ``write()`` method matching this signature satisfies the
+    interface. No class inheritance is required.
+
+    Required behavior
+    ─────────────────
+    ``write()`` must not raise. If the backend encounters an error (I/O failure,
+    serialization error, network timeout), it must catch the exception internally
+    and log it. The ``EnforcementPoint`` catches exceptions from ``write()`` as a
+    last resort, but ``AuditWriter`` implementations must not depend on that: a
+    raised exception produces an application log entry rather than a proper
+    audit-failure record.
+
+    ``write()`` must not mutate the event. ``AuditEvent`` is a frozen Pydantic
+    model; mutation attempts will raise ``ValidationError``. Implementations that
+    need to transform the event for storage must work from ``event.model_dump()``
+    or a serialized copy, not from the event object itself.
+
+    ``write()`` must not influence the authorization decision. It must not call
+    back into the ``PolicyEngine`` or ``EnforcementPoint``, modify shared
+    application state, or raise exceptions that could alter the caller's control
+    flow.
+
+    Purpose and scope
+    ─────────────────
+    Audit is evidence, not enforcement. The decision has already been made by the
+    ``PolicyEngine`` before ``write()`` is called. The writer's responsibility is
+    to record what happened. A write failure does not reverse the decision — see
+    ``docs/failure-modes.md`` for the governing rationale.
+
+    Ordering expectations
+    ─────────────────────
+    The ``EnforcementPoint`` calls ``write()`` exactly once per evaluated request
+    (excluding malformed requests that fail pre-policy validation). Writers may
+    not assume that events arrive in timestamp order; concurrent requests may
+    produce out-of-order calls.
+
+    What implementations may assume
+    ────────────────────────────────
+    - ``event`` is a complete, frozen ``AuditEvent`` with a non-empty
+      ``event_id``, a timezone-aware ``timestamp``, and a non-empty ``action``.
+    - ``event.outcome`` accurately reflects the authorization decision that was
+      made for the request identified by ``event.request_id``.
+    - The same ``event_id`` will not be passed to ``write()`` twice in a
+      single-process lifetime (though writers that persist across restarts must
+      handle duplicate delivery at the storage layer).
+    """
 
     def write(self, event: AuditEvent) -> None:
-        """Persist an audit event. Must not raise on write failure."""
+        """
+        Persist an audit event.
+
+        Must not raise. Must not mutate ``event``. Must not affect the
+        authorization outcome. If persistence fails, catch the exception
+        internally and log it.
+        """
         ...
 
 

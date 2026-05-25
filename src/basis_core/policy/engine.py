@@ -146,18 +146,63 @@ class PolicyRule(Protocol):
     """
     Interface all policy rule implementations must satisfy.
 
-    evaluate() returns a Decision with an explicit PolicyOutcome:
-      ALLOW          — this rule permits the request.
-      DENY           — this rule prohibits the request.
-      NOT_APPLICABLE — this rule does not cover this request; the engine
-                       continues to the next rule.
+    Any object with an ``evaluate()`` method matching this signature satisfies
+    the interface. No class inheritance is required.
 
-    Rules must never return None. Use NOT_APPLICABLE for requests outside
-    the rule's scope.
+    Required behavior
+    ─────────────────
+    ``evaluate()`` must always return a ``Decision`` with an explicit
+    ``PolicyOutcome``. It must never return ``None`` and must never raise
+    without catching — the engine catches unhandled exceptions and treats them
+    as DENY with ``is_error=True``, but relying on this is incorrect rule design.
 
-    Rules must be stateless. They must not modify system state, make
-    network calls, or perform I/O during evaluate(). State needed for
-    evaluation (e.g., a role table) is loaded at construction time.
+    Use ``NOT_APPLICABLE`` for requests outside the rule's scope. A rule must
+    not return ``DENY`` for actions it simply does not recognize; that would
+    prevent downstream rules from allowing them and would violate deny-overrides
+    composition.
+
+    Populate ``evaluated_by`` with a stable, non-empty identifier (typically the
+    class name or a constructor-configured rule name). This value appears verbatim
+    in ``DecisionResponse.evaluated_by`` and in audit records. It must not be
+    empty and must not change between calls on the same instance.
+
+    Populate ``reason`` with a non-empty, human-readable explanation. The reason
+    appears in ``DecisionResponse.reason`` and audit records. Raw exception text,
+    stack traces, and internal implementation details must not appear in ``reason``.
+
+    Statefulness and thread safety
+    ──────────────────────────────
+    Rules must be stateless at evaluation time: ``evaluate()`` must not modify
+    any instance attribute, write to external state, or produce side effects
+    beyond the returned ``Decision``. State needed for evaluation (role tables,
+    resource configurations, action allowlists) must be loaded at construction
+    time and held as an immutable reference.
+
+    A ``PolicyEngine`` instance is designed to be shared across concurrent
+    requests. Rules registered in the engine must be safe for concurrent use —
+    which follows naturally from the statelessness requirement.
+
+    Forbidden side effects during evaluate()
+    ─────────────────────────────────────────
+    - Network calls, database queries, or file I/O.
+    - Modifying the ``Subject``, ``context``, or any other argument received.
+    - Calling ``EnforcementPoint.evaluate()`` recursively or invoking another
+      ``PolicyEngine`` (would violate import boundaries and create recursion).
+    - Sleeping, blocking on a lock, or introducing latency beyond in-process
+      computation.
+    - Importing from ``basis_core.enforcement`` (violates import boundary rules).
+
+    What rules may assume about inputs
+    ───────────────────────────────────
+    - ``subject`` is a frozen, validated ``Subject`` instance. Its fields will
+      not change during the call.
+    - ``action`` is a non-empty string validated against the
+      ``{verb}:{domain}[:{object}]`` format.
+    - ``resource_id``, when not None, has been validated against the
+      ``{type}:{qualifier}`` format.
+    - ``context``, when not None, is a plain ``dict[str, str]``; treat as
+      read-only.
+    - The engine calls rules in registration order and never reorders them.
     """
 
     def evaluate(
@@ -167,7 +212,25 @@ class PolicyRule(Protocol):
         resource_id: str | None = None,
         identity_context: IdentityContext | None = None,
         context: dict[str, Any] | None = None,
-    ) -> Decision: ...
+    ) -> Decision:
+        """
+        Evaluate whether the subject is permitted to perform the action.
+
+        Parameters
+        ──────────
+        subject          Frozen, validated identity of the requesting entity.
+        action           Validated action name (e.g. "write:hvac:setpoint").
+        resource_id      Validated resource identifier, or None for
+                         resource-independent requests.
+        identity_context Verified identity context carrying additional claims,
+                         or None if not provided.
+        context          Request-scoped key/value conditions from
+                         ``DecisionRequest.context``, or None.
+
+        Returns a ``Decision`` with an explicit ``PolicyOutcome``. Never None.
+        Never raises (catch your own exceptions and return a safe outcome).
+        """
+        ...
 
 
 class PolicyEngine:
