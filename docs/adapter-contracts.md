@@ -34,6 +34,14 @@ Normalized resource identifiers and action names appear in audit records. If an 
 
 Changes to normalization should be treated like action name changes: document them, version them, and account for the discontinuity in audit analysis tools.
 
+## Normalization compatibility
+
+Adapter normalization changes are compatibility-sensitive. The mapping from a protocol-specific operation to an action name and resource identifier is a compatibility surface shared by policies (which reference the normalized form) and audit records (which capture it).
+
+Changing a normalization mapping produces policy and audit inconsistency without a runtime error. A policy written against the prior normalization will silently evaluate differently — or produce a different decision — against the new normalization. Historical audit records use the prior form; current records use the new form. Cross-period audit analysis must account for the change explicitly.
+
+Changes to normalization must be treated with the same discipline as action name changes: documented, versioned, and with adapter version recorded in audit events so that normalization-level changes are traceable. See `docs/architecture/compatibility-philosophy.md` in basis-architecture for the governing compatibility rules.
+
 ## Telemetry vs. commands
 
 Adapters typically handle two directions of traffic:

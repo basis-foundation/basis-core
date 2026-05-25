@@ -149,3 +149,14 @@ than visible failures.
 record was written. The current value is `"1.1"`. Consumers should read this
 field to determine which optional fields are present. Fields are added, never
 removed or renamed, once a schema version is deployed.
+
+## Schema compatibility
+
+Audit event schema fields are compatibility contracts shared by every consumer that reads audit records — query interfaces, compliance reporters, forensic analysis tools. The governing rules:
+
+- Required fields must not be removed or renamed after a schema version is deployed.
+- Field semantics must not be changed. Redefining what a field means is a breaking change even if the field name is preserved.
+- New optional fields may be added without a version increment, provided their absence does not cause consumer failures.
+- New required fields constitute a breaking change unless they can be backfilled for records produced under prior schema versions.
+
+These rules reflect the audit continuity requirements in `docs/architecture/compatibility-philosophy.md` in basis-architecture. Audit records may be retained for years and must remain interpretable across schema revisions. An immutable record written in a format that current tooling cannot interpret is preserved but not auditable.

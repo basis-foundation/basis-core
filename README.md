@@ -8,11 +8,11 @@ basis-core is a Python library providing the authorization kernel: policy evalua
 
 basis-core is the **authorization kernel** — the isolated core that everything else depends on. It contains only the logic for evaluating authorization requests and recording the results. It knows nothing about transports, databases, identity providers, field protocols, or deployment environments.
 
-Future components built around this kernel:
-- **basis-gateway** — HTTP and WebSocket API layer for exposing enforcement to networked services.
-- **basis-console** — Operator-facing management interface.
-- **Protocol adapters** — BACnet, Modbus, MQTT, OPC-UA normalizers that produce `DecisionRequest` objects.
-- **Deployment bundles** — Docker, Kubernetes, cloud-specific packaging.
+Components built around this kernel:
+- **basis-gateway** — API and runtime wrapper; hosts the HTTP interface, invokes basis-core for evaluation, acts as the enforcement point for networked services.
+- **basis-console** — Operator and administrator UI; contains no authorization logic.
+- **basis-adapters** — Protocol normalization adapters; translates BACnet, Modbus, MQTT, OPC-UA, and other field-protocol messages into the subject-resource-action vocabulary basis-core evaluates.
+- **basis-deploy** — Deployment and distribution tooling; not part of the authorization runtime.
 
 None of these belong in this repository. basis-core must remain free of those dependencies so it can be embedded, tested, and reasoned about independently.
 
@@ -93,10 +93,26 @@ ruff check src tests
 mypy src
 ```
 
-## Repository context
+## Ecosystem and architectural authority
 
-- **basis-architecture** — architecture principles and trust boundary analysis that inform this library's design.
-- **basis-poc** — a full-stack proof of concept demonstrating this authorization model in a building automation context.
+basis-core implements the authorization kernel defined by the [basis-architecture](https://github.com/basis-foundation/basis-architecture) repository. Architecture constraints, compatibility commitments, kernel boundary rules, and required terminology originate there. This repository realizes those constraints in executable form.
+
+The BASIS Core Services Distribution places basis-core at the foundation of a layered component hierarchy:
+
+| Component | Role |
+|---|---|
+| **basis-core** (this repository) | Authorization kernel — policy evaluation, enforcement semantics, failure mode contracts, audit event schema |
+| **basis-gateway** | API and runtime wrapper — request lifecycle, decision dispatch, enforcement point for networked services |
+| **basis-console** | Operator and administrator UI — no authorization logic |
+| **basis-adapters** | Protocol normalization adapters — translates field-protocol messages into normalized vocabulary |
+| **basis-deploy** | Deployment and distribution tooling — not part of the authorization runtime |
+| **basis-poc** | Research proof-of-concept — validated the core mechanisms; a research artifact, not the canonical implementation |
+
+Dependency direction is strictly downward: every component in the distribution depends on basis-core; basis-core must not depend on any of them.
+
+The basis-architecture repository is the review authority for changes that affect kernel boundaries, action vocabulary, audit schema compatibility, or terminology. When an implementation constraint conflicts with an architectural rule defined in basis-architecture, surface the conflict there rather than resolving it silently in this repository.
+
+See `docs/architecture-references.md` in this repository for a map of implementation concepts to the relevant basis-architecture documents.
 
 ## License
 

@@ -38,3 +38,11 @@ A request is evaluated as follows:
 6. The adapter applies the decision: permit the operation or reject it.
 
 The policy engine does not carry operational traffic. It evaluates; it does not route, relay, or proxy.
+
+## Compatibility constraints
+
+**Action names** are compatibility-sensitive contracts. They appear simultaneously in deployed policies and in audit records. Once an action name is in production use — referenced in a policy, recorded in an audit event, or emitted by an adapter normalization mapping — it must not be renamed or have its scope changed without a versioned, documented break and a defined deprecation period. There is no runtime signal when a normalization and a policy diverge on an action name; the result is silent denial.
+
+**Resource identifiers** are audit-sensitive contracts. The `{type}:{qualifier}` format is a compatibility surface. Changing the identifier format invalidates policy references and breaks correlation in audit queries that span the format boundary.
+
+See `docs/architecture/compatibility-philosophy.md` and `docs/architecture/action-vocabulary.md` in basis-architecture for the governance rules that apply to these decisions.

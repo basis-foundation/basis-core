@@ -155,3 +155,11 @@ time.
 Policy versioning is the application's responsibility. This library records the
 version the caller provides; it does not manage policy lifecycle, distribution,
 or storage.
+
+## Compatibility
+
+Action names used in policy rules are compatibility-sensitive contracts. An action name that appears in a deployed policy must continue to evaluate correctly for the lifetime of that policy. Renaming or narrowing the scope of an established action name is a breaking change — it produces silent denials in policies that reference the prior name without any runtime error.
+
+Policy evaluation semantics must be stable across kernel version increments. Adding a new policy construct is additive. Changing the evaluation behavior of an existing construct — including the default-deny outcome for unmatched actions — is a breaking change.
+
+See `docs/architecture/compatibility-philosophy.md` in basis-architecture for the compatibility commitments that govern these decisions.

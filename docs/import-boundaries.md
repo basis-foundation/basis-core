@@ -1,8 +1,10 @@
 # Import Boundaries
 
-This document defines the allowed dependency direction between `basis_core` subpackages. The rule is simple: lower layers do not import from higher layers. `domain/` has no `basis_core` imports at all. `enforcement/` may import from everything else, but nothing imports from `enforcement/`.
+This document defines the allowed dependency direction between `basis_core` subpackages and the constraints on what may enter the kernel at all. It is the implementation specification for the architectural requirements stated in `docs/kernel-boundary-rules.md` in basis-architecture. That document is the architectural authority; this document is the implementation detail.
 
-Violations of these boundaries are bugs, not style issues. A module that imports from a layer above it introduces a circular dependency risk and erodes the testability of the lower layer.
+The rule is simple: lower layers do not import from higher layers. `domain/` has no `basis_core` imports at all. `enforcement/` may import from everything else, but nothing within `basis_core` imports from `enforcement/`.
+
+Violations of these boundaries are bugs, not style issues. A module that imports from a layer above it introduces a circular dependency risk and erodes the testability of the lower layer. A module that imports a framework, database client, or protocol library violates the kernel isolation that makes basis-core embeddable, testable, and portable.
 
 ## Allowed dependencies
 
@@ -69,3 +71,14 @@ Additional boundary assertions in `tests/test_import_boundaries.py` cover:
 - `domain/` does not import from any other `basis_core` subpackage
 
 These tests do not require running the imported modules. They catch violations at the source level, before they produce a `CircularImportError` at runtime.
+
+## Architectural context
+
+The layer structure above implements the kernel isolation model defined in `basis-architecture/docs/kernel-boundary-rules.md`. The structural intent:
+
+- `enforcement/` is the **orchestration layer**. It is the only component authorized to compose policy evaluation, decision handling, and audit writing into a single execution path. Nothing outside the application layer may import from `basis_core.enforcement` — not other basis_core subpackages, and not external adapter or gateway code.
+- `domain/`, `decisions/`, `policy/`, `audit/`, and `adapters/` must each be independently testable without instantiating the enforcement layer. This testability is a kernel property, not a testing convenience.
+- **Framework and runtime code must remain outside the kernel entirely.** HTTP frameworks, database ORMs, cloud SDKs, and protocol-specific libraries must not appear in any `basis_core` subpackage. The import boundary tests verify this statically.
+- **Protocol-specific packages must remain outside the kernel.** BACnet libraries, Modbus libraries, MQTT clients, and similar must not enter any layer. Protocol normalization belongs in `basis-adapters`, not here.
+
+If a proposed change requires expanding the import boundary rules — relaxing a constraint, permitting a new external dependency, or allowing a new inter-layer dependency — that change should be proposed and reviewed separately before the implementation that depends on it is merged. Import boundary rules are governance infrastructure. Expanding them to accommodate a specific feature is the wrong order of operations.
