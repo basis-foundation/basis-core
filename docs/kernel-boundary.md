@@ -4,6 +4,8 @@
 
 basis-core is the **authorization kernel** — the isolated core that all other components depend on. It contains exactly the logic needed to evaluate authorization requests and record decisions. Nothing more.
 
+The non-negotiable invariants that define what the kernel must always be — regardless of how the codebase evolves — are stated in `docs/kernel-constitution.md`. This document provides the rationale and implementation detail for those invariants as they apply to the kernel boundary specifically.
+
 The kernel is designed to be embedded in any application or service that needs authorization. It does not know what transport delivers a request, what database stores the audit log, which identity provider authenticated the user, or which OT protocol the field device speaks. Those concerns belong in the layers around the kernel, not inside it.
 
 ## What the kernel contains

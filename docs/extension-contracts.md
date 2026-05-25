@@ -293,7 +293,7 @@ Extension implementations must be isolated from the authorization decision path.
 
 ## Breaking changes to extension contracts
 
-The following changes to the extension interfaces are breaking changes that require a major version increment, an ADR, and a defined migration path.
+The following changes to the extension interfaces are breaking changes that require a major version increment, an ADR, and a defined migration path. Invariants 7 (adapters normalize), 8 (audit records evidence), and 9 (compatibility is a public contract) in `docs/kernel-constitution.md` establish why extension interfaces are stability obligations, not implementation conveniences.
 
 ### Behavioral breakage
 
