@@ -4,7 +4,7 @@ The JSON Schemas in `schemas/` are external compatibility contracts, not impleme
 
 This document explains what that commitment means in practice, what kinds of changes are breaking, and what open questions require resolution before certain schemas can be considered fully stabilized.
 
-Cross-references: `docs/architecture/compatibility-philosophy.md` in basis-architecture establishes the overarching rationale. `docs/audit-model.md`, `docs/policy-model.md`, and `docs/adapter-contracts.md` in this repository describe the semantic context behind the schemas. `docs/architecture-references.md` maps these schemas to their governing architecture documents.
+Cross-references: `docs/architecture/compatibility-philosophy.md` in basis-architecture establishes the overarching rationale. `docs/audit-model.md`, `docs/policy-model.md`, and `docs/adapter-contracts.md` in this repository describe the semantic context behind the schemas. `docs/architecture-references.md` maps these schemas to their governing architecture documents. `docs/schema-versioning.md` defines the schema evolution rules, the breaking-change process, and the open versioning questions.
 
 ---
 
@@ -145,6 +145,8 @@ The schemas themselves do not currently carry a version identifier (distinct fro
 **Open question**: Should a `version` or `x-schema-version` annotation be added to the schemas to make schema revision explicit, independently of the `$schema` declaration?
 
 This is not urgent while the schemas are pre-1.0 and breaking changes carry no compatibility obligation. It becomes important once consumers begin building against a specific schema revision.
+
+See `docs/schema-versioning.md` for the full set of schema evolution rules, the breaking-change process, and all open versioning questions in one place.
 
 ---
 
