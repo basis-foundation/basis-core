@@ -38,6 +38,7 @@ tests/
       decision_request.deny.json
       decision_response.allow.json
       decision_response.deny.json
+      decision_response.fail_closed.json
       audit_event.allow.json
       audit_event.deny.json
       evaluation_trace.allow.json
@@ -90,7 +91,9 @@ The fixtures in `tests/fixtures/contracts/` are stable JSON files that represent
 - `timestamp`: `2026-05-22T14:30:00Z`
 - `schema_version`: `1.1`
 
-The `evaluation_trace` fixtures represent two canonical evaluation shapes: an allow outcome where ALLOW did not short-circuit (two rules evaluated: one allow, one not_applicable), and a deny outcome where DENY short-circuited after the first rule.
+The `evaluation_trace` fixtures represent two canonical evaluation shapes: an allow outcome where ALLOW did not short-circuit (two rules evaluated: one allow, one not_applicable), and a deny outcome where DENY short-circuited after the first rule because a second rule was registered but never called. Note that `short_circuited` is not simply True for every DENY — it is True only when `len(evaluated_rules) < total rules registered`. If the denying rule is the last (or only) registered rule, `short_circuited` is False.
+
+The `decision_response.fail_closed` fixture captures the distinct shape of an enforcement boundary failure: `outcome="deny"` with a non-null `failure_reason`. This is structurally different from `decision_response.deny` (a policy-produced refusal) because consumers use `failure_reason` to distinguish enforcement failures from normal policy decisions. `failure_reason` serializes as a plain lowercase string (e.g., `"policy_error"`, not `"POLICY_ERROR"`); this value is a contract.
 
 ---
 
@@ -136,9 +139,16 @@ If `jsonschema` is not installed, the schema-validation tests are skipped with a
 
 A snapshot test failure means the serialized shape of a model no longer matches the stored fixture. Before updating the fixture, determine whether the change is:
 
-**Additive** — a new optional field with defined absence semantics. Update the fixture to include the new field. Add a changelog entry. No architecture review required, but the fixture commit should be visible in code review.
+**Additive** — a new optional field with defined absence semantics, or a new enum value. Update the fixture to include the new field or value. Add a changelog entry. No architecture review or ADR is required, but the fixture commit must be visible in code review so that the contract change is explicit.
 
-**Breaking** — a field renamed, removed, or changed type. Do not update the fixture until architecture review has been completed and an ADR filed, per the process in `docs/schema-versioning.md`. The failing test is the signal that the breaking change has occurred — it must not be silenced until the governance steps are complete.
+**Breaking** — any of the following require architecture review in basis-architecture and an ADR before the fixture may be updated:
+- Field renamed or removed
+- Field type changed (including serialization format changes)
+- Required field added
+- Enum value removed or semantically redefined
+- `failure_reason` string value changed
+
+The failing test is the signal that the breaking change has occurred. It must not be silenced until the governance steps — architecture review, ADR, defined migration path — are complete per `docs/schema-versioning.md`.
 
 ### In `test_backward_compatibility.py`
 
@@ -174,3 +184,5 @@ This harness complements rather than replaces the existing test suite:
 `test_evaluation_semantics.py` — tests the DENY/ALLOW/NOT_APPLICABLE evaluation algorithm in detail. The compatibility harness captures the *serialized shape* of evaluation traces but does not re-test the algorithm.
 
 `test_extension_contracts.py` — tests the behavioral contracts of the extension interfaces. The compatibility harness captures the serialized representation of the records those interfaces produce.
+
+Extension interface method names (`AuditWriter.write`, `PolicyRule.evaluate`, `AdapterBase.start`/`stop`) are not protected by JSON snapshots — they are protected by the `isinstance` checks in `test_extension_contracts.py`. Because `AuditWriter`, `PolicyRule`, and `AdapterBase` are `@runtime_checkable` Protocols, renaming a method on the Protocol causes existing implementations to fail the `isinstance` check in that file. This is the correct protection mechanism: interface contracts are behavioral, not serialized.
