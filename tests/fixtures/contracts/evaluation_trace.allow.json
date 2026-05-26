@@ -1,0 +1,16 @@
+{
+  "final_outcome": "allow",
+  "evaluated_rules": [
+    {
+      "rule_name": "RolePolicyRule",
+      "outcome": "allow",
+      "reason": "Role 'operator' is permitted for 'write:hvac:setpoint'."
+    },
+    {
+      "rule_name": "ResourceTypePolicyRule",
+      "outcome": "not_applicable",
+      "reason": "No resource type restrictions for this action."
+    }
+  ],
+  "short_circuited": false
+}

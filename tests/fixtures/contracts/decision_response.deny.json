@@ -1,0 +1,9 @@
+{
+  "request_id": "a1b2c3d4-0002-0000-0000-000000000002",
+  "outcome": "deny",
+  "reason": "Subject role 'viewer' is not permitted to perform 'write:hvac:setpoint'.",
+  "evaluated_by": "RolePolicyRule",
+  "policy_version": "v1.0.0",
+  "failure_reason": null,
+  "timestamp": "2026-05-22T14:30:00Z"
+}

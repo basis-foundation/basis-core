@@ -1,0 +1,37 @@
+{
+  "event_id": "e1000000-0000-0000-0000-000000000002",
+  "event_type": "authorization_decision",
+  "timestamp": "2026-05-22T14:30:00Z",
+  "schema_version": "1.1",
+  "request_id": "a1b2c3d4-0002-0000-0000-000000000002",
+  "decision_id": null,
+  "correlation_id": null,
+  "subject_id": "a7b8c9d0-1234-5678-abcd-ef0123456789",
+  "subject_name": null,
+  "subject_type": "human",
+  "subject_roles": [
+    "viewer"
+  ],
+  "action": "write:hvac:setpoint",
+  "resource_id": "hvac:zone-a",
+  "resource_type": "hvac",
+  "outcome": "denied",
+  "reason": "Subject role 'viewer' is not permitted to perform 'write:hvac:setpoint'.",
+  "evaluated_by": "RolePolicyRule",
+  "policy_version": "v1.0.0",
+  "matched_rules": [
+    "RolePolicyRule"
+  ],
+  "trace": {
+    "final_outcome": "deny",
+    "evaluated_rules": [
+      {
+        "rule_name": "RolePolicyRule",
+        "outcome": "deny",
+        "reason": "Role 'viewer' is not permitted to perform 'write:hvac:setpoint'."
+      }
+    ],
+    "short_circuited": true
+  },
+  "detail": {}
+}

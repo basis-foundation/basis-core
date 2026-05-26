@@ -1,0 +1,11 @@
+{
+  "final_outcome": "deny",
+  "evaluated_rules": [
+    {
+      "rule_name": "RolePolicyRule",
+      "outcome": "deny",
+      "reason": "Role 'viewer' is not permitted to perform 'write:hvac:setpoint'."
+    }
+  ],
+  "short_circuited": true
+}
