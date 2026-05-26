@@ -1,0 +1,42 @@
+{
+  "event_id": "e1000000-0000-0000-0000-000000000001",
+  "event_type": "authorization_decision",
+  "timestamp": "2026-05-22T14:30:00Z",
+  "schema_version": "1.1",
+  "request_id": "a1b2c3d4-0001-0000-0000-000000000001",
+  "decision_id": null,
+  "correlation_id": null,
+  "subject_id": "a7b8c9d0-1234-5678-abcd-ef0123456789",
+  "subject_name": null,
+  "subject_type": "human",
+  "subject_roles": [
+    "operator"
+  ],
+  "action": "write:hvac:setpoint",
+  "resource_id": "hvac:zone-a",
+  "resource_type": "hvac",
+  "outcome": "allowed",
+  "reason": "Subject holds a role permitted for 'write:hvac:setpoint'.",
+  "evaluated_by": "RolePolicyRule",
+  "policy_version": "v1.0.0",
+  "matched_rules": [
+    "RolePolicyRule"
+  ],
+  "trace": {
+    "final_outcome": "allow",
+    "evaluated_rules": [
+      {
+        "rule_name": "RolePolicyRule",
+        "outcome": "allow",
+        "reason": "Role 'operator' is permitted for 'write:hvac:setpoint'."
+      },
+      {
+        "rule_name": "ResourceTypePolicyRule",
+        "outcome": "not_applicable",
+        "reason": "No resource type restrictions for this action."
+      }
+    ],
+    "short_circuited": false
+  },
+  "detail": {}
+}
