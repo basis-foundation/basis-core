@@ -41,6 +41,7 @@ from basis_core.decisions.models import (
     DecisionOutcome,
     DecisionRequest,
     DecisionResponse,
+    FailureReason,
 )
 from tests.helpers.contracts import assert_matches_fixture, fixture_names
 
@@ -215,6 +216,25 @@ class TestDecisionResponseSnapshots:
             f"Missing: {expected_fields - set(fixture.keys())}"
         )
 
+    def test_fail_closed_response_matches_fixture(self) -> None:
+        """fail-closed denial: outcome='deny', failure_reason='policy_error'.
+
+        This is structurally distinct from a policy-produced denial
+        (decision_response.deny) where failure_reason is null. Consumers and
+        audit pipelines use failure_reason to distinguish enforcement failures
+        from normal policy refusals.
+        """
+        resp = DecisionResponse(
+            request_id=_DENY_REQUEST_ID,
+            outcome=DecisionOutcome.DENY,
+            reason="Policy evaluation failed due to an internal rule error. Access denied.",
+            evaluated_by="PolicyEngine",
+            policy_version="v1.0.0",
+            failure_reason=FailureReason.POLICY_ERROR,
+            timestamp=_TS,
+        )
+        assert_matches_fixture(resp, "decision_response.fail_closed")
+
     def test_outcome_values_are_strings(self) -> None:
         """Serialized outcome is a plain string, not an enum wrapper."""
         from tests.helpers.contracts import load_fixture
@@ -224,6 +244,27 @@ class TestDecisionResponseSnapshots:
             "outcome must serialize as a plain string, not an enum or object"
         )
         assert fixture["outcome"] == "allow"
+
+    def test_failure_reason_serializes_as_string(self) -> None:
+        """failure_reason serializes as a plain string when set, null when absent."""
+        from tests.helpers.contracts import load_fixture
+
+        # Policy-produced denial: failure_reason is null.
+        deny_fixture = load_fixture("decision_response.deny")
+        assert deny_fixture["failure_reason"] is None, (
+            "failure_reason must be null for policy-produced denials"
+        )
+
+        # Fail-closed denial: failure_reason is the enum string value.
+        fail_closed_fixture = load_fixture("decision_response.fail_closed")
+        assert isinstance(fail_closed_fixture["failure_reason"], str), (
+            "failure_reason must serialize as a plain string when set, not an enum or object"
+        )
+        assert fail_closed_fixture["failure_reason"] == "policy_error", (
+            f"failure_reason value changed: expected 'policy_error', "
+            f"got {fail_closed_fixture['failure_reason']!r}. "
+            "Enum value changes are breaking — see docs/schema-versioning.md."
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -385,12 +426,20 @@ class TestDecisionTraceSnapshots:
         )
 
     def test_deny_trace_short_circuited_true(self) -> None:
-        """DENY outcome — short_circuited must be True when not all rules were evaluated."""
+        """DENY outcome — short_circuited is True when fewer rules were evaluated than registered.
+
+        Per evaluation-semantics.md: short_circuited = (outcome is DENY) AND
+        (len(evaluated_rules) < total rules registered). The deny fixture models
+        a two-rule engine where the first rule denied and the second was never called.
+        short_circuited is NOT simply True for every DENY — if the denying rule is
+        the last (or only) registered rule, short_circuited is False.
+        """
         from tests.helpers.contracts import load_fixture
 
         fixture = load_fixture("evaluation_trace.deny")
         assert fixture["short_circuited"] is True, (
-            "short_circuited must be True for short-circuit DENY outcomes."
+            "short_circuited must be True when a DENY stopped evaluation before "
+            "all registered rules were called."
         )
 
     def test_evaluated_rules_order_preserved(self) -> None:
@@ -434,6 +483,7 @@ class TestFixtureInventory:
             "decision_request.deny",
             "decision_response.allow",
             "decision_response.deny",
+            "decision_response.fail_closed",
             "evaluation_trace.allow",
             "evaluation_trace.deny",
         }

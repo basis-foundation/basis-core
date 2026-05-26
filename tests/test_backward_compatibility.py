@@ -110,6 +110,10 @@ class TestContractFixturesValidateAgainstSchemas:
         schema = _load_schema("decision-response")
         _schema_validate(load_fixture("decision_response.deny"), schema)
 
+    def test_decision_response_fail_closed_fixture_is_schema_valid(self) -> None:
+        schema = _load_schema("decision-response")
+        _schema_validate(load_fixture("decision_response.fail_closed"), schema)
+
     def test_audit_event_allow_fixture_is_schema_valid(self) -> None:
         schema = _load_schema("audit-event")
         _schema_validate(load_fixture("audit_event.allow"), schema)
@@ -152,6 +156,17 @@ class TestContractFixturesDeserializeIntoModels:
         resp = DecisionResponse.model_validate(fixture)
         assert resp.outcome.value == "deny"
         assert resp.failure_reason is None
+
+    def test_decision_response_fail_closed_fixture_deserializes(self) -> None:
+        """Fail-closed denial: failure_reason deserializes to the FailureReason enum."""
+        from basis_core.decisions.models import FailureReason
+
+        fixture = load_fixture("decision_response.fail_closed")
+        resp = DecisionResponse.model_validate(fixture)
+        assert resp.outcome.value == "deny"
+        assert resp.failure_reason is not None
+        assert resp.failure_reason == FailureReason.POLICY_ERROR
+        assert resp.failure_reason.value == "policy_error"
 
     def test_audit_event_allow_fixture_deserializes(self) -> None:
         fixture = load_fixture("audit_event.allow")
@@ -247,6 +262,10 @@ class TestContractFixtureRoundTrips:
 
     def test_decision_response_deny_round_trip(self) -> None:
         self._round_trip_decision_response("decision_response.deny")
+
+    def test_decision_response_fail_closed_round_trip(self) -> None:
+        """failure_reason value survives round-trip as the same enum string."""
+        self._round_trip_decision_response("decision_response.fail_closed")
 
     def test_audit_event_allow_round_trip(self) -> None:
         self._round_trip_audit_event("audit_event.allow")
