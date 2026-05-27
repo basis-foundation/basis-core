@@ -2,7 +2,7 @@
 
 This document describes the backward compatibility and contract snapshot testing harness for basis-core. The harness provides executable regression protection for the public kernel contracts — the serialized shapes and behavioral contracts that external consumers depend on.
 
-Cross-references: `docs/schema-versioning.md` defines what counts as a breaking vs. additive change. `docs/kernel-constitution.md` Invariant 9 establishes why compatibility is a governance concern. `docs/extension-contracts.md` documents the behavioral contracts the tests enforce.
+Cross-references: `docs/schema-versioning.md` defines what counts as a breaking vs. additive change. `docs/kernel-constitution.md` Invariant 9 establishes why compatibility is a governance concern. `docs/extension-contracts.md` documents the behavioral contracts the tests enforce. `docs/breaking-change-discipline.md` defines the unified process for classifying and executing contract changes across all surfaces — including what a test failure here signals and what governance steps must complete before a fixture may be updated.
 
 ---
 

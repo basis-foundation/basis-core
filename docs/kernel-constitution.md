@@ -6,6 +6,8 @@ This document states the non-negotiable invariants of basis-core — the laws th
 
 It is not a substitute for the detailed specifications in `docs/evaluation-semantics.md`, `docs/extension-contracts.md`, `docs/schema-versioning.md`, `docs/kernel-boundary.md`, and `docs/import-boundaries.md`. Those documents define *how* each invariant is implemented and enforced. This document defines *what* must never change about the kernel as a whole.
 
+For the process that governs changes to public contracts (schemas, fixtures, public API, evaluation semantics, extension interfaces, audit behavior, action vocabulary), see `docs/breaking-change-discipline.md`.
+
 When a proposed change raises the question "does this belong in basis-core?" — this is the first place to check.
 
 ---
@@ -118,6 +120,7 @@ This document is the highest-level summary of the kernel's laws. It answers "mus
 | `docs/audit-model.md` | Audit record model; append-only semantics; AuditWriter protocol |
 | `docs/failure-modes.md` | Concrete failure scenarios and library behavior in each case |
 | `docs/adapter-contracts.md` | Normalization requirements; NormalizedEvent contracts |
+| `docs/breaking-change-discipline.md` | Unified process: how to classify, govern, and execute public contract changes |
 | `docs/architecture/compatibility-philosophy.md` (basis-architecture) | Governing rationale for compatibility as an architectural concern |
 | `docs/kernel-boundary-rules.md` (basis-architecture) | Enforceable boundary rules; boundary decision test; disallowed concerns |
 

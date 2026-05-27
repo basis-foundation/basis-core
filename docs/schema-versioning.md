@@ -4,7 +4,7 @@ This document establishes the minimum safe compatibility discipline for schema e
 
 This is **not** a full migration framework, a schema registry service, or a finalized versioning scheme. It captures the baseline rules that protect external consumers from accidental incompatible schema changes while those larger questions remain open.
 
-Cross-references: `docs/schema-contracts.md` documents the stability rules and open questions for each schema. `docs/architecture/compatibility-philosophy.md` in basis-architecture establishes the governing rationale — this document operationalizes that rationale for the schemas in this repository. `docs/audit-model.md` and `docs/core-domain.md` describe the semantic context these schemas encode. Invariant 9 in `docs/kernel-constitution.md` states the constitutional commitment that makes schema evolution a governance concern rather than a purely local coding decision.
+Cross-references: `docs/schema-contracts.md` documents the stability rules and open questions for each schema. `docs/architecture/compatibility-philosophy.md` in basis-architecture establishes the governing rationale — this document operationalizes that rationale for the schemas in this repository. `docs/audit-model.md` and `docs/core-domain.md` describe the semantic context these schemas encode. Invariant 9 in `docs/kernel-constitution.md` states the constitutional commitment that makes schema evolution a governance concern rather than a purely local coding decision. `docs/breaking-change-discipline.md` is the unified process document that covers all contract surfaces, including schemas; the breaking-change process section in that document supersedes the process section in this file where they differ.
 
 ---
 

@@ -2,7 +2,7 @@
 
 This document is the authoritative inventory of what external consumers may import and depend on from basis-core. It classifies every symbol into one of three tiers and specifies the import path for each.
 
-Cross-references: `docs/import-boundaries.md` defines the allowed dependency graph between subpackages. `docs/extension-contracts.md` specifies the behavioral contracts for extension-point interfaces. `docs/compatibility-testing.md` describes the test harness that protects the serialised shapes of public contracts. `docs/schema-versioning.md` governs schema evolution. `docs/kernel-constitution.md` states the invariants that constrain this surface.
+Cross-references: `docs/import-boundaries.md` defines the allowed dependency graph between subpackages. `docs/extension-contracts.md` specifies the behavioral contracts for extension-point interfaces. `docs/compatibility-testing.md` describes the test harness that protects the serialised shapes of public contracts. `docs/schema-versioning.md` governs schema evolution. `docs/kernel-constitution.md` states the invariants that constrain this surface. `docs/breaking-change-discipline.md` defines the required process for any change to this surface.
 
 ---
 
