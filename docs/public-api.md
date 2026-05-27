@@ -218,19 +218,19 @@ The following are implementation details. They must not be imported by code outs
 
 ### `basis_core.api`
 
-`basis_core.api` and `basis_core.api.enforcement` are **deprecated stubs** retained only because the sandbox does not support file deletion. They re-export `EnforcementPoint` from `basis_core.enforcement.enforcement`.
+`basis_core.api` and `basis_core.api.enforcement` are **deprecated stubs** scheduled for removal after v0.1. They were created during an internal refactor when `EnforcementPoint` lived in `api/` and was later moved to `enforcement/`. Importing from either path now emits a `DeprecationWarning`.
 
 **Do not import from `basis_core.api`.** Use `basis_core.enforcement` instead:
 
 ```python
-# Deprecated — do not use
+# Deprecated — emits DeprecationWarning, will be removed
 from basis_core.api.enforcement import EnforcementPoint
 
 # Correct
 from basis_core.enforcement import EnforcementPoint
 ```
 
-The `basis_core.api` package is not protected by the public API test suite and carries no compatibility guarantee.
+The `basis_core.api` package is not protected by the public API test suite and carries no compatibility guarantee. It will be removed in the release following v0.1.
 
 ---
 

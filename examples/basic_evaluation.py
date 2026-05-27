@@ -1,8 +1,13 @@
 """
 examples/basic_evaluation.py — minimal end-to-end authorization evaluation.
 
-Demonstrates the core loop: construct a Subject, submit a DecisionRequest
-through an EnforcementPoint, and inspect the result.
+Demonstrates the integration boundary: the application constructs a Subject
+(from pre-verified identity), submits a DecisionRequest to an EnforcementPoint,
+and inspects the DecisionResponse. The kernel handles policy evaluation, the
+fail-closed guarantee, and the audit trail.
+
+This example uses only the stable public API. No transport, database, identity
+provider, or protocol adapter is required.
 
 Run:
     cd basis-core
@@ -11,12 +16,11 @@ Run:
 
 from __future__ import annotations
 
-from basis_core.audit.writer import LogAuditWriter
-from basis_core.decisions.models import DecisionRequest
-from basis_core.domain.subject import Subject
-from basis_core.enforcement.enforcement import EnforcementPoint
-from basis_core.policy.engine import PolicyEngine
-from basis_core.policy.rules import RolePolicyRule
+from basis_core.audit import LogAuditWriter
+from basis_core.decisions import DecisionRequest
+from basis_core.domain import Subject
+from basis_core.enforcement import EnforcementPoint
+from basis_core.policy import PolicyEngine, RolePolicyRule
 
 # ── Policy configuration ──────────────────────────────────────────────────────
 

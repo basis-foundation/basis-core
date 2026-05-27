@@ -62,13 +62,17 @@ domain/ ← decisions/ ← audit/
 
 ## Verifying the boundary
 
-The import boundary is tested in `tests/test_models.py` and `tests/test_policy_rules.py`. The tests use `ast.parse()` to inspect each source file statically and confirm that modules in `domain/`, `policy/`, `decisions/`, `audit/`, and `adapters/` do not import from `basis_core.enforcement`.
+The primary enforcement is in `tests/test_import_boundaries.py`, which uses `ast.parse()` to inspect every kernel source file statically. It asserts:
 
-Additional boundary assertions in `tests/test_import_boundaries.py` cover:
-- No imports from external framework packages (FastAPI, Flask, SQLAlchemy, etc.)
-- `enforcement/` does not import from `adapters/`
-- `policy/` does not import from `audit/`, `enforcement/`, or `adapters/`
+- No imports from external framework packages (FastAPI, Flask, SQLAlchemy, HTTP clients, etc.)
+- No imports from OT protocol libraries, cloud SDKs, or Kubernetes clients
 - `domain/` does not import from any other `basis_core` subpackage
+- `policy/` does not import from `audit/`, `enforcement/`, or `adapters/`
+- `enforcement/` does not import from `adapters/`
+- `audit/` does not import from `enforcement/`, `adapters/`, or `policy/`
+- `decisions/` does not import from `enforcement/`
+
+`tests/test_models.py` and `tests/test_policy_rules.py` also include targeted static boundary assertions for the packages they exercise. These complement `test_import_boundaries.py` but `test_import_boundaries.py` is the authoritative boundary check.
 
 These tests do not require running the imported modules. They catch violations at the source level, before they produce a `CircularImportError` at runtime.
 

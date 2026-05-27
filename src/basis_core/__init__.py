@@ -15,13 +15,15 @@ Package layout:
                Imports from domain/ only.
 
   audit/       Audit event types and the AuditWriter protocol.
-               Imports from domain/ and decisions/ only.
+               Imports from domain/ only.
+
+  enforcement/ The authorization enforcement boundary.
+               Imports from policy/, audit/, decisions/, adapters/, domain/.
+               EnforcementPoint connects policy evaluation and audit writing.
 
   adapters/    Adapter protocol and base utilities.
                Adapters normalize external representations into domain types.
-               Adapter implementations must not import from api/.
-
-  api/         Entry points for exposing core logic over HTTP or other transports.
-               Imports from all other subpackages.
-               Infrastructure (FastAPI, databases, etc.) is introduced here only.
+               Implementations live outside this repository.
 """
+
+__version__ = "0.1.0"
