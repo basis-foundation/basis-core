@@ -11,10 +11,10 @@ Run:
 
 from __future__ import annotations
 
-from basis_core.enforcement.enforcement import EnforcementPoint
 from basis_core.audit.writer import LogAuditWriter
 from basis_core.decisions.models import DecisionRequest
 from basis_core.domain.subject import Subject
+from basis_core.enforcement.enforcement import EnforcementPoint
 from basis_core.policy.engine import PolicyEngine
 from basis_core.policy.rules import RolePolicyRule
 
@@ -35,6 +35,7 @@ ep = EnforcementPoint(engine=engine, audit_writer=writer, policy_version="exampl
 
 # ── Evaluate some requests ────────────────────────────────────────────────────
 
+
 def evaluate(name: str, roles: list[str], action: str, resource: str) -> None:
     subject = Subject(id=f"id-{name}", name=name, roles=roles)
     request = DecisionRequest(
@@ -53,8 +54,8 @@ def evaluate(name: str, roles: list[str], action: str, resource: str) -> None:
 if __name__ == "__main__":
     print("basis-core: basic evaluation example\n")
 
-    evaluate("alice", ["operator"], "write:hvac:setpoint",   "hvac:zone-a")
-    evaluate("bob",   ["viewer"],   "write:hvac:setpoint",   "hvac:zone-a")
-    evaluate("carol", ["admin"],    "read:audit:log",         "audit:log")
-    evaluate("dave",  ["viewer"],   "read:sensor:telemetry",  "sensor:co2")
-    evaluate("eve",   ["operator"], "read:audit:log",         "audit:log")
+    evaluate("alice", ["operator"], "write:hvac:setpoint", "hvac:zone-a")
+    evaluate("bob", ["viewer"], "write:hvac:setpoint", "hvac:zone-a")
+    evaluate("carol", ["admin"], "read:audit:log", "audit:log")
+    evaluate("dave", ["viewer"], "read:sensor:telemetry", "sensor:co2")
+    evaluate("eve", ["operator"], "read:audit:log", "audit:log")

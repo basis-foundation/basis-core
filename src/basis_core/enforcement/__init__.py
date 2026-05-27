@@ -13,4 +13,15 @@ Contents
   enforcement.py   EnforcementPoint — submits DecisionRequests to the
                    PolicyEngine, records decisions in the audit log, and
                    returns DecisionResponses. Fail-closed on all error paths.
+
+Public API
+──────────
+``EnforcementPoint`` is the sole public export of this package.
+See ``docs/public-api.md`` for the full inventory and stability tiers.
 """
+
+from basis_core.enforcement.enforcement import EnforcementPoint
+
+__all__ = [
+    "EnforcementPoint",
+]

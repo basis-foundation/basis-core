@@ -16,9 +16,23 @@ and wire formats must not appear outside the adapter that owns them.
 
 Contents
 ────────
-  base.py    AdapterBase protocol — the lifecycle interface all adapters implement.
+  base.py    AdapterBase (Protocol) and NormalizedEvent.
+             AdapterBase — lifecycle interface all adapters implement.
+             NormalizedEvent — protocol-agnostic output of adapter normalization.
 
 Concrete adapter implementations (BACnet, Modbus, MQTT, etc.) live outside
 this package or in a separate repository. They depend on basis_core but are
 not part of it.
+
+Public API
+──────────
+All stable public symbols are available directly from this package.
+See ``docs/public-api.md`` for the full inventory and stability tiers.
 """
+
+from basis_core.adapters.base import AdapterBase, NormalizedEvent
+
+__all__ = [
+    "AdapterBase",
+    "NormalizedEvent",
+]
