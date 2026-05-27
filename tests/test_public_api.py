@@ -450,5 +450,3 @@ class TestTopLevelPackage:
         import basis_core  # noqa: F401
 
         assert basis_core is not None
-
-
