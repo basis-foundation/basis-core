@@ -96,7 +96,7 @@ Field removal, field renaming, semantic redefinition, enum value removal, and re
 
 Every component in the ecosystem depends on basis-core. basis-core depends on none of them.
 
-basis-core must not import from basis-gateway, basis-console, basis-adapters, basis-deploy, or any BASAuth component. Within the kernel, import direction is strictly downward: `domain` is the dependency sink; `enforcement` is the top layer; lower layers never import from higher ones.
+basis-core must not import from basis-gateway, basis-console, basis-adapters, basis-deploy, or any higher-level system component. Within the kernel, import direction is strictly downward: `domain` is the dependency sink; `enforcement` is the top layer; lower layers never import from higher ones.
 
 A proposed change that requires basis-core to depend on a higher-level component, a cloud platform SDK, or any external runtime service is categorically out of scope. The correct response to such a design pressure is to reconsider whether the concern belongs in the kernel at all.
 

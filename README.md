@@ -68,10 +68,22 @@ request = DecisionRequest(
 )
 
 response = ep.evaluate(request, subject=subject)
+print(response.allowed)   # True
 print(response.outcome)   # DecisionOutcome.ALLOW
+print(response.reason)    # human-readable explanation
 ```
 
 See `examples/basic_evaluation.py` for a more complete example.
+
+## Documentation
+
+Key documents in `docs/`:
+
+- [`docs/public-api.md`](docs/public-api.md) — stable public API surface, tier definitions, and versioning commitments
+- [`docs/evaluation-semantics.md`](docs/evaluation-semantics.md) — deterministic evaluation contract, DENY short-circuit, fail-closed semantics
+- [`docs/extension-contracts.md`](docs/extension-contracts.md) — `PolicyRule`, `AuditWriter`, `AdapterBase` behavioral contracts
+- [`docs/kernel-constitution.md`](docs/kernel-constitution.md) — non-negotiable kernel invariants
+- [`docs/breaking-change-discipline.md`](docs/breaking-change-discipline.md) — governance process for public contract changes
 
 ## Development
 
@@ -113,6 +125,14 @@ The basis-architecture repository is the review authority for changes that affec
 
 See `docs/architecture-references.md` in this repository for a map of implementation concepts to the relevant basis-architecture documents.
 
+## Status
+
+basis-core is at v0.1. The public API, evaluation semantics, and extension interfaces are stabilized and covered by contract tests. Breaking changes require an ADR and architecture review — see `docs/breaking-change-discipline.md`.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE).
