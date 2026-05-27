@@ -45,12 +45,11 @@ Requires Python 3.10+. Runtime dependency: [pydantic](https://docs.pydantic.dev/
 ## Quick start
 
 ```python
-from basis_core.enforcement.enforcement import EnforcementPoint
-from basis_core.audit.writer import LogAuditWriter
-from basis_core.decisions.models import DecisionRequest
-from basis_core.domain.subject import Subject
-from basis_core.policy.engine import PolicyEngine
-from basis_core.policy.rules import RolePolicyRule
+from basis_core.enforcement import EnforcementPoint
+from basis_core.audit import LogAuditWriter
+from basis_core.decisions import DecisionRequest
+from basis_core.domain import Subject
+from basis_core.policy import PolicyEngine, RolePolicyRule
 
 ROLE_TABLE = {
     "write:hvac:setpoint": {"operator", "admin"},
