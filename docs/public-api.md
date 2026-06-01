@@ -26,7 +26,7 @@ Core domain types. No imports from any other `basis_core` subpackage. Immutable 
 |---|---|---|
 | `Subject` | `basis_core.domain` or `basis_core.domain.subject` | Frozen Pydantic model. Normalized identity of any entity performing an action. |
 | `SubjectType` | `basis_core.domain` or `basis_core.domain.subject` | Enum: `HUMAN`, `DEVICE`, `SERVICE`, `GATEWAY`, `AGENT`. |
-| `subject_from_jwt` | `basis_core.domain` or `basis_core.domain.subject` | Factory: constructs a `Subject` from a decoded OIDC/JWT payload. |
+| `subject_from_jwt` | `basis_core.domain` or `basis_core.domain.subject` | **Deprecated** — see ADR-0005. Factory: constructs a `Subject` from a decoded OIDC/JWT payload. Assumes Keycloak/OIDC claim conventions; this is a kernel boundary violation. JWT normalization belongs at the gateway layer. Will be removed in a future release. Do not introduce new dependencies on this function. |
 | `Resource` | `basis_core.domain` or `basis_core.domain.resource` | Frozen Pydantic model. Immutable descriptor for any OT resource. |
 | `ResourceType` | `basis_core.domain` or `basis_core.domain.resource` | Enum: `HVAC`, `SENSOR`, `ZONE`, `DEVICE`, `GATEWAY`. |
 | `build_resource_id` | `basis_core.domain` or `basis_core.domain.resource` | Utility: constructs a normalized `{type}:{qualifier}` resource identifier. |
@@ -253,4 +253,4 @@ The following questions are deferred to basis-architecture. They are tracked her
 
 **Top-level `basis_core` namespace** — `basis_core.__init__.py` currently exports nothing. Whether to provide a convenience namespace (`from basis_core import Subject, EnforcementPoint, ...`) is deliberately deferred. A flat top-level namespace is ergonomic but commits to a fixed shape that is harder to evolve. Track as `OPEN: top-level-namespace`.
 
-**`subject_from_jwt` placement** — `subject_from_jwt` is in `basis_core.domain.subject` but assumes a Keycloak/OIDC JWT structure. It is a convenience factory, not a core domain type. Whether it belongs in a future `basis_core.auth` helper module rather than `domain` is an open question. Track as `OPEN: subject-from-jwt-placement`.
+**`subject_from_jwt` placement** — Resolved by ADR-0005. JWT/OIDC normalization belongs at the gateway layer, not in the kernel. `subject_from_jwt` is deprecated. It will be removed in a future release. New code should implement normalization in `basis-gateway` or an equivalent trusted runtime component. See `docs/adr/ADR-0005-move-jwt-normalization-outside-kernel.md`.
