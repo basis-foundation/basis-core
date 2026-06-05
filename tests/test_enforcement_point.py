@@ -424,3 +424,117 @@ def test_deny_overrides_any_number_of_allows(n_allows: int) -> None:
     subject = Subject(id="u1", name="alice", roles=["operator"])
     response = ep.evaluate(make_request(), subject=subject)
     assert response.outcome == DecisionOutcome.DENY
+
+
+# ── Public policy_version accessor ────────────────────────────────────────────
+
+
+def test_policy_version_property_returns_configured_value() -> None:
+    """EnforcementPoint.policy_version exposes the value set at construction."""
+    ep = EnforcementPoint(
+        engine=PolicyEngine(policies=[RolePolicyRule(ROLE_TABLE)]),
+        audit_writer=_null_writer(),
+        policy_version="v2.3.1",
+    )
+    assert ep.policy_version == "v2.3.1"
+
+
+def test_policy_version_property_returns_none_when_not_set() -> None:
+    """EnforcementPoint.policy_version is None when no version was provided."""
+    ep = EnforcementPoint(
+        engine=PolicyEngine(policies=[RolePolicyRule(ROLE_TABLE)]),
+        audit_writer=_null_writer(),
+    )
+    assert ep.policy_version is None
+
+
+def test_policy_version_property_is_read_only() -> None:
+    """EnforcementPoint.policy_version must not be assignable."""
+    ep = EnforcementPoint(
+        engine=PolicyEngine(policies=[RolePolicyRule(ROLE_TABLE)]),
+        audit_writer=_null_writer(),
+        policy_version="v1",
+    )
+    with pytest.raises(AttributeError):
+        ep.policy_version = "v2"  # type: ignore[misc]
+
+
+def test_policy_version_propagates_to_response() -> None:
+    """policy_version set on the EP appears verbatim in every DecisionResponse."""
+    ep = EnforcementPoint(
+        engine=PolicyEngine(policies=[RolePolicyRule(ROLE_TABLE)]),
+        audit_writer=_null_writer(),
+        policy_version="release-42",
+    )
+    subject = Subject(id="u1", name="alice", roles=["operator"])
+    response = ep.evaluate(make_request(), subject=subject)
+    assert response.policy_version == "release-42"
+
+
+def test_policy_version_none_propagates_to_response() -> None:
+    """A None policy_version on the EP produces None in the DecisionResponse."""
+    ep = EnforcementPoint(
+        engine=PolicyEngine(policies=[RolePolicyRule(ROLE_TABLE)]),
+        audit_writer=_null_writer(),
+    )
+    subject = Subject(id="u1", name="alice", roles=["operator"])
+    response = ep.evaluate(make_request(), subject=subject)
+    assert response.policy_version is None
+
+
+def test_policy_version_propagates_to_audit_event() -> None:
+    """policy_version set on the EP appears in the AuditEvent."""
+    captured: list[AuditEvent] = []
+    ep = EnforcementPoint(
+        engine=PolicyEngine(policies=[RolePolicyRule(ROLE_TABLE)]),
+        audit_writer=_capturing_writer(captured),
+        policy_version="audit-v9",
+    )
+    subject = Subject(id="u1", name="alice", roles=["operator"])
+    ep.evaluate(make_request(), subject=subject)
+    assert len(captured) == 1
+    assert captured[0].policy_version == "audit-v9"
+
+
+def test_policy_version_none_propagates_to_audit_event() -> None:
+    """A None policy_version on the EP produces None in the AuditEvent."""
+    captured: list[AuditEvent] = []
+    ep = EnforcementPoint(
+        engine=PolicyEngine(policies=[RolePolicyRule(ROLE_TABLE)]),
+        audit_writer=_capturing_writer(captured),
+    )
+    subject = Subject(id="u1", name="alice", roles=["operator"])
+    ep.evaluate(make_request(), subject=subject)
+    assert len(captured) == 1
+    assert captured[0].policy_version is None
+
+
+def test_policy_version_accessible_without_private_access() -> None:
+    """Callers must be able to read policy_version without touching _policy_version."""
+    ep = EnforcementPoint(
+        engine=PolicyEngine(policies=[RolePolicyRule(ROLE_TABLE)]),
+        audit_writer=_null_writer(),
+        policy_version="public-only",
+    )
+    # Access via the public property only — no underscore attribute.
+    version = ep.policy_version
+    assert version == "public-only"
+
+
+# ── Private helpers for new tests ─────────────────────────────────────────────
+
+
+def _null_writer() -> Any:
+    class NullWriter:
+        def write(self, event: AuditEvent) -> None:
+            pass
+
+    return NullWriter()
+
+
+def _capturing_writer(target: list[AuditEvent]) -> Any:
+    class CapturingWriter:
+        def write(self, event: AuditEvent) -> None:
+            target.append(event)
+
+    return CapturingWriter()

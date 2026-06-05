@@ -113,6 +113,7 @@ The authorization boundary. Orchestrates policy evaluation and audit writing.
 | Symbol | Import path | Description |
 |---|---|---|
 | `EnforcementPoint` | `basis_core.enforcement` or `basis_core.enforcement.enforcement` | The single component authorized to compose `PolicyEngine` evaluation and `AuditWriter` recording in one path. Never raises; all failure paths produce a safe `DENY`. |
+| `EnforcementPoint.policy_version` | property on `EnforcementPoint` | Read-only. The policy version identifier supplied at construction (`policy_version` parameter), or `None` if not set. Propagated verbatim into every `DecisionResponse.policy_version` and `AuditEvent.policy_version` this instance produces. Provenance metadata only — does not affect evaluation semantics. |
 
 Preferred import style:
 
@@ -209,7 +210,7 @@ The following are implementation details. They must not be imported by code outs
 | `_DECISION_OUTCOME_TO_AUDIT_OUTCOME` | `basis_core.enforcement.enforcement` | Internal outcome mapping table. |
 | `_REASON_MALFORMED`, `_REASON_POLICY_ERROR`, `_REASON_INTERNAL` | `basis_core.enforcement.enforcement` | Sanitised caller-visible reason strings for enforcement failures. |
 | `EnforcementPoint._write_audit` | `basis_core.enforcement.enforcement` | Private method; not part of the `EnforcementPoint` public interface. |
-| `EnforcementPoint._engine`, `._audit_writer`, `._policy_version` | `basis_core.enforcement.enforcement` | Private attributes. |
+| `EnforcementPoint._engine`, `._audit_writer` | `basis_core.enforcement.enforcement` | Private attributes. Access `policy_version` via the public property instead. |
 | `log` (all packages) | various | Module-level Python loggers. Not exported. |
 
 ---

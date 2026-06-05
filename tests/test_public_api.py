@@ -401,6 +401,15 @@ class TestEnforcementPackage:
 
         assert callable(getattr(EnforcementPoint, "evaluate", None))
 
+    def test_enforcement_point_has_policy_version_property(self) -> None:
+        """policy_version must be a public read-only property on EnforcementPoint."""
+        from basis_core.enforcement import EnforcementPoint
+
+        assert isinstance(
+            EnforcementPoint.__dict__.get("policy_version"),
+            property,
+        ), "EnforcementPoint.policy_version must be a property, not a plain attribute"
+
 
 # ── basis_core.adapters ───────────────────────────────────────────────────────
 

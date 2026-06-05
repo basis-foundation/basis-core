@@ -140,6 +140,21 @@ class EnforcementPoint:
         self._audit_writer = audit_writer
         self._policy_version = policy_version
 
+    @property
+    def policy_version(self) -> str | None:
+        """Version identifier of the policy set active on this enforcement point.
+
+        Returns the value passed as ``policy_version`` at construction, or
+        ``None`` if no version was supplied. This value is propagated verbatim
+        into every ``DecisionResponse`` and ``AuditEvent`` produced by this
+        instance.
+
+        This is provenance metadata only. It identifies which policy set was
+        in effect when a decision was made; it does not influence evaluation
+        semantics.
+        """
+        return self._policy_version
+
     def evaluate(
         self,
         request: DecisionRequest | dict[str, object],
