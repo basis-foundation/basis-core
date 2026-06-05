@@ -107,6 +107,8 @@ The Pydantic models in `src/basis_core/` must remain aligned with their correspo
 
 **AuditEvent.subject_type** *(open compatibility decision)*: The schema restricts `subject_type` to the enum values `human`, `device`, `service`, `gateway`, `agent`, or null. The `AuditEvent` model accepts any string (or null) for this field. This is intentional: the model is designed to be forward-compatible with subject types not yet listed in the schema. A model instance with an unlisted `subject_type` will pass model construction but fail schema validation. Callers should only supply values in the schema enum until the schema is explicitly extended. See the open compatibility questions section.
 
+**DecisionResponse.policy_version and AuditEvent.policy_version**: Both models carry an optional `policy_version: str | None` field. This value is not derived from the request — it is supplied to `EnforcementPoint` at construction via the `policy_version` parameter and is exposed publicly through `EnforcementPoint.policy_version`. The enforcement point propagates the value verbatim into every `DecisionResponse` and (via `response.policy_version`) into every `AuditEvent` it produces. When no version is set, both fields are `None`. This is provenance metadata: it records which policy set was active at evaluation time and does not affect evaluation semantics.
+
 **Policy schema**: No Pydantic model corresponds to the `policy.schema.json` schema in this repository. The schema describes serialized policy configuration documents, which are loaded and parsed by application code outside the kernel. The schema exists as the canonical specification for that format. Schema-valid fixture examples are in `schemas/examples/policy.json`.
 
 ---
