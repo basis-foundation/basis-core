@@ -39,6 +39,18 @@ additive classification follows `docs/breaking-change-discipline.md`.
   refresh documentation, and `docs/compatibility-testing.md` for how this
   harness relates to the existing v0.1.0 compatibility-testing harness.
 
+- **Operation-aware test package scaffold.** Adds `tests/operation_aware/`
+  (`__init__.py`, `README.md`, `test_scaffold.py`) as the dedicated test
+  package that future operation-aware model, policy, trace, audit, and
+  evaluator tests will use. Proves that pytest discovers and runs tests in
+  the new subpackage and that it can reach the pinned `basis-schemas`
+  v0.2.0 fixture snapshot through the existing
+  `tests/helpers/basis_schemas_snapshot.py` helper. No production code, no
+  YAML parsing, no new dependencies, and no public API changes are included
+  — this is test-infrastructure only, per
+  `docs/implementation/basis-core-v0.2-operation-aware-plan.md` Milestone 0,
+  PR 3.
+
 ## [0.1.0] - 2026-05-27
 
 Initial public release. See `docs/v0.1-readiness-review.md` and

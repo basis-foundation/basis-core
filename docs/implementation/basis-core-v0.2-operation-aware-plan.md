@@ -1237,6 +1237,23 @@ Compatibility risk: none (test-fixtures-only change).
 Blocked by architecture decision: no.
 
 **PR 3 — Operation-aware test scaffolding.**
+
+**Status: implemented** (`test/oa-test-scaffold`). Delivers the
+`tests/operation_aware/` test package: `__init__.py` (docstring-only marker,
+no `sys.path` manipulation, no production imports, no side effects),
+`README.md` (scope boundaries and the anticipated-but-not-yet-implemented
+future test file list), and `test_scaffold.py` (8 tests covering package
+discovery, fixture-foundation accessibility through the existing
+`tests/helpers/basis_schemas_snapshot.py` helper, isolation from a
+nonexistent `basis_core.operation_aware` production package, and confirming
+`import basis_core` exposes neither the scaffold nor the fixture helpers).
+No configuration change was needed — `pyproject.toml`'s existing
+`testpaths = ["tests"]` already discovers the subpackage. This PR adds no
+YAML parsing, no fixture-loading behavior beyond what PR 2 already
+established, and no `src/basis_core/` changes; the remaining portion of PR 4
+(generic YAML contract-loading and structural-validation helpers) is still
+open.
+
 Objective: create `tests/operation_aware/__init__.py` and confirm
 `pytest`/`pythonpath` discovery works for the new subpackage; no assertions
 beyond a placeholder.
