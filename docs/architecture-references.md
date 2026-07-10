@@ -111,6 +111,39 @@ basis-architecture is the constitutional and semantic authority for the BASIS ec
 
 ---
 
+## Operation-aware authorization model
+
+**Documents:** ADR-0001 through ADR-0005 in basis-architecture
+(`docs/adr/0001-operation-aware-ot-authorization.md` through
+`docs/adr/0005-operation-aware-schema-readiness.md`), and their companion
+documents (`docs/architecture/operation-aware-authorization-model.md`,
+`docs/architecture/operation-aware-evaluation-semantics.md`,
+`docs/architecture/operation-aware-trace-audit-evidence.md`,
+`docs/architecture/operation-aware-policy-rule-model.md`,
+`docs/architecture/operation-aware-schema-readiness-plan.md`).
+
+**Governs:** The conceptual model, evaluation semantics, trace/audit
+evidence model, and policy bundle/rule model for the operation-aware
+expansion of the authorization kernel, and the order in which those
+concepts were published as machine-readable contracts in `basis-schemas`
+v0.2.0.
+
+**Why it matters for basis-core contributors:** This is the architectural
+authority for `basis-core` v0.2.0. It defines every category an
+operation-aware `DecisionRequest`/`DecisionResponse`, policy bundle/rule, and
+trace/audit evidence model must be able to represent, and the deterministic
+rules the kernel must apply when evaluating them — before any
+`basis-core` implementation work begins.
+
+**Relevant for:** Any change under a future `operation_aware` module in
+`src/basis_core/`. See
+[`docs/implementation/basis-core-v0.2-operation-aware-plan.md`](implementation/basis-core-v0.2-operation-aware-plan.md)
+in this repository for the phased implementation roadmap that translates
+these architecture documents, and the corresponding `basis-schemas` v0.2.0
+contracts, into a sequenced set of `basis-core` pull requests.
+
+---
+
 ## Relationship between this document and basis-architecture
 
 This document is a contributor navigation aid. It does not reproduce or supersede the content of the basis-architecture documents it references. When in doubt about the authoritative position on any constraint, consult the basis-architecture document directly.

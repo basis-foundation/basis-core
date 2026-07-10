@@ -84,6 +84,7 @@ Key documents in `docs/`:
 - [`docs/extension-contracts.md`](docs/extension-contracts.md) — `PolicyRule`, `AuditWriter`, `AdapterBase` behavioral contracts
 - [`docs/kernel-constitution.md`](docs/kernel-constitution.md) — non-negotiable kernel invariants
 - [`docs/breaking-change-discipline.md`](docs/breaking-change-discipline.md) — governance process for public contract changes
+- [`docs/implementation/basis-core-v0.2-operation-aware-plan.md`](docs/implementation/basis-core-v0.2-operation-aware-plan.md) — planning-only roadmap for the v0.2.0 operation-aware authorization expansion
 
 ## Development
 
