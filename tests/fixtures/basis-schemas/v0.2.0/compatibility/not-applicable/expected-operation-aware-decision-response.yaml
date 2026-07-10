@@ -1,0 +1,11 @@
+# Canonical compatibility fixture — scenario: not-applicable.
+
+request_id: req-compat-not-applicable-001
+evaluation_status: completed
+outcome: not_applicable
+failure_reason: null
+bundle_id: null
+bundle_version: null
+trace_id: trace-compat-not-applicable-001
+reason_code: no_applicable_bundle
+explanation: No policy bundle's scope covers this chiller resource request.

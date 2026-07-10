@@ -1,0 +1,26 @@
+# Canonical compatibility fixture — scenario: allow-basic.
+#
+# A minimal, globally-applicable (no `scope`) bundle containing a single
+# ALLOW rule that matches the paired operation-aware-decision-request.yaml.
+# This fixture is a plain instance of policy-bundle
+# (schemas/policy-bundle/policy-bundle.yaml), not a copy of that contract's
+# own schema file.
+
+bundle_id: bundle-compat-allow
+bundle_version: "1.0.0"
+schema_version: "0.1.0"
+policy_owner: compat-vectors-team
+description: >-
+  Canonical compatibility fixture demonstrating a basic ALLOW decision: an
+  applicable (globally-scoped) bundle, a matching ALLOW rule, and no
+  matching DENY rule.
+rules:
+  - rule_id: allow-operator-read-ahu
+    effect: allow
+    match:
+      subject_roles:
+        - operator
+      actions:
+        - "read:ahu"
+    reason_code: allow_rule_matched
+    explanation: Operators may read AHU telemetry.

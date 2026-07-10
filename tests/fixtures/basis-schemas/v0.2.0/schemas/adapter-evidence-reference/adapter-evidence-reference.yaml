@@ -1,0 +1,386 @@
+# BASIS Adapter Evidence Reference — published contract.
+#
+# This file PUBLISHES the safe-reference shape for normalized adapter
+# evidence, decided in basis-architecture's operation-aware schema readiness
+# plan (ADR-0005, docs/architecture/operation-aware-schema-readiness-plan.md,
+# "PR B — Evidence Reference Contracts"). It lets future operation-aware
+# request, trace, audit, and explanation contracts identify the adapter
+# evidence that supported normalization of an OT operation WITHOUT embedding
+# raw protocol payloads, packets, frames, credentials, or device secrets, and
+# without making basis-core protocol-aware.
+#
+# This contract publishes a reference *shape* only. It does not define
+# adapter normalization logic, protocol parsing, protocol-specific behavior,
+# evidence storage, evidence retrieval, evidence retention, evidence signing,
+# evidence verification, runtime hashing behavior, authorization result, or
+# enforcement result — all of that stays exactly where it already lives
+# (basis-adapters produces normalized evidence and mints reference values;
+# basis-gateway assembles references into operation-aware requests and
+# gateway audit events; basis-core consumes references as request context
+# without retrieving, parsing, or interpreting raw evidence; basis-console
+# displays redacted reference metadata).
+#
+# The `lifecycle` is `experimental` because this published contract is new in
+# basis-schemas, not because the underlying need for a safe adapter-evidence
+# reference is unsettled.
+
+contract:
+  name: adapter-evidence-reference
+  title: BASIS Adapter Evidence Reference
+  version: 0.1.0
+  lifecycle: experimental
+  governed_by: basis-architecture
+  published_by: basis-schemas
+  source: docs/architecture/operation-aware-schema-readiness-plan.md
+  description: >-
+    A safe reference to normalized adapter evidence: a stable reference
+    identifier, a structural evidence digest, an adapter source label, an
+    optional protocol label, optional adapter-normalization and
+    protocol-mapping version provenance, a redaction classification, and
+    optional association with a decision request and a broader correlated
+    operation. Lets future operation-aware request, trace, audit, and
+    explanation contracts identify which adapter evidence supported
+    normalization of an OT operation without duplicating raw protocol
+    payloads or device credentials into those artifacts. This contract
+    defines the reference shape only — it does not define adapter
+    normalization logic, protocol parsing, evidence storage or retrieval, or
+    evidence signing or verification, all of which remain owned by
+    basis-adapters and the components that consume this reference.
+  depends_on:
+    - contract-metadata
+    - redaction-classification
+
+adapter_evidence_reference:
+  # The reference is a single object. These four fields are required; the
+  # rest are optional with the defaults below. Unknown fields are rejected.
+  required:
+    - reference_id
+    - evidence_digest
+    - adapter_source
+    - redaction_classification
+  optional:
+    - normalization_version
+    - mapping_version
+    - protocol
+    - request_id
+    - correlation_id
+  additional_properties: false
+
+  fields:
+    - id: reference_id
+      type: string
+      required: true
+      non_empty: true
+      description: >-
+        Stable, deterministic identifier for the referenced adapter evidence
+        artifact. Independent of Python import path, source filename, or
+        temporary storage path; safe to place in future request, trace, and
+        audit artifacts because it is not itself a secret. UUID v4
+        recommended, matching this repository's existing request_id /
+        event_id convention; no stricter format is mandated here so future
+        evidence producers are not blocked by a premature identifier grammar.
+    - id: evidence_digest
+      type: object
+      required: true
+      description: >-
+        A structural digest reference for the adapter evidence artifact —
+        see evidence_digest_shape below. Structural metadata only: this
+        contract does not implement, canonicalize, or verify hashing;
+        evidence producers (basis-adapters) own deterministic digest
+        generation.
+    - id: adapter_source
+      type: string
+      required: true
+      non_empty: true
+      description: >-
+        Opaque, non-empty label identifying the adapter or normalization
+        component that produced the underlying evidence (for example, a
+        specific adapter instance or deployment reference chosen by
+        basis-adapters). Deliberately protocol-neutral at the field level:
+        this field alone does not require any protocol-specific shape, so
+        adapters beyond the nine currently published (REST, BACnet, Modbus,
+        OPC UA, MQTT, DNP3, IEC 61850, KNX, Niagara) and future adapters
+        remain representable without a contract change. Carries no raw
+        protocol payload or credential material.
+    - id: normalization_version
+      type:
+        - string
+        - "null"
+      required: false
+      default: null
+      description: >-
+        Version of the adapter normalization logic (basis-adapters) that
+        produced this evidence, when the producer tracks one. Null or absent
+        when not applicable or not tracked. Provenance metadata only; this
+        contract does not define normalization behavior.
+    - id: mapping_version
+      type:
+        - string
+        - "null"
+      required: false
+      default: null
+      description: >-
+        Version of the protocol-to-canonical mapping table applied when
+        normalizing the operation, when applicable. Null or absent when no
+        such mapping was used or the producer does not track one.
+    - id: protocol
+      type:
+        - string
+        - "null"
+      required: false
+      default: null
+      pattern: "^[a-z][a-z0-9_-]*$"
+      description: >-
+        Open, lowercase protocol label carried as safe provenance metadata
+        only (for example modbus, bacnet, opcua, mqtt, dnp3, iec61850, knx,
+        niagara, rest). Not a closed enum: new adapters have been added
+        additively throughout basis-adapters' history and this field must not
+        block a future one. This is a label, never a protocol-specific
+        operation payload field, and its presence does not make basis-core
+        protocol-aware — consumers may treat it as opaque provenance.
+    - id: redaction_classification
+      type: string
+      required: true
+      enum:
+        - safe_to_expose
+        - safe_after_redaction
+        - reference_only
+        - never_store
+        - never_display
+      governed_by: redaction-classification
+      description: >-
+        Handling requirement for the adapter evidence artifact this
+        reference points to — not a grant of permission to expose it. A
+        safe_to_expose classification here does not itself authorize display
+        of the underlying evidence; ordinary authorization and access
+        controls still apply to whatever view carries this reference. See
+        the redaction-classification contract for the full definition of
+        each value.
+    - id: request_id
+      type:
+        - string
+        - "null"
+      required: false
+      default: null
+      non_empty: true
+      description: >-
+        The decision request's request_id this adapter evidence supports,
+        when already known. Non-empty when present; null or absent because
+        adapter evidence is commonly produced during normalization, ahead of
+        the specific authorization request the gateway later assembles.
+    - id: correlation_id
+      type:
+        - string
+        - "null"
+      required: false
+      default: null
+      description: >-
+        Optional caller-provided trace identifier for cross-system
+        correlation, passed through verbatim (mirrors audit-event's
+        correlation_id). Distinct from reference_id, which identifies the
+        evidence artifact itself, and from request_id, which associates
+        evidence with one specific decision request: correlation_id
+        associates evidence with a broader end-to-end operation or workflow.
+
+  # The evidence_digest field's own nested shape, documented the same way
+  # audit-event documents its optional trace sub-object (trace_shape) and
+  # identical to identity-evidence-reference's evidence_digest_shape.
+  evidence_digest_shape:
+    required:
+      - algorithm
+      - value
+    additional_properties: false
+    fields:
+      - id: algorithm
+        type: string
+        required: true
+        non_empty: true
+        pattern: "^[a-z][a-z0-9]*(-[a-z0-9]+)*$"
+        description: >-
+          Open, lowercase kebab-case label identifying the digest algorithm
+          (for example sha-256, sha3-256). Not a closed enum: this contract
+          validates only that the label is well-formed, not that it names a
+          specific approved algorithm. No hashing, canonicalization, or
+          verification behavior is implemented or implied.
+      - id: value
+        type: string
+        required: true
+        non_empty: true
+        pattern: "^[a-f0-9]+$"
+        description: >-
+          The digest value as lowercase hexadecimal, with no "0x" or
+          "algorithm:" prefix, whitespace, or padding. Structural shape only;
+          evidence producers own deterministic, canonical digest generation,
+          which this contract does not define, and this contract makes no
+          tamper-evidence or cryptographic-authenticity claim.
+
+  # Reproduced here so a consumer can validate redaction_classification
+  # without dereferencing the redaction-classification contract file.
+  redaction_classification_values:
+    - safe_to_expose
+    - safe_after_redaction
+    - reference_only
+    - never_store
+    - never_display
+
+  constraints:
+    - reference_id, evidence_digest, adapter_source, and
+      redaction_classification are required.
+    - reference_id and adapter_source must be non-empty strings.
+    - evidence_digest must be an object with exactly algorithm and value;
+      both are required and non-empty; algorithm must match the algorithm
+      pattern; value must match the lowercase-hexadecimal pattern.
+    - protocol, when present and non-null, must match the protocol pattern
+      (open lowercase label; not a closed enum).
+    - redaction_classification must be one of the five published
+      redaction-classification values.
+    - normalization_version and mapping_version, when present, are strings or
+      null.
+    - request_id, when present and non-null, must be non-empty.
+    - correlation_id, when present, is passed through verbatim with no format
+      constraint beyond being a string or null.
+    - This contract defines no raw_payload, raw_protocol_payload, packet,
+      frame, credential, password, api_key, private_key, or
+      unredacted_device_secret field. Any such field is rejected as unknown.
+    - Unknown / additional fields are rejected.
+
+  # Where this reference is produced and consumed. Informative; it records
+  # the boundary ownership decided in basis-architecture, it adds no
+  # structure.
+  composition:
+    produced_by: basis-adapters   # produces normalized adapter evidence and mints reference values
+    consumed_by: basis-gateway, basis-core, basis-console  # reference evidence in requests, traces, audit, and explanations without retrieving raw material
+    # basis-schemas does not retrieve, parse, or interpret raw adapter
+    # evidence or protocol payloads; it publishes the reference shape only.
+
+  examples:
+    valid:
+      - reference_id: adev-0001-0000-0000-000000000001
+        evidence_digest:
+          algorithm: sha-256
+          value: 1f825aa2f0020ef7cf91dfa30da4668d791c5d4824fc8e41354b89ec05795ab
+        adapter_source: basis-adapters:modbus
+        normalization_version: "1.0.0"
+        mapping_version: "modbus-map-2026-05-01"
+        protocol: modbus
+        redaction_classification: reference_only
+        request_id: a1b2c3d4-0001-0000-0000-000000000001
+        correlation_id: null
+      - reference_id: adev-0002-0000-0000-000000000002
+        evidence_digest:
+          algorithm: sha3-256
+          value: b1b6ffcf5155299a1e622c8f5b9f56f1fef0d0b0e3c1f2c6f4f6e5b0e2c1e11a
+        adapter_source: basis-adapters:bacnet
+        protocol: bacnet
+        redaction_classification: safe_after_redaction
+    invalid:
+      - reason: missing required reference_id
+        value:
+          evidence_digest:
+            algorithm: sha-256
+            value: 1f825aa2f0020ef7cf91dfa30da4668d791c5d4824fc8e41354b89ec05795ab
+          adapter_source: basis-adapters:modbus
+          redaction_classification: reference_only
+      - reason: empty reference_id
+        value:
+          reference_id: ""
+          evidence_digest:
+            algorithm: sha-256
+            value: 1f825aa2f0020ef7cf91dfa30da4668d791c5d4824fc8e41354b89ec05795ab
+          adapter_source: basis-adapters:modbus
+          redaction_classification: reference_only
+      - reason: missing required evidence_digest fields
+        value:
+          reference_id: adev-1001-0000-0000-000000000001
+          adapter_source: basis-adapters:modbus
+          redaction_classification: reference_only
+      - reason: evidence_digest missing required digest value
+        value:
+          reference_id: adev-1002-0000-0000-000000000002
+          evidence_digest:
+            algorithm: sha-256
+          adapter_source: basis-adapters:modbus
+          redaction_classification: reference_only
+      - reason: invalid digest algorithm format (uppercase)
+        value:
+          reference_id: adev-1003-0000-0000-000000000003
+          evidence_digest:
+            algorithm: SHA256
+            value: 1f825aa2f0020ef7cf91dfa30da4668d791c5d4824fc8e41354b89ec05795ab
+          adapter_source: basis-adapters:modbus
+          redaction_classification: reference_only
+      - reason: malformed digest value (colon-prefixed, not bare hex)
+        value:
+          reference_id: adev-1004-0000-0000-000000000004
+          evidence_digest:
+            algorithm: sha-256
+            value: "sha256:1f825aa2"
+          adapter_source: basis-adapters:modbus
+          redaction_classification: reference_only
+      - reason: missing required adapter_source
+        value:
+          reference_id: adev-1005-0000-0000-000000000005
+          evidence_digest:
+            algorithm: sha-256
+            value: 1f825aa2f0020ef7cf91dfa30da4668d791c5d4824fc8e41354b89ec05795ab
+          redaction_classification: reference_only
+      - reason: missing required redaction_classification
+        value:
+          reference_id: adev-1006-0000-0000-000000000006
+          evidence_digest:
+            algorithm: sha-256
+            value: 1f825aa2f0020ef7cf91dfa30da4668d791c5d4824fc8e41354b89ec05795ab
+          adapter_source: basis-adapters:modbus
+      - reason: unsupported redaction classification value
+        value:
+          reference_id: adev-1007-0000-0000-000000000007
+          evidence_digest:
+            algorithm: sha-256
+            value: 1f825aa2f0020ef7cf91dfa30da4668d791c5d4824fc8e41354b89ec05795ab
+          adapter_source: basis-adapters:modbus
+          redaction_classification: public
+      - reason: malformed protocol label (uppercase)
+        value:
+          reference_id: adev-1008-0000-0000-000000000008
+          evidence_digest:
+            algorithm: sha-256
+            value: 1f825aa2f0020ef7cf91dfa30da4668d791c5d4824fc8e41354b89ec05795ab
+          adapter_source: basis-adapters:modbus
+          redaction_classification: reference_only
+          protocol: Modbus
+      - reason: empty request_id (malformed correlation)
+        value:
+          reference_id: adev-1009-0000-0000-000000000009
+          evidence_digest:
+            algorithm: sha-256
+            value: 1f825aa2f0020ef7cf91dfa30da4668d791c5d4824fc8e41354b89ec05795ab
+          adapter_source: basis-adapters:modbus
+          redaction_classification: reference_only
+          request_id: ""
+      - reason: raw protocol payload field rejected (unknown field)
+        value:
+          reference_id: adev-1010-0000-0000-000000000010
+          evidence_digest:
+            algorithm: sha-256
+            value: 1f825aa2f0020ef7cf91dfa30da4668d791c5d4824fc8e41354b89ec05795ab
+          adapter_source: basis-adapters:modbus
+          redaction_classification: reference_only
+          raw_protocol_payload: "0x0300000A"
+      - reason: device credential field rejected (unknown field)
+        value:
+          reference_id: adev-1011-0000-0000-000000000011
+          evidence_digest:
+            algorithm: sha-256
+            value: 1f825aa2f0020ef7cf91dfa30da4668d791c5d4824fc8e41354b89ec05795ab
+          adapter_source: basis-adapters:modbus
+          redaction_classification: reference_only
+          unredacted_device_secret: correct-horse-battery-staple
+      - reason: unknown / additional field rejected
+        value:
+          reference_id: adev-1012-0000-0000-000000000012
+          evidence_digest:
+            algorithm: sha-256
+            value: 1f825aa2f0020ef7cf91dfa30da4668d791c5d4824fc8e41354b89ec05795ab
+          adapter_source: basis-adapters:modbus
+          redaction_classification: reference_only
+          confidence: 0.97

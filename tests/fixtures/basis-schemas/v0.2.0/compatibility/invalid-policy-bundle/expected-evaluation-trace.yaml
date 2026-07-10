@@ -1,0 +1,17 @@
+# Canonical compatibility fixture — scenario: invalid-policy-bundle.
+#
+# bundle_applicability: null — the failure occurred while validating the
+# policy bundle's own shape (evaluation phase 2, ADR-0002 Section 3), before
+# bundle applicability is established (phase 3 onward). rule_evidence is
+# empty: rule evaluation never began. outcome is null, never a substantive
+# decision (ADR-0002 Section 14).
+
+trace_id: trace-compat-invalid-policy-001
+request_id: req-compat-invalid-policy-001
+evaluation_status: failed
+outcome: null
+bundle_applicability: null
+failure_reason: invalid_policy_bundle
+rule_evidence: []
+reason_code: policy_bundle_invalid
+explanation: The policy bundle failed validation because it declared duplicate rule IDs.

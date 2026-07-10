@@ -1,0 +1,17 @@
+# Canonical compatibility fixture — scenario: deny-precedence.
+
+event_id: gateway-event-compat-deny-precedence-001
+event_type: gateway_authorization
+timestamp: "2026-07-09T09:05:02Z"
+request_id: req-compat-deny-precedence-001
+evaluation_status: completed
+outcome: deny
+failure_reason: null
+bundle_id: bundle-compat-deny-precedence
+bundle_version: "1.0.0"
+trace_id: trace-compat-deny-precedence-001
+audit_evidence_id: audit-compat-deny-precedence-001
+gateway_id: gateway-compat-vectors-01
+enforcement_action: deny
+reason_code: deny_rule_matched
+explanation: Deny precedence applied; gateway enforced the kernel deny.

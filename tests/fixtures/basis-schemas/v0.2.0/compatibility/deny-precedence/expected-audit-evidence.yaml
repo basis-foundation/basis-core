@@ -1,0 +1,21 @@
+# Canonical compatibility fixture — scenario: deny-precedence.
+#
+# matched_rule_ids carries both the allow and deny rule_id values that
+# matched (bounded provenance only; no rule effect, condition results, or
+# explanation duplicated here — those remain on evaluation-trace, referenced
+# by trace_id).
+
+evidence_id: audit-compat-deny-precedence-001
+request_id: req-compat-deny-precedence-001
+trace_id: trace-compat-deny-precedence-001
+evaluation_status: completed
+outcome: deny
+failure_reason: null
+bundle_id: bundle-compat-deny-precedence
+bundle_version: "1.0.0"
+matched_rule_ids:
+  - allow-operator-write-hvac-setpoint
+  - deny-control-during-interlock
+reason_code: deny_rule_matched
+explanation: Deny precedence applied; an interlock-scoped deny rule matched.
+recorded_at: "2026-07-09T09:05:01Z"

@@ -1185,6 +1185,43 @@ Compatibility risk: none.
 Blocked by architecture decision: no.
 
 **PR 2 — Vendor pinned `basis-schemas` v0.2.0 compatibility fixtures.**
+
+**Status: implemented** (`feature/oa-schema-fixture-foundation`, "PR 1:
+Schema and Compatibility Fixture Foundation" in the implementation
+tracker — a distinct numbering scheme from this document's roadmap
+sequence, since this document's own PR 1 was the planning PR above, already
+merged). Delivered as one PR that folds this PR's scope together with the
+fixture-*discovery* half of PR 4 (parsing/validation into a generic
+required/optional/pattern/enum view is explicitly deferred — see below),
+because the completion criteria for a governed, drift-checked snapshot were
+judged to require the loader helpers and inventory/integrity tests in the
+same reviewable change, not a separate follow-up PR. PR 3's
+`tests/operation_aware/` subpackage scaffold was not created by this PR —
+the new tests were added as flat `tests/test_basis_schemas_snapshot*.py`
+modules, matching this repository's existing flat `tests/*.py` convention
+(`test_contract_snapshots.py`, `test_schema_validation.py`, etc.); PR 3
+remains open and unstarted.
+
+Two deviations from the sketch below, both strictly additive:
+
+- `manifest.json` (JSON, machine-readable) was used instead of a prose
+  `PROVENANCE.md`, so that a per-file SHA-256 digest could be recorded and
+  mechanically verified — `PROVENANCE.md`'s tag/commit/date/procedure
+  content is instead carried by the snapshot's `README.md` plus
+  `manifest.json`'s structured fields.
+- A test-only discovery/integrity helper module
+  (`tests/helpers/basis_schemas_snapshot.py`) and a controlled offline
+  refresh tool (`scripts/update_basis_schemas_snapshot.py`) were added
+  alongside the vendored tree, rather than deferred to PR 4, since a vendored
+  snapshot without a governed update mechanism and discovery helpers is not
+  usefully "complete" on its own.
+
+What remains for a future PR 4 (unchanged from the original scope below):
+YAML *parsing* into a generic required/optional/pattern/enum policy view
+(the `_validate_object`-style helper), and the PyYAML dev dependency that
+requires. This PR's helpers resolve paths, load `manifest.json`, and
+enumerate inventory only — they never parse the vendored YAML content.
+
 Objective: implement the Section 4 recommendation.
 Files: new `tests/fixtures/basis-schemas/v0.2.0/` tree (14 contract YAMLs +
 5 canonical-vector directories + `PROVENANCE.md`); no `src/` changes.

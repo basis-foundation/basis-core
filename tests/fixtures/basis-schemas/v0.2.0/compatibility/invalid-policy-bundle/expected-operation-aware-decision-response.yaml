@@ -1,0 +1,15 @@
+# Canonical compatibility fixture — scenario: invalid-policy-bundle.
+#
+# outcome: null and evaluation_status: failed together (the required
+# invariant operation-aware-decision-response.yaml enforces): a failed
+# evaluation never serializes allow, deny, or not_applicable. No bundle_id /
+# bundle_version: the bundle never became an identified, validated bundle
+# for this evaluation.
+
+request_id: req-compat-invalid-policy-001
+evaluation_status: failed
+outcome: null
+failure_reason: invalid_policy_bundle
+trace_id: trace-compat-invalid-policy-001
+reason_code: policy_bundle_invalid
+explanation: The policy bundle failed validation because it declared duplicate rule IDs.

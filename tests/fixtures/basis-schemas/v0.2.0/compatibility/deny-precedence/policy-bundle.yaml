@@ -1,0 +1,35 @@
+# Canonical compatibility fixture — scenario: deny-precedence.
+#
+# A globally-applicable bundle containing one ALLOW rule and one DENY rule
+# that both match the paired request. Deny precedence (ADR-0002 Section 6)
+# means the final outcome is DENY even though the ALLOW rule also matched.
+
+bundle_id: bundle-compat-deny-precedence
+bundle_version: "1.0.0"
+schema_version: "0.1.0"
+policy_owner: compat-vectors-team
+description: >-
+  Canonical compatibility fixture demonstrating DENY precedence: a matching
+  ALLOW rule and a matching DENY rule both present in one applicable
+  bundle, with DENY winning unconditionally.
+rules:
+  - rule_id: allow-operator-write-hvac-setpoint
+    effect: allow
+    match:
+      subject_roles:
+        - operator
+      actions:
+        - "write:hvac:setpoint"
+    reason_code: allow_rule_matched
+    explanation: Operators may write HVAC setpoints.
+  - rule_id: deny-control-during-interlock
+    effect: deny
+    match:
+      safety_modes:
+        - interlock-engaged
+      operation_intents:
+        - control_affecting
+    reason_code: deny_rule_matched
+    explanation: >-
+      Control-affecting operations are denied while an interlock is
+      engaged.

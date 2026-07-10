@@ -1,0 +1,26 @@
+# Canonical compatibility fixture — scenario: not-applicable.
+#
+# THE CRITICAL FAIL-CLOSED DISTINCTION: the kernel outcome (not_applicable)
+# is never rewritten as deny — it is preserved verbatim from
+# expected-audit-evidence.yaml / expected-operation-aware-decision-response.yaml.
+# The gateway's own enforcement_action is a separate fact, recorded here as
+# deny (fail-closed enforcement policy on a kernel result that was not
+# itself a policy deny — ADR-0003 Section 9). The gateway's own reason_code
+# (no_allow_rule_matched) explains the gateway's fail-closed choice and is
+# not required to equal the kernel's own reason_code
+# (no_applicable_bundle, on expected-audit-evidence.yaml) — the two explain
+# different layers (gateway-audit-event.yaml's own reason_code field
+# description).
+
+event_id: gateway-event-compat-not-applicable-001
+event_type: gateway_authorization
+timestamp: "2026-07-09T09:15:02Z"
+request_id: req-compat-not-applicable-001
+evaluation_status: completed
+outcome: not_applicable
+failure_reason: null
+trace_id: trace-compat-not-applicable-001
+audit_evidence_id: audit-compat-not-applicable-001
+enforcement_action: deny
+reason_code: no_allow_rule_matched
+explanation: No applicable policy bundle; gateway fail-closed policy denied the request.
