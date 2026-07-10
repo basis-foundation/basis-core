@@ -1,0 +1,692 @@
+# BASIS Evaluation Trace — published contract.
+#
+# This file PUBLISHES the deterministic, bounded explanation-of-one-
+# evaluation shape decided in basis-architecture's operation-aware trace and
+# audit evidence model (ADR-0003,
+# docs/architecture/operation-aware-trace-audit-evidence.md, Sections 2 and
+# 4) and evaluation semantics (ADR-0002,
+# docs/architecture/operation-aware-evaluation-semantics.md), sequenced for
+# schema publication by the operation-aware schema readiness plan (ADR-0005,
+# "PR E — DecisionResponse and EvaluationTrace"). It does not invent new
+# trace semantics: every field below formalizes a conceptual category
+# ADR-0002 or ADR-0003 already named. Architecture governs; schemas publish;
+# implementations consume.
+#
+# CRITICAL BOUNDARY: TRACE IS NOT AUDIT. Per ADR-0003 Section 2: "Trace
+# explains evaluation. Audit records evidence. Gateway enforcement records
+# what happened at runtime." This contract publishes the kernel-produced
+# EXPLANATION of one evaluation only. It is not an immutable audit record, a
+# gateway enforcement record, a policy-loading record, a session record, an
+# identity-verification record, a protocol transaction log, a persistence
+# format, or a compliance attestation. AuditEvidence and GatewayAuditEvent
+# are separate, later contracts (PR F) that reference this trace's
+# identifiers rather than being defined by this file.
+#
+# THIS CONTRACT DOES NOT CARRY: a full request snapshot, a full policy
+# bundle, raw identity evidence, raw adapter evidence, raw protocol
+# payloads, credentials, tokens, key material, stack traces, or exception
+# objects. It carries safe identifiers (trace_id, request_id,
+# correlation_id, bundle_id, bundle_version), a closed authorization
+# outcome, a closed evaluation status, a closed bundle-applicability value,
+# bounded rule evidence (trace-rule-evidence-shaped, referenced not
+# redefined), and optional reason code / explanation.
+#
+# AUTHORIZATION OUTCOME AND EVALUATION STATUS ARE STRUCTURALLY SEPARATE
+# FIELDS. Per ADR-0002 Section 14 ("Evaluation errors are not authorization
+# allows... it must not disguise an evaluation failure as a DENY or
+# NOT_APPLICABLE decision"), this contract never collapses "the evaluator
+# could not produce a decision" into any of allow/deny/not_applicable.
+# evaluation_status (completed/failed) and outcome (allow/deny/
+# not_applicable/null) are independent required fields, with a required
+# invariant: outcome is null if and only if evaluation_status is "failed".
+# This mirrors, and must remain structurally consistent with,
+# operation-aware-decision-response.yaml's identical outcome/evaluation_status/
+# failure_reason model — see that file's header for the full model
+# rationale, which this file does not repeat.
+#
+# DETERMINISTIC SERIALIZATION ORDER IS NOT AUTHORIZATION PRECEDENCE. Per
+# ADR-0002 Section 8 and ADR-0003 Section 13, rule_evidence must be
+# serialized in a stable, deterministic order for identical input, but this
+# contract does not define, and a producer's chosen serialization order
+# (for example, a stable sort by rule_id) never defines, evaluation
+# priority or rule-combining precedence. See trace_ordering below.
+#
+# RULE-EVALUATION ERROR PROPAGATES TO EVALUATION_STATUS. ADR-0002 Section 14
+# lists "condition evaluation error" as one of the representative
+# evaluation-failure categories, alongside invalid_request and
+# internal_evaluation_error — not as a recoverable, per-rule condition an
+# otherwise-completed evaluation can absorb. This contract therefore
+# REQUIRES: if any rule_evidence entry carries rule_result: error, the
+# containing trace's evaluation_status MUST be "failed" (and therefore
+# outcome MUST be null, per the invariant above). A rule-evaluation error
+# can never coexist with a completed allow or deny — this repository does
+# not define a "recoverable rule error" concept, and architecture does not
+# name one.
+#
+# OUTCOME AND BUNDLE_APPLICABILITY AGREE WHEN EVALUATION_STATUS IS
+# COMPLETED. Rules are evaluated only within an applicable bundle (ADR-0002
+# Section 3, evaluation phases; policy-bundle.yaml's own scope_semantics).
+# This contract therefore REQUIRES, when evaluation_status is "completed":
+# outcome: not_applicable if and only if bundle_applicability:
+# not_applicable, and outcome: allow or outcome: deny if and only if
+# bundle_applicability: applicable. A not_applicable bundle never produces
+# an allow/deny outcome, and an applicable bundle is never reported
+# alongside outcome: not_applicable. When bundle_applicability is
+# not_applicable, rule_evidence MUST be empty: no policy bundle applied, so
+# no rule was ever a candidate to evaluate. This correlation is NOT
+# required when evaluation_status is "failed" — see the bundle_applicability
+# field description below for why a failure may occur before or after
+# applicability was determined.
+#
+# SKIPPED IS A PER-RULE TRACE STATE, NOT A BUNDLE-APPLICABILITY OUTCOME.
+# trace-rule-evidence's rule_result: skipped describes one candidate rule
+# inside an APPLICABLE bundle that evaluation did not reach (for example,
+# after an earlier deny short-circuited further rule evaluation). It is
+# never interchangeable with this contract's own bundle_applicability:
+# not_applicable, which describes the bundle-scope decision that no rule in
+# it was ever a candidate in the first place (ADR-0002 Section 5). A
+# not_applicable trace therefore never contains a rule_evidence entry at
+# all (skipped or otherwise) — see the constraint above.
+#
+# The `lifecycle` is `experimental`: this is the first publication of the
+# evaluation trace shape, ahead of any real consumer.
+
+contract:
+  name: evaluation-trace
+  title: BASIS Evaluation Trace
+  version: 0.1.0
+  lifecycle: experimental
+  governed_by: basis-architecture
+  published_by: basis-schemas
+  source: docs/architecture/operation-aware-schema-readiness-plan.md
+  description: >-
+    The deterministic, bounded explanation of one kernel authorization
+    evaluation: a stable trace identifier, the request it explains, optional
+    correlation, the applicable policy bundle's identity/version (when one
+    applied), a closed bundle-applicability value, a closed authorization
+    outcome and evaluation status maintained as independent fields (a failed
+    evaluation never serializes an allow/deny/not_applicable outcome), a
+    closed evaluation-failure reason when evaluation_status is failed,
+    bounded rule evidence (trace-rule-evidence-shaped, referenced not
+    redefined), and optional reason code / safe explanation. Publishes the
+    trace *shape* only: this contract does not implement evaluation, does
+    not persist anything durably, and is not itself an audit record — see
+    the file header, "Trace is not audit."
+  # contract-metadata: this file's own contract: block follows the
+  # formalized pattern. operation-aware-decision-request: request_id/
+  # correlation_id echo that contract's identifiers; this file does not
+  # copy the full request. policy-bundle: bundle_id/bundle_version echo
+  # that contract's identity/version fields unchanged. trace-rule-evidence:
+  # rule_evidence is a collection of trace-rule-evidence-shaped values,
+  # referenced not redefined. reason-code: the optional reason_code field
+  # reuses that contract's format unchanged. redaction-classification is
+  # deliberately NOT declared: this contract carries no field of its own
+  # that needs a per-field classification (rule-level and condition-level
+  # evidence are already bounded to safe identifiers, closed vocabularies,
+  # and reason codes with no raw values to classify).
+  depends_on:
+    - contract-metadata
+    - operation-aware-decision-request
+    - policy-bundle
+    - trace-rule-evidence
+    - reason-code
+
+evaluation_trace:
+  # A trace is a single object. trace_id, request_id, evaluation_status,
+  # outcome, bundle_applicability, and rule_evidence are always-present
+  # required keys (outcome and failure_reason may hold an explicit null —
+  # see the field-level descriptions and constraints below for exactly
+  # when). correlation_id, bundle_id, bundle_version, failure_reason,
+  # reason_code, and explanation are independently optional. Unknown fields
+  # are rejected.
+  required:
+    - trace_id
+    - request_id
+    - evaluation_status
+    - outcome
+    - bundle_applicability
+    - rule_evidence
+  optional:
+    - correlation_id
+    - bundle_id
+    - bundle_version
+    - failure_reason
+    - reason_code
+    - explanation
+  additional_properties: false
+
+  fields:
+    - id: trace_id
+      type: string
+      required: true
+      non_empty: true
+      description: >-
+        Stable identifier for this evaluation trace, unique to this specific
+        evaluation. Independent of array position, safe to reference from an
+        operation-aware-decision-response (see that contract's optional
+        trace_id / evaluation_trace fields), from tests, from a future
+        console rendering, and from a future audit event (PR F) without
+        being itself a secret. No UUID requirement is imposed by this
+        contract, matching the identifier convention already used by
+        request_id and bundle_id.
+    - id: request_id
+      type: string
+      required: true
+      non_empty: true
+      description: >-
+        The request_id of the operation-aware-decision-request this trace
+        explains. Same meaning as that contract's own request_id; this
+        contract does not copy the full request, only its identifier.
+    - id: correlation_id
+      type:
+        - string
+        - "null"
+      required: false
+      default: null
+      description: >-
+        Optional passthrough of the evaluated request's correlation_id, for
+        cross-system correlation. No reconciliation behavior beyond
+        passthrough is implemented here.
+    - id: evaluation_status
+      type: string
+      required: true
+      enum:
+        - completed
+        - failed
+      description: >-
+        Whether the kernel completed evaluation and produced a valid
+        authorization outcome ("completed"), or could not ("failed"). This
+        is the ADR-0002 Section 14 distinction between a substantive policy
+        decision and an evaluation failure, published as its own field so
+        the two are never structurally ambiguous. A "failed" trace never
+        carries a non-null outcome — see the required invariant on outcome
+        below.
+    - id: outcome
+      type:
+        - string
+        - "null"
+      required: true
+      enum:
+        - allow
+        - deny
+        - not_applicable
+        - null
+      description: >-
+        The authorization outcome, when evaluation_status is "completed":
+        one of allow / deny / not_applicable, matching decision-response's
+        existing outcome vocabulary exactly (no new outcome values are
+        introduced). REQUIRED to be null when evaluation_status is "failed"
+        — an evaluation failure never serializes as allow, deny, or
+        not_applicable (ADR-0002 Section 14). This is a required key on
+        every trace (present, possibly null), not an optional field, so a
+        consumer never has to distinguish "outcome omitted" from "outcome
+        explicitly absent because evaluation failed."
+    - id: bundle_applicability
+      type:
+        - string
+        - "null"
+      required: true
+      enum:
+        - applicable
+        - not_applicable
+        - null
+      description: >-
+        Whether an applicable policy bundle was found for this request,
+        distinct from the final authorization outcome (ADR-0002 Section 5:
+        "NOT_APPLICABLE... is not the same as the subject lacking
+        permission"). 'applicable': a policy bundle's scope covered this
+        request (bundle_id/bundle_version below identify it). 'not_
+        applicable': no policy bundle's scope covered this request — this
+        is the condition that produces outcome: not_applicable when
+        evaluation_status is completed. null: bundle applicability could
+        not be determined, which is possible when evaluation_status is
+        failed and the failure occurred during request/schema validation
+        (ADR-0002 Section 3, evaluation phases 1-2) before bundle
+        applicability is established in phase 3 onward — a failure that
+        occurs after an applicable bundle was already identified (for
+        example, a condition evaluation error inside that bundle) may still
+        report bundle_applicability: applicable alongside evaluation_status:
+        failed. This contract does not implement the applicability
+        determination itself; it only publishes the value.
+    - id: bundle_id
+      type:
+        - string
+        - "null"
+      required: false
+      default: null
+      non_empty: true
+      governed_by: policy-bundle
+      description: >-
+        The bundle_id of the policy-bundle found applicable to this request
+        (policy-bundle.md), when bundle_applicability is "applicable". Null
+        or absent when no bundle applied, or when applicability could not be
+        determined. Reused unchanged from policy-bundle; this contract does
+        not redefine bundle identity.
+    - id: bundle_version
+      type:
+        - string
+        - "null"
+      required: false
+      default: null
+      pattern: "^\\d+\\.\\d+\\.\\d+$"
+      governed_by: policy-bundle
+      description: >-
+        The bundle_version of the applicable policy-bundle actually
+        evaluated — distinct from an operation-aware-decision-request's
+        expected_policy_version (a request-side expectation) and from the
+        policy-bundle contract's own schema_version (the bundle-shape
+        version). Reused unchanged from policy-bundle's semver pattern.
+    - id: failure_reason
+      type:
+        - string
+        - "null"
+      required: false
+      default: null
+      enum:
+        - invalid_request
+        - unsupported_schema_version
+        - invalid_policy_bundle
+        - policy_validation_failure
+        - condition_evaluation_error
+        - internal_evaluation_error
+        - null
+      description: >-
+        The evaluation-failure category, REQUIRED to be non-null when
+        evaluation_status is "failed" and REQUIRED to be null when
+        evaluation_status is "completed". This is a closed, six-value
+        evaluator-failure vocabulary reproducing ADR-0002 Section 14's
+        representative evaluation-failure categories exactly (invalid
+        request, unsupported schema version, invalid policy bundle, policy
+        validation failure, condition evaluation error, internal evaluation
+        error) — distinct from, and never conflated with, the open
+        reason_code field below, and distinct from the existing first-wave
+        decision-response's own four-value failure_reason (malformed_
+        request / policy_error / audit_error / internal_error), which this
+        contract does not modify, reinterpret, or extend. See
+        operation-aware-decision-response.md, "Evaluation failure", for the
+        full relationship discussion.
+    - id: rule_evidence
+      type: array
+      required: true
+      description: >-
+        Zero or more trace-rule-evidence-shaped values (see
+        trace-rule-evidence.md) — referenced, not redefined. May be empty:
+        a not_applicable trace (no bundle applied) or a trace for a failure
+        that occurred before rule evaluation began (per evaluation phases
+        1-4, ADR-0002 Section 3) legitimately has no rule evidence to
+        report. rule_id values within this array must be unique (trace-
+        level validation — see constraints below).
+    - id: reason_code
+      type:
+        - string
+        - "null"
+      required: false
+      default: null
+      pattern: "^[a-z][a-z0-9]*(_[a-z0-9]+)*$"
+      governed_by: reason-code
+      description: >-
+        Optional stable, machine-readable reason code summarizing this
+        trace's overall result, reusing the reason-code contract's format
+        unchanged. Distinct from any individual rule_evidence entry's own
+        reason_code, which explains that specific rule's contribution.
+    - id: explanation
+      type:
+        - string
+        - "null"
+      required: false
+      default: null
+      non_empty: true
+      description: >-
+        Optional static, non-empty, human-readable summary explanation of
+        this trace's overall result. Descriptive rendering only — not
+        authoritative (ADR-0003 Section 11). No template, variable-
+        interpolation, expression-evaluation, or script-execution mechanism
+        is defined. Must not contain secrets or credential material.
+
+  # Deterministic serialization order is required; authorization precedence
+  # is not defined by it. This is a basis-schemas publication choice,
+  # documented (not implemented) per ADR-0002 Section 8 and ADR-0003
+  # Section 13.
+  trace_ordering:
+    serialization: deterministic_for_identical_input   # the same request + policy bundle version must produce the same rule_evidence order every time
+    order_source: producer_defined                     # this contract does not mandate a specific sort key (e.g. rule_id); it requires stability, not a specific key
+    authorization_precedence: not_defined_by_this_contract  # array order is never evaluation priority; see policy-rule.md's own rule-ordering deferral
+
+  # Reproduced from policy-bundle.yaml / reason-code.yaml so a consumer can
+  # validate without dereferencing them. Parity with the canonical files is
+  # enforced by this repository's test suite.
+  outcome_values:
+    - allow
+    - deny
+    - not_applicable
+  evaluation_status_values:
+    - completed
+    - failed
+  bundle_applicability_values:
+    - applicable
+    - not_applicable
+  failure_reason_values:
+    - invalid_request
+    - unsupported_schema_version
+    - invalid_policy_bundle
+    - policy_validation_failure
+    - condition_evaluation_error
+    - internal_evaluation_error
+  bundle_version_pattern: "^\\d+\\.\\d+\\.\\d+$"
+  reason_code_pattern: "^[a-z][a-z0-9]*(_[a-z0-9]+)*$"
+
+  constraints:
+    - trace_id, request_id, evaluation_status, outcome, bundle_applicability,
+      and rule_evidence are required keys on every trace (outcome may hold
+      an explicit null; see below).
+    - trace_id and request_id must be non-empty strings.
+    - evaluation_status must be one of completed or failed.
+    - >-
+      outcome is REQUIRED to be one of allow, deny, or not_applicable when
+      evaluation_status is completed, and REQUIRED to be null when
+      evaluation_status is failed. A failed evaluation must never serialize
+      a non-null outcome.
+    - bundle_applicability must be one of applicable, not_applicable, or
+      null. This contract does not require a fixed correlation between
+      bundle_applicability and evaluation_status beyond what is stated in
+      the bundle_applicability field description above (a failure may occur
+      before or after applicability was determined).
+    - >-
+      When evaluation_status is completed, outcome and bundle_applicability
+      MUST agree: outcome: not_applicable if and only if
+      bundle_applicability: not_applicable; outcome: allow or outcome: deny
+      if and only if bundle_applicability: applicable. This correlation is
+      not required when evaluation_status is failed (bundle_applicability
+      may be applicable, not_applicable, or null under failure, per the
+      field description above).
+    - bundle_id, when present and non-null, must be a non-empty string.
+    - bundle_version, when present and non-null, must match
+      bundle_version_pattern (parity with policy-bundle's bundle_version).
+    - >-
+      failure_reason is REQUIRED to be null when evaluation_status is
+      completed, and REQUIRED to be one of the six published
+      failure_reason_values when evaluation_status is failed.
+    - >-
+      rule_evidence must be an array (possibly empty) of objects matching
+      trace-rule-evidence's own published field policy (parity with
+      trace-rule-evidence.yaml — reused, not redefined). rule_id values
+      within this array must be unique (trace-level validation: a
+      cross-record uniqueness concern a single rule-evidence entry's own
+      schema cannot express).
+    - >-
+      When bundle_applicability is not_applicable, rule_evidence MUST be
+      empty: no bundle applied, so no rule was ever a candidate (see the
+      file header, "Outcome and bundle_applicability agree").
+    - >-
+      If any rule_evidence entry carries rule_result: error, evaluation_status
+      MUST be failed (and therefore outcome MUST be null). A rule-evaluation
+      error can never coexist with a completed allow or deny outcome (see
+      the file header, "Rule-evaluation error propagates to
+      evaluation_status").
+    - reason_code, when present and non-null, must match reason_code_pattern
+      (parity with the reason-code contract).
+    - explanation, when present and non-null, must be a non-empty string.
+    - >-
+      This contract does not carry a full request snapshot, a full policy
+      bundle, raw identity evidence, raw adapter evidence, raw protocol
+      payloads, credentials, tokens, key material, or gateway enforcement
+      facts (route, HTTP status, response returned to caller). It does not
+      define full_request, request_snapshot, full_policy, policy_document,
+      policy_source, raw_claims, full_claim_set, raw_payload,
+      raw_protocol_payload, packet, frame, device_secret, access_token,
+      id_token, refresh_token, jwt, bearer_token, authorization_header,
+      cookie, session_secret, client_secret, password, private_key,
+      api_key, credential, debug, debug_data, exception, exception_object,
+      stack, stack_trace, traceback, gateway_enforcement,
+      enforcement_result, http_status, or response_status fields. Any such
+      field is rejected as unknown.
+    - >-
+      Unknown / additional top-level fields are rejected (additional
+      properties are set to false).
+    - >-
+      This contract does not implement evaluation, does not implement
+      persistence, retention, or storage, and is not itself an audit
+      record. AuditEvidence and GatewayAuditEvent are later, separate
+      contracts (PR F) that reference this trace's trace_id rather than
+      being defined here — see the file header, "Trace is not audit."
+
+  # Where this shape is produced, consumed, and governed. Informative; it
+  # records boundary ownership already established in ADR-0003, it adds no
+  # structure of its own.
+  composition:
+    produced_by: basis-core                     # future v0.2.0 kernel produces this trace as part of evaluation
+    embedded_in_or_referenced_by: operation-aware-decision-response  # see that contract's optional evaluation_trace / trace_id fields
+    consumed_by: basis-gateway, basis-console    # basis-gateway assembles audit evidence from this trace (PR F, not implemented here); basis-console may visualize it, never authoritatively
+    published_by: basis-schemas                  # publishes the trace shape only; implements none of the above
+
+  examples:
+    valid:
+      # 1. ALLOW trace: one matching allow rule, one non-matching candidate.
+      - trace_id: trace-0001-0000-0000-000000000001
+        request_id: oadr-0002-0000-0000-000000000002
+        evaluation_status: completed
+        outcome: allow
+        bundle_applicability: applicable
+        bundle_id: baseline-read-only-telemetry
+        bundle_version: "1.0.0"
+        rule_evidence:
+          - rule_id: rule-operator-read-ahu-telemetry
+            effect: allow
+            rule_result: matched
+            reason_code: allow_rule_matched
+        reason_code: allow_rule_matched
+        explanation: Operator role matched an allow rule for read:ahu.
+      # 2. DENY trace: a matching deny rule overrides a matching allow rule
+      #    (deny precedence, ADR-0002 Section 6).
+      - trace_id: trace-0002-0000-0000-000000000002
+        request_id: oadr-0003-0000-0000-000000000003
+        evaluation_status: completed
+        outcome: deny
+        bundle_applicability: applicable
+        bundle_id: west-campus-hvac-operations
+        bundle_version: "2.3.1"
+        rule_evidence:
+          - rule_id: rule-west-campus-hvac-allow
+            effect: allow
+            rule_result: matched
+            reason_code: allow_rule_matched
+          - rule_id: rule-west-campus-hvac-deny-interlock
+            effect: deny
+            rule_result: matched
+            reason_code: deny_rule_matched
+        reason_code: deny_rule_matched
+        explanation: Deny precedence applied; an interlock-scoped deny rule matched.
+      # 3. NOT_APPLICABLE trace: no policy bundle covered the request.
+      - trace_id: trace-0003-0000-0000-000000000003
+        request_id: oadr-0001-0000-0000-000000000001
+        evaluation_status: completed
+        outcome: not_applicable
+        bundle_applicability: not_applicable
+        rule_evidence: []
+        reason_code: no_applicable_bundle
+        explanation: No policy bundle's scope covers this request.
+      # 4. Evaluation-failure trace: an unsupported schema version, detected
+      #    before bundle applicability could be established.
+      - trace_id: trace-0004-0000-0000-000000000004
+        request_id: oadr-1099-0000-0000-000000000099
+        evaluation_status: failed
+        outcome: null
+        bundle_applicability: null
+        failure_reason: unsupported_schema_version
+        rule_evidence: []
+        explanation: The request declared a schema version this kernel does not support.
+      # 5. Evaluation-failure trace occurring inside an already-applicable
+      #    bundle (a condition evaluation error), demonstrating
+      #    bundle_applicability may remain "applicable" under a failure.
+      - trace_id: trace-0005-0000-0000-000000000005
+        request_id: oadr-0004-0000-0000-000000000004
+        evaluation_status: failed
+        outcome: null
+        bundle_applicability: applicable
+        bundle_id: vendor-remote-access-baseline
+        bundle_version: "0.4.0"
+        failure_reason: condition_evaluation_error
+        rule_evidence:
+          - rule_id: rule-deny-elevated-risk
+            effect: deny
+            rule_result: error
+            condition_results:
+              - condition_id: cond-risk-score-high
+                result: error
+                reason_code: condition_type_mismatch
+        reason_code: condition_evaluation_error
+    invalid:
+      - reason: missing required trace ID
+        value:
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: completed
+          outcome: allow
+          bundle_applicability: applicable
+          rule_evidence: []
+      - reason: missing required request ID
+        value:
+          trace_id: trace-1001-0000-0000-000000000001
+          evaluation_status: completed
+          outcome: allow
+          bundle_applicability: applicable
+          rule_evidence: []
+      - reason: invalid outcome value
+        value:
+          trace_id: trace-1002-0000-0000-000000000002
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: completed
+          outcome: maybe
+          bundle_applicability: applicable
+          rule_evidence: []
+      - reason: malformed evaluation_status value
+        value:
+          trace_id: trace-1003-0000-0000-000000000003
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: partial
+          outcome: allow
+          bundle_applicability: applicable
+          rule_evidence: []
+      - reason: failed evaluation represented as ALLOW (required invariant violation)
+        value:
+          trace_id: trace-1004-0000-0000-000000000004
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: failed
+          outcome: allow
+          bundle_applicability: null
+          failure_reason: internal_evaluation_error
+          rule_evidence: []
+      - reason: completed evaluation with non-null failure_reason (invariant violation)
+        value:
+          trace_id: trace-1005-0000-0000-000000000005
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: completed
+          outcome: allow
+          bundle_applicability: applicable
+          failure_reason: internal_evaluation_error
+          rule_evidence: []
+      - reason: invalid bundle_version (not semver)
+        value:
+          trace_id: trace-1006-0000-0000-000000000006
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: completed
+          outcome: allow
+          bundle_applicability: applicable
+          bundle_id: baseline-read-only-telemetry
+          bundle_version: "v1"
+          rule_evidence: []
+      - reason: malformed rule evidence (invalid rule_result)
+        value:
+          trace_id: trace-1007-0000-0000-000000000007
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: completed
+          outcome: allow
+          bundle_applicability: applicable
+          rule_evidence:
+            - rule_id: rule-invalid-result
+              effect: allow
+              rule_result: passed
+      - reason: duplicate rule IDs within one trace's rule_evidence
+        value:
+          trace_id: trace-1008-0000-0000-000000000008
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: completed
+          outcome: allow
+          bundle_applicability: applicable
+          rule_evidence:
+            - rule_id: rule-duplicate
+              effect: allow
+              rule_result: matched
+            - rule_id: rule-duplicate
+              effect: deny
+              rule_result: not_matched
+      - reason: unknown field rejected
+        value:
+          trace_id: trace-1009-0000-0000-000000000009
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: completed
+          outcome: allow
+          bundle_applicability: applicable
+          rule_evidence: []
+          confidence: 0.97
+      - reason: raw request snapshot field rejected (unknown field)
+        value:
+          trace_id: trace-1010-0000-0000-000000000010
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: completed
+          outcome: allow
+          bundle_applicability: applicable
+          rule_evidence: []
+          request_snapshot:
+            subject_id: alice
+      - reason: stack trace field rejected (unknown field)
+        value:
+          trace_id: trace-1011-0000-0000-000000000011
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: failed
+          outcome: null
+          bundle_applicability: null
+          failure_reason: internal_evaluation_error
+          rule_evidence: []
+          stack_trace: "Traceback (most recent call last): ..."
+      - reason: rule_result error present but evaluation_status is completed (must be failed)
+        value:
+          trace_id: trace-1012-0000-0000-000000000012
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: completed
+          outcome: deny
+          bundle_applicability: applicable
+          bundle_id: baseline-read-only-telemetry
+          bundle_version: "1.0.0"
+          rule_evidence:
+            - rule_id: rule-deny-elevated-risk
+              effect: deny
+              rule_result: error
+      - reason: outcome not_applicable but bundle_applicability applicable (must agree)
+        value:
+          trace_id: trace-1013-0000-0000-000000000013
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: completed
+          outcome: not_applicable
+          bundle_applicability: applicable
+          bundle_id: baseline-read-only-telemetry
+          bundle_version: "1.0.0"
+          rule_evidence: []
+      - reason: outcome allow but bundle_applicability not_applicable (must agree)
+        value:
+          trace_id: trace-1014-0000-0000-000000000014
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: completed
+          outcome: allow
+          bundle_applicability: not_applicable
+          rule_evidence: []
+      - reason: not_applicable trace with non-empty rule_evidence (no bundle applied, so no rule was ever a candidate)
+        value:
+          trace_id: trace-1015-0000-0000-000000000015
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: completed
+          outcome: not_applicable
+          bundle_applicability: not_applicable
+          rule_evidence:
+            - rule_id: rule-operator-read-ahu-telemetry
+              effect: allow
+              rule_result: skipped

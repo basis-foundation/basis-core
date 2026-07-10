@@ -1,0 +1,358 @@
+# BASIS Policy Condition — published contract.
+#
+# This file PUBLISHES the deterministic, data-only condition shape decided in
+# basis-architecture's operation-aware policy bundle and rule model (ADR-0004,
+# docs/architecture/operation-aware-policy-rule-model.md, Section 7
+# "Conditions") and sequenced for schema publication by the operation-aware
+# schema readiness plan (ADR-0005,
+# docs/architecture/operation-aware-schema-readiness-plan.md, "PR D — Policy
+# Bundle and Rule Contracts"). It does not invent new policy semantics: every
+# field below formalizes a conceptual requirement ADR-0004 Section 7 already
+# named (explicit, deterministic, no external data fetching, no side effects,
+# distinguishes match/no-match/error, no silent type coercion, no missing-
+# context-as-truthy). Architecture governs; schemas publish; implementations
+# consume.
+#
+# CRITICAL DESIGN BOUNDARY: this publishes a structured policy DATA model, not
+# a policy language. It does not select Rego, Cedar, CEL, Python, JavaScript,
+# SQL, WASM, a custom DSL, or a templated expression language, and it does not
+# publish an executable policy expression, embedded code, a `script` field, or
+# an unrestricted executed-expression string. A condition is inert data; this
+# contract does not implement, and does not imply, condition evaluation,
+# match/no-match/error determination, or external context retrieval — that is
+# a future basis-core v0.2.0 responsibility (ADR-0004 Section 16).
+#
+# The operator vocabulary is DELIBERATELY NOT closed. ADR-0004 Section 7
+# states explicitly: "This document does not define a full operator language
+# ... That is deferred to the eventual policy format design." This contract
+# therefore validates only that an operator is a well-formed, extensible
+# identifier (lowercase snake_case, matching the reason-code contract's own
+# token shape) — never that it is one of a fixed set. A structurally valid
+# field path or operator does not mean basis-core supports it: unsupported
+# values are rejected during future policy validation, not by this contract.
+#
+# The `lifecycle` is `experimental`: this is the first publication of the
+# policy condition shape, ahead of any real consumer.
+
+contract:
+  name: policy-condition
+  title: BASIS Policy Condition
+  version: 0.1.0
+  lifecycle: experimental
+  governed_by: basis-architecture
+  published_by: basis-schemas
+  source: docs/architecture/operation-aware-schema-readiness-plan.md
+  description: >-
+    A deterministic, data-only predicate over operation-aware request
+    context: a stable condition identifier, a validated dotted field-path
+    reference into the categories published by
+    operation-aware-decision-request, an open (not closed-enum) lowercase
+    snake_case operator identifier, and a smallest-safe-representation
+    expected value (string, number, boolean, null, or a homogeneous array of
+    those scalars). Publishes the condition *shape* only: this contract does
+    not implement, and does not define, condition evaluation, match/no-match/
+    error determination, operator support, or external context retrieval —
+    all of that is deferred to a future basis-core v0.2.0 policy validator
+    and evaluator. A structurally valid condition is not a claim that
+    basis-core currently supports its field path or operator.
+  depends_on:
+    - contract-metadata
+
+policy_condition:
+  # A condition is a single object. All four fields are required: a
+  # condition without an expected_value, an operator, or a field path is not
+  # a usable predicate, and omitting condition_id would make the condition
+  # impossible to reference stably from trace, audit, or a containing rule.
+  # Unknown fields are rejected — this is a closed, minimal shape by design,
+  # with no metadata/extensions/context bag and no embedded code field.
+  required:
+    - condition_id
+    - field_path
+    - operator
+    - expected_value
+  optional: []
+  additional_properties: false
+
+  fields:
+    - id: condition_id
+      type: string
+      required: true
+      non_empty: true
+      description: >-
+        Stable identifier for this condition, unique within its containing
+        rule (rule-level validation, not enforced by this field's own type —
+        see "constraints" below and policy-rule.yaml's own duplicate-
+        condition-id validation). No UUID requirement: a short, stable,
+        human-readable token (e.g. cond-risk-score-high) is sufficient and
+        preferred for trace/audit/test readability. Must not carry a
+        timestamp or other mutable information — an identifier that changes
+        across bundle revisions without an explicit rename breaks every
+        downstream consumer that referenced it (trace, audit, compatibility
+        tests), the same stability requirement ADR-0004 Section 4 places on
+        rule identifiers.
+    - id: field_path
+      type: string
+      required: true
+      non_empty: true
+      pattern: "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+      description: >-
+        A validated dotted identifier path identifying which part of the
+        operation-aware request (published by
+        operation-aware-decision-request) this condition evaluates — for
+        example subject_id, subject_attrs.clearance, location.site_id,
+        device.device_class, protocol_context.protocol, risk_context.score,
+        or evaluation_time. This contract validates only that the path is
+        structurally well-formed (lowercase dot-separated segments; no
+        method calls, array-indexing syntax, function calls, or executable
+        expressions of any kind) — it does not enumerate or close the set of
+        supported request field paths, because doing so would either
+        duplicate operation-aware-decision-request's own field list
+        divergently or prematurely freeze which paths a future policy format
+        may reference. A structurally valid field path does not guarantee
+        basis-core supports it: an unsupported (but well-formed) field path
+        is rejected during future policy validation, not silently
+        evaluated, and not rejected by this schema.
+    - id: operator
+      type: string
+      required: true
+      non_empty: true
+      pattern: "^[a-z][a-z0-9]*(_[a-z0-9]+)*$"
+      description: >-
+        A validated, extensible machine-readable operator identifier —
+        lowercase snake_case, using the same token shape as the reason-code
+        contract's pattern. Deliberately NOT a closed enum: ADR-0004
+        Section 7 explicitly defers the operator/condition language to a
+        future policy format. This field accepts any structurally valid
+        future operator and rejects only malformed identifiers (uppercase,
+        leading digit, colon, hyphen, or leading/trailing/doubled
+        underscore). See illustrative_operators below for non-final,
+        illustrative examples only. Which operators a given field path and
+        expected_value combination actually supports is determined by
+        future basis-core policy validation, not by this contract.
+    - id: expected_value
+      type:
+        - string
+        - number
+        - boolean
+        - "null"
+        - array
+      required: true
+      description: >-
+        The smallest safe, data-only value this condition compares the
+        referenced field against: a string, a number, a boolean, an
+        explicit null, or a homogeneous array of string/number/boolean
+        scalars (see expected_value_array_item_types below). This field is
+        REQUIRED — the key must always be present — but its value may
+        legitimately be the null literal itself (for example, an explicit
+        equals-null comparison, or a value an illustrative "exists"-style
+        operator does not otherwise need); this differs from this
+        repository's usual required+nullable pairing, where a nullable type
+        marks "absent," because here null is itself a meaningful data value,
+        not an absence marker. This contract does NOT allow: nested objects,
+        nested arrays, heterogeneous arrays, functions, code, templates,
+        arbitrary executable expressions, or external data-source/network
+        references. This is a structural, data-only representation; this
+        contract does not itself interpret the value against the operator or
+        field path — that is future basis-core evaluation, not this schema.
+
+  # --- Extensibility metadata (documentation + parity-testable constants) ---
+
+  # Reproduced from the reason-code contract's own token pattern so a
+  # consumer can validate operator without dereferencing that contract; not a
+  # claim that operator and reason_code are the same concept, only that they
+  # share one convenient, already-published token shape (lowercase snake_case).
+  field_path_pattern: "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+  operator_pattern: "^[a-z][a-z0-9]*(_[a-z0-9]+)*$"
+
+  # Illustrative examples ONLY — explicitly NOT a final or closed operator
+  # vocabulary. ADR-0004 Section 7 defers the operator language; this list
+  # exists so early examples have something concrete to use, not to
+  # constrain what basis-core may later support.
+  illustrative_operators:
+    - equals
+    - not_equals
+    - in
+    - greater_than
+    - less_than
+    - exists
+
+  # expected_value's scalar/array shape, documented machine-readably so tests
+  # can validate it without hardcoding the rule twice.
+  expected_value_scalar_types:
+    - string
+    - number
+    - boolean
+    - "null"
+  expected_value_array_item_types:
+    - string
+    - number
+    - boolean
+
+  constraints:
+    - condition_id, field_path, operator, and expected_value are required.
+    - condition_id and field_path must be non-empty strings.
+    - >-
+      condition_id must be stable and unique within its containing rule.
+      Uniqueness within a rule is RULE-LEVEL validation (see
+      policy-rule.yaml), not something this single-condition schema can
+      express or enforce on its own — a standalone condition object has no
+      sibling conditions to compare against.
+    - >-
+      field_path must match field_path_pattern (lowercase dot-separated
+      identifier segments only). No method calls, no array-indexing syntax,
+      no function calls, and no executable expression of any kind.
+    - >-
+      A structurally valid field_path is not a claim that basis-core
+      currently supports evaluating that path. Unsupported (but
+      well-formed) field paths are rejected during future policy
+      validation, not by this contract.
+    - >-
+      operator must be non-empty and must match operator_pattern (lowercase
+      snake_case). This contract does not enumerate a closed set of valid
+      operators — a string that matches the pattern is a structurally valid
+      operator even if it is not one of illustrative_operators above.
+    - >-
+      A structurally valid operator is not a claim that basis-core currently
+      supports it for a given field_path/expected_value combination.
+      Unsupported (but well-formed) operators are rejected during future
+      policy validation, not by this contract.
+    - expected_value must be a string, a number, a boolean, an explicit
+      null, or an array whose items are all the same one of string, number,
+      or boolean (expected_value_array_item_types). Nested objects, nested
+      arrays, and heterogeneous arrays are rejected.
+    - >-
+      This contract defines no script, code, executable, command, shell,
+      python, javascript, rego, cedar, cel, wasm, sql, template, or
+      expression field. Any such field is rejected as unknown
+      (additional_properties is false).
+    - >-
+      This contract does not implement condition evaluation. It does not
+      define match, no-match, or evaluation-error behavior (per ADR-0004
+      Section 7 and the operation-aware evaluation semantics document,
+      Section 9); those are future basis-core v0.2.0 responsibilities. It
+      also does not fetch external data at "evaluation time" — there is no
+      evaluation implemented here to fetch data for.
+    - Unknown / additional fields are rejected.
+
+  # Where this shape is produced, consumed, and governed. Informative; it
+  # records boundary ownership already established in ADR-0004 Section 16,
+  # it adds no structure of its own.
+  composition:
+    authored_as_part_of: policy-rule   # conditions are carried inside a policy-rule's conditions array
+    validated_by: basis-core           # future v0.2.0 policy validator determines field-path/operator support
+    evaluated_by: basis-core           # future v0.2.0 kernel evaluates match/no-match/error deterministically
+    published_by: basis-schemas        # publishes the condition shape only; implements none of the above
+
+  examples:
+    valid:
+      # 1. Equality-like subject attribute condition.
+      - condition_id: cond-clearance-equals-level-2
+        field_path: subject_attrs.clearance
+        operator: equals
+        expected_value: level-2
+      # 2. Numeric risk-score condition.
+      - condition_id: cond-risk-score-above-threshold
+        field_path: risk_context.score
+        operator: greater_than
+        expected_value: 0.5
+      # 3. Evaluation-time condition (evaluation semantics not implemented
+      #    or implied here — this is data only).
+      - condition_id: cond-evaluation-time-present
+        field_path: evaluation_time
+        operator: exists
+        expected_value: true
+      # 4. Structurally valid future/illustrative operator — clearly
+      #    non-final — demonstrating the operator vocabulary is open, not a
+      #    closed enum.
+      - condition_id: cond-device-class-future-operator
+        field_path: device.device_class
+        operator: matches_future_pattern
+        expected_value: controller
+      # 5. Homogeneous array expected_value (an "in"-style alternatives
+      #    condition over string scalars).
+      - condition_id: cond-site-in-allowed-set
+        field_path: location.site_id
+        operator: in
+        expected_value:
+          - west-campus
+          - east-campus
+    invalid:
+      - reason: missing required condition_id
+        value:
+          field_path: subject_attrs.clearance
+          operator: equals
+          expected_value: level-2
+      - reason: empty condition_id
+        value:
+          condition_id: ""
+          field_path: subject_attrs.clearance
+          operator: equals
+          expected_value: level-2
+      - reason: missing required field_path
+        value:
+          condition_id: cond-missing-field-path
+          operator: equals
+          expected_value: level-2
+      - reason: malformed field path (array-indexing syntax, not a plain dotted path)
+        value:
+          condition_id: cond-malformed-field-path
+          field_path: "subject_roles[0]"
+          operator: equals
+          expected_value: operator
+      - reason: malformed field path (method-call syntax)
+        value:
+          condition_id: cond-malformed-field-path-call
+          field_path: "subject_attrs.get('clearance')"
+          operator: equals
+          expected_value: level-2
+      - reason: missing required operator
+        value:
+          condition_id: cond-missing-operator
+          field_path: subject_attrs.clearance
+          expected_value: level-2
+      - reason: malformed operator (uppercase, not this contract's lowercase snake_case)
+        value:
+          condition_id: cond-malformed-operator
+          field_path: subject_attrs.clearance
+          operator: EQUALS
+          expected_value: level-2
+      - reason: malformed operator (contains a colon)
+        value:
+          condition_id: cond-malformed-operator-colon
+          field_path: subject_attrs.clearance
+          operator: "equals:strict"
+          expected_value: level-2
+      - reason: missing required expected value
+        value:
+          condition_id: cond-missing-expected-value
+          field_path: subject_attrs.clearance
+          operator: equals
+      - reason: unsupported value shape (nested object, not a data-only scalar or homogeneous array)
+        value:
+          condition_id: cond-unsupported-value-shape
+          field_path: subject_attrs.clearance
+          operator: equals
+          expected_value:
+            nested: object-not-allowed
+      - reason: unsupported value shape (heterogeneous array)
+        value:
+          condition_id: cond-heterogeneous-array
+          field_path: location.site_id
+          operator: in
+          expected_value:
+            - west-campus
+            - 42
+      - reason: unknown field rejected
+        value:
+          condition_id: cond-unknown-field
+          field_path: subject_attrs.clearance
+          operator: equals
+          expected_value: level-2
+          priority: 1
+      - reason: executable expression / script field rejected (unknown field)
+        value:
+          condition_id: cond-script-field
+          field_path: subject_attrs.clearance
+          operator: equals
+          expected_value: level-2
+          script: "return subject_attrs['clearance'] == 'level-2'"

@@ -186,3 +186,50 @@ This harness complements rather than replaces the existing test suite:
 `test_extension_contracts.py` — tests the behavioral contracts of the extension interfaces. The compatibility harness captures the serialized representation of the records those interfaces produce.
 
 Extension interface method names (`AuditWriter.write`, `PolicyRule.evaluate`, `AdapterBase.start`/`stop`) are not protected by JSON snapshots — they are protected by the `isinstance` checks in `test_extension_contracts.py`. Because `AuditWriter`, `PolicyRule`, and `AdapterBase` are `@runtime_checkable` Protocols, renaming a method on the Protocol causes existing implementations to fail the `isinstance` check in that file. This is the correct protection mechanism: interface contracts are behavioral, not serialized.
+
+---
+
+## Operation-aware `basis-schemas` v0.2.0 fixture snapshot
+
+This is a separate, additive harness from everything above. It does not
+protect a `basis-core` model's serialized shape (there is no operation-aware
+model yet — see `docs/implementation/basis-core-v0.2-operation-aware-plan.md`)
+— it protects a **vendored, pinned copy of an upstream `basis-schemas`
+release** from silent drift, so that future operation-aware implementation
+work has a reproducible, offline, immutable target to build and test
+against.
+
+**Location:** `tests/fixtures/basis-schemas/v0.2.0/` — 14 operation-aware
+contract YAMLs under `schemas/` and 5 canonical compatibility scenarios under
+`compatibility/`, pinned to `basis-schemas` tag `v0.2.0` (commit
+`1d3af3cfd38686173980cfb47f8fa44659a4e1c4`). See that directory's own
+`README.md` for the full ownership, boundary, and refresh documentation —
+this section only orients where it fits alongside the harness above.
+
+**Test coverage:**
+
+| Concern | Coverage |
+|---|---|
+| Contract/scenario inventory (14 contracts, 5 scenarios, per-scenario artifact sets) | `tests/test_basis_schemas_snapshot.py` |
+| SHA-256 integrity, manifest structure, path-traversal/symlink rejection, deterministic ordering | `tests/test_basis_schemas_snapshot_integrity.py` |
+| Source provenance (`source_repository`/`source_release`/`source_commit`) | `tests/test_basis_schemas_snapshot_provenance.py` |
+| Refresh tool happy/failure paths | `tests/test_update_basis_schemas_snapshot.py` |
+| Public API and runtime-import boundaries unchanged | `tests/test_basis_schemas_snapshot_boundaries.py` |
+
+**Helpers:** `tests/helpers/basis_schemas_snapshot.py` provides
+`get_schema_path`, `get_scenario_artifact`, `list_operation_aware_contracts`,
+`list_compatibility_scenarios`, and `load_snapshot_manifest` — discovery and
+integrity only, no YAML parsing, no schema-to-model conversion.
+
+**Refreshing:** `scripts/update_basis_schemas_snapshot.py` — an offline,
+network-free tool that copies a fixed, reviewed allowlist of files from a
+local `basis-schemas` checkout and regenerates `manifest.json`
+deterministically. See the snapshot `README.md`'s "Refreshing this snapshot"
+section for the exact command.
+
+**What this is not:** this snapshot is not a runtime dependency (never added
+to `pyproject.toml`), not a new schema authority (`basis-schemas` remains
+authoritative), and not itself a test of operation-aware evaluation
+semantics — no policy bundle is parsed and no request is evaluated by
+anything in this harness. It exists purely so that later operation-aware
+implementation PRs have something reproducible to build against.
