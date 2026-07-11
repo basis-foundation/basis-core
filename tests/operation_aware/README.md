@@ -46,11 +46,52 @@ modules are not moved, renamed, or duplicated here.
   never grow its own parallel policy-evaluation, matching, or precedence
   logic used to "check" the kernel from the outside.
 
+## YAML contract loading (Milestone 1, PR 4)
+
+`test_scaffold.py` (Milestone 0, PR 3) proved this package could *locate*
+pinned snapshot content through `tests/helpers/basis_schemas_snapshot.py`,
+without parsing any of it. Milestone 1, PR 4 adds the remaining
+YAML-*parsing* half:
+
+- **Where the helpers live** — `tests/helpers/operation_aware_contracts.py`.
+  It provides `load_yaml_document` (a safe, `yaml.SafeLoader`-based loader
+  with an added duplicate-mapping-key check), `load_contract` and
+  `load_scenario_artifact` (snapshot-boundary-aware wrappers over the
+  existing discovery helpers), generic structural assertions
+  (`require_mapping`, `require_sequence`, `require_string_field`,
+  `require_mapping_field`, `require_sequence_field`, `require_optional_field`,
+  `reject_unknown_fields`), and `validate_contract_metadata` (structural
+  presence/type checks for the shared `contract:` block only).
+- **What they validate** — that a fixture file is well-formed, safe YAML
+  (single document, no unsafe tags, no duplicate keys, valid UTF-8) and has
+  the broad container shape (mapping vs. sequence vs. scalar) a caller
+  expects; and, for contract metadata specifically, that `contract`,
+  `contract.name`, `contract.version`, `contract.lifecycle`, and
+  `contract.depends_on` are present with the right structural type.
+- **What they intentionally do not validate** — any contract's business
+  semantics: field patterns (e.g. kebab-case `name`, semver `version`),
+  enum membership (e.g. `lifecycle`'s three values), cross-field
+  constraints, condition-operator behavior, selector matching, evaluation
+  outcomes, or trace/audit content. Those are `basis-schemas`' own
+  contracts to define and later, separate roadmap work (domain models,
+  policy, evaluator) to implement and test.
+- **Reuse, don't re-parse** — future test files below should call
+  `load_contract` / `load_scenario_artifact` / the `require_*` helpers
+  rather than opening and parsing vendored YAML themselves. This keeps
+  exactly one place that knows how to safely read the snapshot.
+- **Test-only, always** — like `basis_schemas_snapshot.py`, this helper
+  module is never imported by `src/basis_core/` and exposes no
+  `basis_core` public API; see `tests/test_basis_schemas_snapshot_boundaries.py`.
+
+Its own tests live in `test_contract_loading.py` (all 14 pinned contracts),
+`test_compatibility_fixture_loading.py` (all 5 pinned scenarios), and
+`test_yaml_loader_negative.py` (malformed/unsafe input, exercised against
+temporary files outside the pinned snapshot).
+
 ## Anticipated future test files
 
 The files below are **anticipated, not yet implemented**. Each is added by
-its own focused roadmap PR as the corresponding production surface lands;
-none of them exist yet as of this scaffold.
+its own focused roadmap PR as the corresponding production surface lands.
 
 ```text
 test_vocabulary.py
@@ -66,7 +107,9 @@ test_operation_aware_engine.py
 test_canonical_vectors.py
 ```
 
-`test_scaffold.py`, added by this PR, is infrastructure-only: it proves the
-package is discovered by pytest and can reach the pinned fixture foundation.
-It is not one of the files above and carries no domain-model or evaluation
-assertions.
+`test_scaffold.py` (PR 3) is infrastructure-only: it proves the package is
+discovered by pytest and can reach the pinned fixture foundation.
+`test_contract_loading.py`, `test_compatibility_fixture_loading.py`, and
+`test_yaml_loader_negative.py` (PR 4, described above) are generic
+loading/structural-validation tests, not domain-model or evaluation tests.
+None of the files in the list above exist yet.

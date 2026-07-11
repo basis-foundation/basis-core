@@ -1199,8 +1199,10 @@ same reviewable change, not a separate follow-up PR. PR 3's
 `tests/operation_aware/` subpackage scaffold was not created by this PR —
 the new tests were added as flat `tests/test_basis_schemas_snapshot*.py`
 modules, matching this repository's existing flat `tests/*.py` convention
-(`test_contract_snapshots.py`, `test_schema_validation.py`, etc.); PR 3
-remains open and unstarted.
+(`test_contract_snapshots.py`, `test_schema_validation.py`, etc.); PR 3 was
+open and unstarted at the time this PR merged (see PR 3's own status note
+above — since implemented) and PR 4 was open and unstarted at the time this
+PR merged (see PR 4's own status note below — since implemented).
 
 Two deviations from the sketch below, both strictly additive:
 
@@ -1216,11 +1218,12 @@ Two deviations from the sketch below, both strictly additive:
   snapshot without a governed update mechanism and discovery helpers is not
   usefully "complete" on its own.
 
-What remains for a future PR 4 (unchanged from the original scope below):
-YAML *parsing* into a generic required/optional/pattern/enum policy view
-(the `_validate_object`-style helper), and the PyYAML dev dependency that
-requires. This PR's helpers resolve paths, load `manifest.json`, and
-enumerate inventory only — they never parse the vendored YAML content.
+What remained for PR 4 at the time this PR merged (now delivered — see PR
+4's own status note below): YAML *parsing* into a generic
+required/optional/pattern/enum policy view (the `_validate_object`-style
+helper), and the PyYAML dev dependency that requires. This PR's helpers
+resolve paths, load `manifest.json`, and enumerate inventory only — they
+never parse the vendored YAML content.
 
 Objective: implement the Section 4 recommendation.
 Files: new `tests/fixtures/basis-schemas/v0.2.0/` tree (14 contract YAMLs +
@@ -1271,6 +1274,57 @@ Blocked by architecture decision: no.
 ### Milestone 1 — Schema/fixture consumption
 
 **PR 4 — Fixture-loading test utilities.**
+
+**Status: implemented** (`test/oa-contract-loading`). Delivers the
+remaining generic YAML-parsing and structural-validation half of this PR —
+the fixture-*discovery* half (path resolution, manifest loading, inventory
+enumeration) was already delivered by PR 2's
+`tests/helpers/basis_schemas_snapshot.py`. Adds
+`tests/helpers/operation_aware_contracts.py`: a safe test-only YAML loader
+(`load_yaml_document`, built on `yaml.SafeLoader` with an added
+duplicate-mapping-key check via a small `_StrictSafeLoader` subclass — no
+unsafe tag construction, no multi-document input, no empty documents),
+snapshot-boundary-aware wrappers (`load_contract`, `load_scenario_artifact`)
+that reuse PR 2's discovery helpers, a concise test-helper exception
+hierarchy (`FixtureLoadError` and 6 focused subtypes distinguishing missing
+file / unsafe path / invalid YAML / empty document / multi-document /
+unexpected root type), generic structural-validation helpers
+(`require_mapping`, `require_sequence`, `require_string_field`,
+`require_mapping_field`, `require_sequence_field`, `require_optional_field`,
+`reject_unknown_fields`), and `validate_contract_metadata`, which checks
+only the structural presence and type of `contract`, `contract.name`,
+`contract.version`, `contract.lifecycle`, and `contract.depends_on` — not
+their patterns, enums, or any other field the `contract-metadata` contract
+itself already governs.
+
+Adds three new `tests/operation_aware/` modules: `test_contract_loading.py`
+(all 14 pinned contracts load, have mapping roots, structurally valid
+metadata, a `name` matching their own inventory entry, structurally valid
+`depends_on`, deterministic repeated loads, and no helper mutates loaded
+data), `test_compatibility_fixture_loading.py` (all 5 scenarios' artifacts
+load and have mapping roots, artifact discovery matches the existing helper
+inventory, the gateway-only artifact still loads but stays labeled
+reference-only, and the intentionally-invalid `invalid-policy-bundle`
+scenario still parses as plain YAML without asserting the business rule
+that makes it semantically invalid), and `test_yaml_loader_negative.py` (16
+focused negative cases against temporary files outside the pinned snapshot:
+missing path, directory-as-file, empty/whitespace/explicit-null documents,
+malformed YAML, multi-document YAML, an unsafe `!!python/object/apply` tag,
+duplicate top-level and nested mapping keys, invalid UTF-8, an unexpected
+scalar root via `require_mapping`, and absolute/`..`-traversal/symlink
+boundary escapes). Also extends
+`tests/test_basis_schemas_snapshot_boundaries.py` with a check that no
+`src/basis_core/` file imports `yaml`.
+
+Adds `PyYAML>=6.0` to `pyproject.toml`'s `[project.optional-dependencies].dev`
+— no runtime dependency change.
+
+161 new tests (862 total, up from 701 after PR 3); all 4 quality gates
+(`pytest`, `ruff check`, `ruff format --check`, `mypy src`) green. No
+`src/basis_core/` change, no operation-aware domain model, no semantic
+policy or request validation, no public API change. **Milestone 0 and
+Milestone 1 are both now complete.**
+
 Objective: a test-only helper module that loads a vendored contract YAML and
 exposes its `required`/`optional`/`fields`/pattern/enum policy generically,
 reusing the same approach `basis-schemas`' own tests use
