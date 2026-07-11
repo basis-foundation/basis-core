@@ -88,15 +88,34 @@ Its own tests live in `test_contract_loading.py` (all 14 pinned contracts),
 `test_yaml_loader_negative.py` (malformed/unsafe input, exercised against
 temporary files outside the pinned snapshot).
 
+## Shared vocabulary value objects (Milestone 2, PR 5)
+
+`test_vocabulary.py` and `test_vocabulary_boundaries.py` test the first
+production code added under `src/basis_core/` for the operation-aware
+surface: `basis_core.domain.operation_aware_vocabulary`, which implements
+`RedactionClassification` (a closed, five-value enum) and `ReasonCode` (a
+validated, open-format string token) — the two shared vocabulary primitives
+every later evidence-reference, request, trace, and policy model is expected
+to depend on. `test_vocabulary.py` covers construction (valid/invalid,
+vendored-fixture-conformant and directly-parametrized), enum exhaustiveness,
+immutability, equality, hashing, and deterministic representation.
+`test_vocabulary_boundaries.py` confirms the new module imports only the
+standard library, is not yet re-exported as public API, and is not imported
+by any existing v0.1.0 module. No evidence-reference, context-object,
+request/response, policy, or evaluator code is implemented or tested here —
+those remain later, separately-scoped roadmap PRs (Milestone 2, PR 6
+onward).
+
 ## Anticipated future test files
 
 The files below are **anticipated, not yet implemented**. Each is added by
 its own focused roadmap PR as the corresponding production surface lands.
 
 ```text
-test_vocabulary.py
 test_evidence_references.py
-test_operation_aware_request.py
+test_context_objects.py
+test_decision_request.py
+test_decision_request_roundtrip.py
 test_policy_condition.py
 test_policy_rule.py
 test_policy_bundle.py
@@ -112,4 +131,5 @@ discovered by pytest and can reach the pinned fixture foundation.
 `test_contract_loading.py`, `test_compatibility_fixture_loading.py`, and
 `test_yaml_loader_negative.py` (PR 4, described above) are generic
 loading/structural-validation tests, not domain-model or evaluation tests.
-None of the files in the list above exist yet.
+`test_vocabulary.py` and `test_vocabulary_boundaries.py` (PR 5, described
+above) are implemented. None of the files in the list above exist yet.
