@@ -1350,6 +1350,55 @@ Blocked by architecture decision: no.
 ### Milestone 2 — Operation-aware domain models
 
 **PR 5 — Shared vocabulary value objects.**
+
+**Status: implemented** (`feature/oa-request-primitives`). Delivers exactly
+the scope named below — `RedactionClassification` (a closed, five-value
+`str, Enum` matching the existing repo convention for
+`SubjectType`/`ResourceType`/`DecisionOutcome`/`FailureReason`) and
+`ReasonCode` (a validated, open-format `str` subclass — not a closed
+enum) — in a new module, `src/basis_core/domain/operation_aware_vocabulary.py`.
+This is the **first PR to add a module under `src/basis_core/`** for the
+operation-aware surface; Milestone 0 and Milestone 1 (PR 1-4) were
+documentation- and test-infrastructure-only.
+
+Scope note: this PR's branch name and originating brief anticipated a
+broader "request primitives" grouping (request identifier, correlation
+identifier, policy version expectation, evaluation timestamp, authority
+mode, operation intent, protocol context, resource/device/location
+references). Inspecting this roadmap directly at implementation time showed
+Milestone 0 and Milestone 1 already complete and the next unstarted roadmap
+PR to be exactly PR 5 as specified below — a materially smaller scope than
+the anticipated list, and one that does not yet touch
+`OperationAwareDecisionRequest`, evidence references, or any context value
+object. Per this plan's own instruction to implement only what the roadmap
+assigns to the next PR rather than a guessed list, this PR delivers PR 5
+only. The broader "request primitives" the brief anticipated are PR 6
+(evidence-reference models), PR 7 (context value objects), and PR 8-9 (the
+request model itself and its round-trip tests) — all still open, and all
+depend on this PR.
+
+The full `PolicyBundle`/`PolicyRule`/`PolicyCondition`/`OperationAwareDecisionRequest`
+model remains unimplemented; no evaluator behavior of any kind was added.
+
+`tests/operation_aware/test_vocabulary.py` (78 tests) covers: enum
+exhaustiveness and member-ID alignment with the vendored
+`redaction-classification` contract; valid/invalid construction for both
+types, parametrized directly and cross-checked against every vendored
+`valid`/`invalid` example in the `redaction-classification` and
+`reason-code` contracts; `ReasonCode`'s compiled pattern checked
+byte-identical to the contract's published `pattern` string; immutability
+(enum singleton identity; `str`-subclass immutability); equality and
+hashing (`str` mixin equality, dict/set usability); and deterministic
+`repr()` for both types. `tests/operation_aware/test_vocabulary_boundaries.py`
+additionally confirms the new module imports only the standard library
+(`re`, `enum` — no YAML, no `pydantic`, no gateway/adapter/identity-provider
+library, no test helper), is not re-exported from `basis_core.domain` or
+any package `__init__.py`, is not yet listed in `docs/public-api.md`'s
+stable public API table, and is not imported by any existing v0.1.0 module.
+
+940 tests total (up from 862 after PR 4; 78 new); all 4 quality gates
+(`pytest`, `ruff check`, `ruff format --check`, `mypy src`) green.
+
 Objective: `RedactionClassification` (closed 5-value enum) and `ReasonCode`
 (validated string type, regex `^[a-z][a-z0-9]*(_[a-z0-9]+)*$`, not a closed
 enum) in a new module.
@@ -1365,7 +1414,8 @@ cases, cross-checked against vendored fixture examples (PR 4's helper).
 Completion criteria: both types importable, validated against vendored
 fixtures.
 Compatibility risk: none — wholly new module, no existing import touched.
-Blocked by architecture decision: no.
+Blocked by architecture decision: no. **Milestone 2's PR 5 is now complete;
+PR 6 (evidence-reference models) is next.**
 
 **PR 6 — Evidence-reference models.**
 Objective: `IdentityEvidenceReference`, `AdapterEvidenceReference` — frozen
