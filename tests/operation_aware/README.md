@@ -139,13 +139,46 @@ here. No context-object, request/response, policy, trace, audit, or
 evaluator code is implemented or tested here — those remain later,
 separately-scoped roadmap PRs (Milestone 2, PR 7 onward).
 
+## Operation-aware context value objects (Milestone 2, PR 7)
+
+`test_context_objects.py` and `test_context_boundaries.py` test the third
+production module added under `src/basis_core/` for the operation-aware
+surface: `basis_core.domain.operation_aware`, which implements
+`OperationAwareLocation`, `OperationAwareDevice`,
+`OperationAwareProtocolContext`, `OperationAwareSafetyContext`,
+`OperationAwareEnvironmentContext`, and `OperationAwareRiskContext` — the
+six optional, independently-nested context value objects published by the
+`operation-aware-decision-request` contract's `location_shape`,
+`device_shape`, `protocol_context_shape`, `safety_context_shape`,
+`environment_context_shape`, and `risk_context_shape` blocks.
+`test_context_objects.py` covers optional field-name and pattern alignment
+with each of the six vendored `*_shape` blocks, valid/invalid construction
+(cross-checked against the two vendored request examples that cleanly
+isolate these six objects, plus the one vendored nested-object invalid
+example), immutability, equality, hashing, and defensive-copy behavior for
+the two tuple-typed collection fields (`safety_context.constraint_ids`,
+`environment_context.condition_ids`) and boolean/non-finite rejection for
+`risk_context.score`. `test_context_boundaries.py` confirms the new module
+imports only the standard library and `pydantic` — unlike `evidence.py`
+(PR 6), these six objects nest neither PR 5's `RedactionClassification` nor
+any PR 6 evidence-reference type, so this module has no import dependency
+on either sibling operation-aware module and neither existing sibling
+boundary test needed an allowlist update; is not yet re-exported as public
+API; is not imported by any existing v0.1.0 module; and declares no
+prohibited raw-security-artifact field name. These models carry normalized,
+supplied context only — no inference, calculation, protocol parsing, or
+trust establishment of any kind is implemented or tested here.
+`OperationAwareDecisionRequest` itself (with its own flat `resource`,
+`resource_type`, and `operation_intent` fields), any policy, trace, audit,
+or evaluator code is not implemented or tested here — those remain later,
+separately-scoped roadmap PRs (Milestone 2, PR 8 onward).
+
 ## Anticipated future test files
 
 The files below are **anticipated, not yet implemented**. Each is added by
 its own focused roadmap PR as the corresponding production surface lands.
 
 ```text
-test_context_objects.py
 test_decision_request.py
 test_decision_request_roundtrip.py
 test_policy_condition.py
@@ -164,6 +197,7 @@ discovered by pytest and can reach the pinned fixture foundation.
 `test_yaml_loader_negative.py` (PR 4, described above) are generic
 loading/structural-validation tests, not domain-model or evaluation tests.
 `test_vocabulary.py` and `test_vocabulary_boundaries.py` (PR 5, described
-above) and `test_evidence.py` and `test_evidence_boundaries.py` (PR 6,
-described above) are implemented. None of the files in the list above exist
-yet.
+above), `test_evidence.py` and `test_evidence_boundaries.py` (PR 6,
+described above), and `test_context_objects.py` and
+`test_context_boundaries.py` (PR 7, described above) are implemented. None
+of the files in the list above exist yet.

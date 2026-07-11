@@ -8,6 +8,53 @@ additive classification follows `docs/breaking-change-discipline.md`.
 
 ### Added
 
+- **Operation-aware context value objects.** Adds
+  `src/basis_core/domain/operation_aware.py` — the third production module
+  added under `src/basis_core/` for `basis-core` v0.2.0 (Milestone 2, PR 7
+  of `docs/implementation/basis-core-v0.2-operation-aware-plan.md`).
+  Implements the six optional, independently-nested context value objects
+  published by `basis-schemas` v0.2.0's `operation-aware-decision-request`
+  contract: `OperationAwareLocation` (site/building/zone/area),
+  `OperationAwareDevice` (device identifier/class), `OperationAwareProtocolContext`
+  (protocol label/protocol-native operation name), `OperationAwareSafetyContext`
+  (mode/classification/constraint identifiers), `OperationAwareEnvironmentContext`
+  (mode/condition identifiers), and `OperationAwareRiskContext`
+  (classification/score). All six are frozen Pydantic models
+  (`extra="forbid"`, matching the existing convention), and every field on
+  every one of them is individually optional, per the published contract —
+  none requires a hierarchy or enforces cross-field consistency between
+  siblings. Field names, patterns (the shared open-identifier label
+  `^[a-z][a-z0-9_-]*$`), and non-empty-when-present rules are taken directly
+  from the vendored contract's six `*_shape` blocks.
+
+  **These are normalized facts supplied to the kernel — not conclusions
+  about them.** None of the six objects authenticates an identity,
+  retrieves device or network state, parses a protocol payload, calculates
+  or combines a risk score, determines whether a safety state is actually
+  safe, or infers operation intent — a supplied `risk_context.score` of
+  `0.62` is a producer-supplied number, not this module's own calculation.
+  `constraint_ids`/`condition_ids` are stored as immutable tuples
+  (defensively copied from any caller-supplied list at construction);
+  `risk_context.score` rejects `bool` (a `bool` is not a risk score) and
+  non-finite (`NaN`/`Infinity`) values. This PR does **not** implement
+  `OperationAwareDecisionRequest` itself (including its own flat `resource`,
+  `resource_type`, and `operation_intent` fields), any policy or condition
+  model, or any evaluator behavior — those remain later, separately-scoped
+  roadmap PRs (Milestone 2, PR 8 onward). None of the six types is yet
+  re-exported from `basis_core.domain` or listed in `docs/public-api.md`'s
+  stable public API table, matching PR 5 and PR 6's internal-first
+  position.
+
+  Adds `tests/operation_aware/test_context_objects.py` (schema-alignment,
+  valid/invalid construction cross-checked against the vendored
+  `operation-aware-decision-request` contract's nested examples,
+  immutability, equality, hashing, and defensive-copy/boolean/non-finite
+  coverage) and `tests/operation_aware/test_context_boundaries.py`
+  (import-boundary and public-API-surface checks specific to the new
+  module). 115 new tests (1168 total, up from 1053 after PR 6); all 4
+  quality gates green. No existing v0.1.0 behavior, model, or public API
+  changed.
+
 - **Operation-aware evidence-reference models.** Adds
   `src/basis_core/domain/evidence.py` — the second production module added
   under `src/basis_core/` for `basis-core` v0.2.0 (Milestone 2, PR 6 of
