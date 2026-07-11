@@ -1418,6 +1418,80 @@ Blocked by architecture decision: no. **Milestone 2's PR 5 is now complete;
 PR 6 (evidence-reference models) is next.**
 
 **PR 6 — Evidence-reference models.**
+
+**Status: implemented** (`feature/oa-evidence-references`). Delivers
+`IdentityEvidenceReference` and `AdapterEvidenceReference` — frozen Pydantic
+models (`model_config = {"frozen": True, "extra": "forbid"}`, matching the
+existing `Subject`/`Resource`/`AuditEvent` convention) mirroring the two
+published `identity-evidence-reference` and `adapter-evidence-reference`
+contracts (PR B) field-for-field, plus a small internal `EvidenceDigest`
+nested value object for the two contracts' byte-identical
+`evidence_digest_shape`. All three types live in the new
+`src/basis_core/domain/evidence.py`, the second production module added
+under `src/basis_core/` for the operation-aware surface (after PR 5's
+`operation_aware_vocabulary.py`, which this module depends on for
+`RedactionClassification`).
+
+`IdentityEvidenceReference` fields: `reference_id`, `evidence_digest`,
+`identity_source`, `redaction_classification` (required); `normalization_version`,
+`mapping_version`, `request_id`, `correlation_id` (optional, default `None`).
+`AdapterEvidenceReference` fields: `reference_id`, `evidence_digest`,
+`adapter_source`, `redaction_classification` (required); `normalization_version`,
+`mapping_version`, `protocol`, `request_id`, `correlation_id` (optional,
+default `None`). Field names, required/optional status, and validation
+(non-empty identifiers, `request_id` non-empty when present, digest
+algorithm/value patterns, `protocol`'s open lowercase pattern, closed
+`redaction_classification` vocabulary) are taken directly from the vendored
+contract YAMLs — no field was added, renamed, or guessed beyond what the
+schemas publish. Neither the identity nor the adapter contract, nor this
+roadmap's own PR 6 entry, defines a timestamp/capture-time field, so none was
+added.
+
+Evidence references remain structurally bounded: no raw token, credential,
+claim set, or protocol payload field exists on either type, unknown fields
+are rejected at construction (`extra="forbid"`, matching each contract's
+`additional_properties: false`), and no trust, verification, signature-
+checking, or digest-authenticity logic was added — `EvidenceDigest` carries a
+structurally well-formed algorithm label and hex value only, per this
+module's own docstring's explicit "reference, not proof" framing. The models
+remain internal (not re-exported from `basis_core.domain`, not listed in
+`docs/public-api.md`), exactly like PR 5's vocabulary types. The full
+`OperationAwareDecisionRequest` and the six context value objects (PR 7)
+remain unimplemented; no evaluator behavior of any kind was added.
+
+`tests/operation_aware/test_evidence.py` (102 tests) covers: digest
+algorithm/value pattern alignment with both vendored contracts (and
+confirms the two contracts' `evidence_digest_shape` blocks are
+byte-identical); required/optional field-name alignment with each
+contract's `required`/`optional` lists; valid/invalid construction,
+parametrized directly and cross-checked against every vendored `valid`/
+`invalid` example in both contracts; each required field individually
+enforced; empty-string rejection for required and optional-but-non-empty-
+when-present identifiers; unsupported `redaction_classification` and
+malformed `protocol`/digest values rejected; all nine currently published
+adapter protocol labels accepted as opaque strings (proving the model
+stays protocol-agnostic); immutability, equality, and hashing; and a
+dedicated security/data-minimization class per model parametrized over
+`access_token`, `refresh_token`, `id_token`, `authorization_header`,
+`password`, `client_secret`, `private_key`, `raw_claims`, `raw_token`,
+`raw_protocol_payload`, and `unredacted_device_secret` — all rejected, both
+because no such field is declared on the model and because unknown fields
+are structurally rejected. `tests/operation_aware/test_evidence_boundaries.py`
+(11 tests) confirms the new module imports only the standard library,
+`pydantic`, and its sibling `operation_aware_vocabulary` module; is not
+re-exported from `basis_core.domain` or any package `__init__.py`; is not
+listed in `docs/public-api.md`'s stable public API table; is not imported by
+any existing v0.1.0 module; and defines no generic public `EvidenceReference`
+base type. PR 5's own `test_vocabulary_boundaries.py` needed one narrow,
+anticipated update: its "no module imports operation_aware_vocabulary"
+check now excludes other operation-aware modules (starting with
+`evidence.py`) via an explicit, documented allowlist, since PR 5's own
+docstring already named evidence references as an expected future consumer.
+
+1053 tests total (up from 940 after PR 5; 113 new); all 4 quality gates
+(`pytest`, `ruff check`, `ruff format --check`, `mypy src`, including a
+`--strict` pass on `evidence.py` alone) green.
+
 Objective: `IdentityEvidenceReference`, `AdapterEvidenceReference` — frozen
 Pydantic models mirroring the two PR B contracts, carrying a structural
 digest and a `RedactionClassification`, never a raw token/credential/claim/
@@ -1436,7 +1510,8 @@ constructed (i.e. the model rejects unknown fields, per `additionalProperties:
 false` parity).
 Completion criteria: both models pass every vendored valid/invalid example.
 Compatibility risk: none.
-Blocked by architecture decision: no.
+Blocked by architecture decision: no. **Milestone 2's PR 6 is now complete;
+PR 7 (operation-aware context value objects) is next.**
 
 **PR 7 — Operation-aware context value objects.**
 Objective: `OperationAwareLocation`, `OperationAwareDevice`,

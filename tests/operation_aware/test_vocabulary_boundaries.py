@@ -39,6 +39,13 @@ MODULE_PATH = (
 )
 SRC_ROOT = Path(__file__).parent.parent.parent / "src" / "basis_core"
 
+# Other operation-aware modules that are legitimate, anticipated consumers of
+# `operation_aware_vocabulary` — see
+# `test_no_v01_module_imports_the_new_operation_aware_vocabulary_module`
+# below. Extend this set as later roadmap PRs add more operation-aware
+# modules under `src/basis_core/`.
+_OPERATION_AWARE_MODULE_PATHS = {SRC_ROOT / "domain" / "evidence.py"}
+
 
 def _collect_imports(path: Path) -> list[str]:
     source = path.read_text(encoding="utf-8")
@@ -94,10 +101,23 @@ class TestModuleImportBoundaries:
     def test_no_v01_module_imports_the_new_operation_aware_vocabulary_module(self) -> None:
         """No existing v0.1.0 `src/basis_core/` module may import the new
         module — the operation-aware surface is additive and inward-facing
-        only; nothing in the existing kernel depends on it."""
+        only; nothing in the *existing v0.1.0 kernel* depends on it.
+
+        This deliberately excludes other operation-aware modules: PR 5's own
+        docstring documents `operation_aware_vocabulary` as the shared
+        primitive "every later operation-aware model (evidence references,
+        request/response, trace/audit evidence, policy rules) is expected to
+        depend on" — `basis_core.domain.evidence` (Milestone 2, PR 6) is the
+        first such legitimate, anticipated consumer. Future operation-aware
+        modules that import this one are expected and should be added to
+        `_OPERATION_AWARE_MODULE_PATHS` below, not treated as violations."""
         violations: list[tuple[str, str]] = []
         for py_file in sorted(SRC_ROOT.rglob("*.py")):
-            if "__pycache__" in str(py_file) or py_file == MODULE_PATH:
+            if (
+                "__pycache__" in str(py_file)
+                or py_file == MODULE_PATH
+                or py_file in _OPERATION_AWARE_MODULE_PATHS
+            ):
                 continue
             for module in _collect_imports(py_file):
                 if module == "basis_core.domain.operation_aware_vocabulary":

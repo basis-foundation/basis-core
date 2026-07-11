@@ -106,13 +106,45 @@ request/response, policy, or evaluator code is implemented or tested here —
 those remain later, separately-scoped roadmap PRs (Milestone 2, PR 6
 onward).
 
+Its own boundary test needed one narrow, anticipated update once PR 6
+landed: `test_vocabulary_boundaries.py`'s "no module imports
+`operation_aware_vocabulary`" check now excludes other operation-aware
+modules (via an explicit, documented allowlist starting with
+`evidence.py`) rather than treating PR 6's legitimate, anticipated import
+as a violation.
+
+## Evidence-reference models (Milestone 2, PR 6)
+
+`test_evidence.py` and `test_evidence_boundaries.py` test the second
+production module added under `src/basis_core/` for the operation-aware
+surface: `basis_core.domain.evidence`, which implements
+`IdentityEvidenceReference`, `AdapterEvidenceReference`, and an internal
+`EvidenceDigest` value object — bounded references to identity and adapter
+evidence produced outside the authorization kernel, matching the published
+`identity-evidence-reference` and `adapter-evidence-reference` contracts.
+`test_evidence.py` covers digest algorithm/value pattern alignment with
+both vendored contracts, required/optional field-name alignment,
+valid/invalid construction (directly parametrized and cross-checked against
+every vendored example in both contracts), immutability, equality, hashing,
+and a dedicated security/data-minimization class per model confirming no
+raw token, credential, claim-set, or protocol-payload field can be
+constructed. `test_evidence_boundaries.py` confirms the new module imports
+only the standard library, `pydantic`, and its sibling
+`operation_aware_vocabulary` module; is not yet re-exported as public API;
+is not imported by any existing v0.1.0 module; and defines no generic
+public `EvidenceReference` base type. These models are references, not
+proof of evidence authenticity — no digest verification, signature
+verification, or trust-establishment behavior is implemented or tested
+here. No context-object, request/response, policy, trace, audit, or
+evaluator code is implemented or tested here — those remain later,
+separately-scoped roadmap PRs (Milestone 2, PR 7 onward).
+
 ## Anticipated future test files
 
 The files below are **anticipated, not yet implemented**. Each is added by
 its own focused roadmap PR as the corresponding production surface lands.
 
 ```text
-test_evidence_references.py
 test_context_objects.py
 test_decision_request.py
 test_decision_request_roundtrip.py
@@ -132,4 +164,6 @@ discovered by pytest and can reach the pinned fixture foundation.
 `test_yaml_loader_negative.py` (PR 4, described above) are generic
 loading/structural-validation tests, not domain-model or evaluation tests.
 `test_vocabulary.py` and `test_vocabulary_boundaries.py` (PR 5, described
-above) are implemented. None of the files in the list above exist yet.
+above) and `test_evidence.py` and `test_evidence_boundaries.py` (PR 6,
+described above) are implemented. None of the files in the list above exist
+yet.
