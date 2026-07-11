@@ -47,6 +47,26 @@ MODULE_PATH = (
 SRC_ROOT = Path(__file__).parent.parent.parent / "src" / "basis_core"
 
 
+def _is_operation_aware_sibling_module(path: Path) -> bool:
+    """True for any `src/basis_core/` module that is itself part of the
+    operation-aware surface (file stem or an ancestor directory name
+    contains ``"operation_aware"``) — e.g. `domain/operation_aware.py`,
+    `domain/operation_aware_vocabulary.py`, `decisions/operation_aware.py`
+    (PR 8), and any future `policy/operation_aware/*.py` or
+    `audit/operation_aware/*.py` module. These modules composing one
+    another along the roadmap's declared import graph
+    (`docs/implementation/basis-core-v0.2-operation-aware-plan.md` Section
+    5) is expected and is not a "v0.1.0 module depends on operation-aware
+    code" violation — only a genuine v0.1.0 (non-operation-aware) importer
+    is. Added in PR 8, when `decisions/operation_aware.py` became the first
+    sibling module to legitimately import this one."""
+    return (
+        path.stem == "operation_aware"
+        or path.stem.startswith("operation_aware_")
+        or "operation_aware" in path.parts
+    )
+
+
 def _collect_imports(path: Path) -> list[str]:
     source = path.read_text(encoding="utf-8")
     tree = ast.parse(source, filename=str(path))
@@ -130,11 +150,17 @@ class TestModuleImportBoundaries:
     def test_no_v01_module_imports_the_new_context_module(self) -> None:
         """No existing v0.1.0 `src/basis_core/` module may import the new
         context-object module — the operation-aware surface is additive
-        and inward-facing only; nothing in the existing kernel depends on
-        it."""
+        and inward-facing only; nothing in the existing v0.1.0 kernel
+        depends on it. A sibling operation-aware module (e.g.
+        `decisions/operation_aware.py`, PR 8) importing this one is
+        expected and excluded — see `_is_operation_aware_sibling_module`."""
         violations: list[tuple[str, str]] = []
         for py_file in sorted(SRC_ROOT.rglob("*.py")):
-            if "__pycache__" in str(py_file) or py_file == MODULE_PATH:
+            if (
+                "__pycache__" in str(py_file)
+                or py_file == MODULE_PATH
+                or _is_operation_aware_sibling_module(py_file)
+            ):
                 continue
             for module in _collect_imports(py_file):
                 if module == "basis_core.domain.operation_aware":

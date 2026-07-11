@@ -19,7 +19,15 @@ module:
      `AdapterEvidenceReference`, or `EvidenceDigest` as part of the stable
      public API surface, matching (2).
   4. No existing v0.1.0 module imports the new evidence-reference module —
-     the operation-aware surface is additive and inward-facing only.
+     the operation-aware surface is additive and inward-facing only. Other
+     *operation-aware* modules (e.g. `decisions/operation_aware.py`, PR 8)
+     composing this one is expected and does not violate this rule — see
+     `_is_operation_aware_sibling_module` below, added in PR 8 when
+     `decisions/operation_aware.py` became the first sibling module to
+     legitimately import this one, per the import graph
+     `docs/implementation/basis-core-v0.2-operation-aware-plan.md` Section 5
+     already specifies (`decisions/operation_aware.py` may import from
+     `domain/evidence.py`).
 
 These complement, and do not replace, the repository's existing generic
 `tests/test_import_boundaries.py` (which already statically scans every
@@ -35,6 +43,23 @@ from pathlib import Path
 
 MODULE_PATH = Path(__file__).parent.parent.parent / "src" / "basis_core" / "domain" / "evidence.py"
 SRC_ROOT = Path(__file__).parent.parent.parent / "src" / "basis_core"
+
+
+def _is_operation_aware_sibling_module(path: Path) -> bool:
+    """True for any `src/basis_core/` module that is itself part of the
+    operation-aware surface (file stem or an ancestor directory name
+    contains ``"operation_aware"``) — e.g. `domain/operation_aware.py`,
+    `domain/operation_aware_vocabulary.py`, `decisions/operation_aware.py`,
+    and any future `policy/operation_aware/*.py` or
+    `audit/operation_aware/*.py` module. These modules composing one
+    another along the roadmap's declared import graph (Section 5) is
+    expected and is not a "v0.1.0 module depends on operation-aware code"
+    violation — only a genuine v0.1.0 (non-operation-aware) importer is."""
+    return (
+        path.stem == "operation_aware"
+        or path.stem.startswith("operation_aware_")
+        or "operation_aware" in path.parts
+    )
 
 
 def _collect_imports(path: Path) -> list[str]:
@@ -111,11 +136,17 @@ class TestModuleImportBoundaries:
     def test_no_v01_module_imports_the_new_evidence_module(self) -> None:
         """No existing v0.1.0 `src/basis_core/` module may import the new
         evidence-reference module — the operation-aware surface is additive
-        and inward-facing only; nothing in the existing kernel depends on
-        it."""
+        and inward-facing only; nothing in the existing v0.1.0 kernel
+        depends on it. A sibling operation-aware module (e.g.
+        `decisions/operation_aware.py`, PR 8) importing this one is
+        expected and excluded — see `_is_operation_aware_sibling_module`."""
         violations: list[tuple[str, str]] = []
         for py_file in sorted(SRC_ROOT.rglob("*.py")):
-            if "__pycache__" in str(py_file) or py_file == MODULE_PATH:
+            if (
+                "__pycache__" in str(py_file)
+                or py_file == MODULE_PATH
+                or _is_operation_aware_sibling_module(py_file)
+            ):
                 continue
             for module in _collect_imports(py_file):
                 if module == "basis_core.domain.evidence":
