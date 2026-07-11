@@ -1514,6 +1514,70 @@ Blocked by architecture decision: no. **Milestone 2's PR 6 is now complete;
 PR 7 (operation-aware context value objects) is next.**
 
 **PR 7 — Operation-aware context value objects.**
+
+**Status: implemented** (`feature/oa-context-objects`). Delivers exactly the
+six frozen Pydantic models named below in a new module,
+`src/basis_core/domain/operation_aware.py` — the third production module
+added under `src/basis_core/` for the operation-aware surface (after PR 5's
+`operation_aware_vocabulary.py` and PR 6's `evidence.py`). Field names,
+optional status (every field on every one of these six objects is
+individually optional — none has a "required" list at all), and validation
+(non-empty-when-present identifiers, the shared open-identifier pattern
+`^[a-z][a-z0-9_-]*$` for `device_class`/`protocol`/safety
+`mode`/`classification`/environment `mode`/risk `classification`, no
+pattern for free-form `operation` or numeric `score`) are taken directly
+from the vendored `operation-aware-decision-request` contract's six
+`*_shape` blocks (`location_shape`, `device_shape`,
+`protocol_context_shape`, `safety_context_shape`,
+`environment_context_shape`, `risk_context_shape`) — no field was added,
+renamed, or guessed beyond what the schema publishes.
+
+Unlike PR 6, none of these six objects nests a PR 5 vocabulary type or a PR
+6 evidence-reference type: the published contract keeps
+`identity_evidence_reference` and `adapter_evidence_reference` as separate,
+sibling fields on the future request itself, not nested inside these six
+shapes. This module therefore has no import dependency on either sibling
+operation-aware module, and neither existing sibling-module boundary test
+(`test_vocabulary_boundaries.py`, `test_evidence_boundaries.py`) needed an
+allowlist update.
+
+`OperationAwareSafetyContext.constraint_ids` and
+`OperationAwareEnvironmentContext.condition_ids` are typed `tuple[str, ...]`
+(default `()`), not `list[str]` — a caller-supplied list is accepted and
+converted at construction, then stored immutably; mutating the caller's
+original list afterward has no effect on the constructed model, and the
+stored tuple itself has no `.append`. `OperationAwareRiskContext.score` is
+validated to reject `bool` (a `bool` is not a risk score, even though
+`bool` is a Python `int` subtype) and non-finite (`NaN`/`Infinity`) values,
+per this roadmap's general Section 11 validation guidance; the contract
+itself defines no bounds, scale, or calculation method, and none is
+implemented here.
+
+`tests/operation_aware/test_context_objects.py` (99 tests) covers: optional
+field-name alignment with each of the six vendored `*_shape` blocks;
+pattern alignment for every pattern-constrained field; valid/invalid
+construction, parametrized directly and cross-checked against the two
+vendored `operation-aware-decision-request` request examples that cleanly
+isolate these six objects without alteration (the "OT operation-rich"
+example for `location`/`device`/`protocol_context`, the "full contextual"
+example for `safety_context`/`environment_context`/`risk_context`) and the
+one vendored nested-object invalid example the contract publishes (an
+unknown `country` key under `location`); immutability, equality, and
+hashing; defensive-copy behavior for both tuple-typed collection fields;
+and boolean/non-finite rejection for `risk_context.score`.
+`tests/operation_aware/test_context_boundaries.py` (16 tests) confirms the
+new module imports only the standard library and `pydantic` (no sibling
+operation-aware module); is not re-exported from `basis_core.domain` or any
+other package `__init__.py`; is not listed in `docs/public-api.md`'s stable
+public API table; is not imported by any existing v0.1.0 module; and
+declares no field name from the prohibited raw-security-artifact list
+(`access_token`, `password`, `raw_claims`, `raw_protocol_payload`, and
+others).
+
+1168 tests total (up from 1053 after PR 6; 115 new); all 4 quality gates
+(`pytest`, `ruff check`, `ruff format --check`, `mypy src`, including a
+`--strict` pass on `operation_aware.py` alone) green.
+
 Objective: `OperationAwareLocation`, `OperationAwareDevice`,
 `OperationAwareProtocolContext`, `OperationAwareSafetyContext`,
 `OperationAwareEnvironmentContext`, `OperationAwareRiskContext` — frozen
@@ -1522,7 +1586,10 @@ Pydantic models for the six optional nested-object categories on
 Files: `src/basis_core/domain/operation_aware.py`; test:
 `tests/operation_aware/test_context_objects.py`.
 Non-goals: none of these participate in evaluation yet (that begins
-Milestone 6).
+Milestone 6). No inference, calculation, protocol parsing, or trust
+establishment of any kind. `OperationAwareDecisionRequest` itself (with its
+flat `resource`, `resource_type`, and `operation_intent` fields) remains
+unimplemented — that is PR 8.
 Dependencies: PR 5.
 Architecture/schema references: `operation-aware-decision-request.md` §17-25
 (PR C).
@@ -1530,7 +1597,8 @@ Required tests: each object's optional-subfield combinations, matching the
 contract's "each independently optional" rule exactly.
 Completion criteria: all six objects pass vendored fixture conformance.
 Compatibility risk: none.
-Blocked by architecture decision: no.
+Blocked by architecture decision: no. **Milestone 2's PR 7 is now complete;
+PR 8 (`OperationAwareDecisionRequest` value object) is next.**
 
 **PR 8 — `OperationAwareDecisionRequest` value object.**
 Objective: the full request model (Section 3's field table), composing PR
