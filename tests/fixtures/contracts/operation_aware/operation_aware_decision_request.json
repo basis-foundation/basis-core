@@ -1,0 +1,80 @@
+{
+  "request_id": "snapshot-request-0001",
+  "correlation_id": "snapshot-correlation-0001",
+  "subject_id": "snapshot-subject-0001",
+  "subject_roles": [
+    "operator",
+    "supervisor"
+  ],
+  "subject_attrs": {
+    "department": "facilities",
+    "shift": "day"
+  },
+  "identity_source": "snapshot-identity-source",
+  "authority_mode": "federated",
+  "identity_evidence_reference": {
+    "reference_id": "snapshot-identity-evidence-0001",
+    "evidence_digest": {
+      "algorithm": "sha-256",
+      "value": "a1b2c3d4e5f6"
+    },
+    "identity_source": "snapshot-identity-source",
+    "redaction_classification": "reference_only",
+    "normalization_version": "snapshot-normalization-v1",
+    "mapping_version": "snapshot-mapping-v1",
+    "request_id": "snapshot-request-0001",
+    "correlation_id": "snapshot-correlation-0001"
+  },
+  "action": "write:hvac:setpoint",
+  "resource": "hvac:zone-a",
+  "resource_type": "hvac",
+  "location": {
+    "site_id": "snapshot-site-0001",
+    "building_id": "snapshot-building-0001",
+    "zone_id": "snapshot-zone-0001",
+    "area_id": "snapshot-area-0001"
+  },
+  "device": {
+    "device_id": "snapshot-device-0001",
+    "device_class": "controller"
+  },
+  "protocol_context": {
+    "protocol": "bacnet",
+    "operation": "writeProperty"
+  },
+  "operation_intent": "state_changing",
+  "adapter_evidence_reference": {
+    "reference_id": "snapshot-adapter-evidence-0001",
+    "evidence_digest": {
+      "algorithm": "sha-256",
+      "value": "0123456789ab"
+    },
+    "adapter_source": "snapshot-adapter-source",
+    "redaction_classification": "safe_after_redaction",
+    "normalization_version": "snapshot-normalization-v1",
+    "mapping_version": "snapshot-mapping-v1",
+    "protocol": "bacnet",
+    "request_id": "snapshot-request-0001",
+    "correlation_id": "snapshot-correlation-0001"
+  },
+  "safety_context": {
+    "mode": "interlock-engaged",
+    "classification": "elevated",
+    "constraint_ids": [
+      "snapshot-constraint-0001",
+      "snapshot-constraint-0002"
+    ]
+  },
+  "environment_context": {
+    "mode": "maintenance_mode",
+    "condition_ids": [
+      "snapshot-condition-0001"
+    ]
+  },
+  "risk_context": {
+    "classification": "elevated",
+    "score": 0.62
+  },
+  "evaluation_time": "2026-01-15T12:00:00Z",
+  "expected_policy_version": "snapshot-policy-v1"
+}
