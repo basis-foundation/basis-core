@@ -68,6 +68,22 @@ class TestRuntimePackageDoesNotImportTestHelpers:
                     violations.append((str(py_file), module))
         assert violations == [], f"Kernel source file(s) import basis_schemas: {violations}"
 
+    def test_no_kernel_source_file_imports_yaml(self) -> None:
+        """PyYAML (added under `[project.optional-dependencies].dev` by PR 4
+        of docs/implementation/basis-core-v0.2-operation-aware-plan.md,
+        strictly to support
+        tests/helpers/operation_aware_contracts.py's test-only YAML loader)
+        must never become a runtime dependency. No file under
+        src/basis_core/ may import it, directly or indirectly."""
+        violations: list[tuple[str, str]] = []
+        for py_file in sorted(SRC_ROOT.rglob("*.py")):
+            if "__pycache__" in str(py_file):
+                continue
+            for module in _collect_imports(py_file):
+                if module == "yaml" or module.startswith("yaml."):
+                    violations.append((str(py_file), module))
+        assert violations == [], f"Kernel source file(s) import yaml: {violations}"
+
 
 class TestPublicApiUnchanged:
     def test_public_api_doc_does_not_reference_the_vendored_snapshot(self) -> None:

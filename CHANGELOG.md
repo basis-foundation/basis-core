@@ -8,6 +8,51 @@ additive classification follows `docs/breaking-change-discipline.md`.
 
 ### Added
 
+- **Safe operation-aware YAML contract loading and generic structural
+  validation.** Adds `tests/helpers/operation_aware_contracts.py`,
+  completing the remaining scope of Milestone 1, PR 4
+  (`docs/implementation/basis-core-v0.2-operation-aware-plan.md`): a
+  test-only YAML loader (`load_yaml_document`, `yaml.SafeLoader`-based with
+  an added duplicate-mapping-key rejection, no unsafe tag construction, no
+  multi-document input, no empty documents), snapshot-boundary-aware
+  wrappers (`load_contract`, `load_scenario_artifact`) built on PR 2's
+  existing discovery helpers, a concise test-helper exception hierarchy
+  distinguishing missing file / unsafe path / invalid YAML / empty document
+  / multi-document / unexpected root type, generic structural-validation
+  helpers (`require_mapping`, `require_sequence`, `require_string_field`,
+  `require_mapping_field`, `require_sequence_field`, `require_optional_field`,
+  `reject_unknown_fields`), and `validate_contract_metadata`, which checks
+  only the structural presence and type of the shared `contract:` metadata
+  block (`contract`, `.name`, `.version`, `.lifecycle`, `.depends_on`) —
+  never its patterns, enums, or any other business rule the
+  `contract-metadata` contract itself already governs.
+
+  Adds `tests/operation_aware/test_contract_loading.py` (all 14 pinned
+  contracts parse, have mapping roots, structurally valid metadata, a
+  `name` matching their own inventory entry, deterministic repeated loads,
+  and no mutation by validation helpers),
+  `tests/operation_aware/test_compatibility_fixture_loading.py` (all 5
+  pinned scenarios' artifacts parse and have mapping roots, artifact
+  discovery matches the existing helper inventory, and the gateway-only
+  artifact still loads while remaining labeled reference-only), and
+  `tests/operation_aware/test_yaml_loader_negative.py` (16 negative cases
+  against temporary files outside the pinned snapshot: missing path,
+  directory-as-file, empty/whitespace/explicit-null documents, malformed
+  YAML, multi-document YAML, an unsafe `!!python/object/apply` tag,
+  duplicate mapping keys, invalid UTF-8, an unexpected scalar root, and
+  absolute/`..`-traversal/symlink boundary escapes). Extends
+  `tests/test_basis_schemas_snapshot_boundaries.py` with a check that no
+  `src/basis_core/` file imports `yaml`.
+
+  Adds `PyYAML>=6.0` to `pyproject.toml`'s
+  `[project.optional-dependencies].dev` — test/development-only, never a
+  runtime dependency. This is test infrastructure only: no
+  `src/basis_core/` change, no operation-aware domain model, no semantic
+  policy or request validation, no public API change. Milestone 0 and
+  Milestone 1 of
+  `docs/implementation/basis-core-v0.2-operation-aware-plan.md` are now
+  both complete.
+
 - **Pinned `basis-schemas` v0.2.0 operation-aware test snapshot.** Vendors a
   narrowly-scoped, immutable copy of the 14 operation-aware contract schemas
   and the 5 canonical compatibility-vector scenarios published by
