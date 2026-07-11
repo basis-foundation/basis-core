@@ -8,6 +8,51 @@ additive classification follows `docs/breaking-change-discipline.md`.
 
 ### Added
 
+- **Operation-aware evidence-reference models.** Adds
+  `src/basis_core/domain/evidence.py` — the second production module added
+  under `src/basis_core/` for `basis-core` v0.2.0 (Milestone 2, PR 6 of
+  `docs/implementation/basis-core-v0.2-operation-aware-plan.md`). Implements
+  immutable identity and adapter evidence-reference models —
+  `IdentityEvidenceReference` and `AdapterEvidenceReference` — for the
+  operation-aware authorization surface, matching the
+  `identity-evidence-reference` and `adapter-evidence-reference` contracts
+  published by `basis-schemas` v0.2.0, plus an internal `EvidenceDigest`
+  value object for their shared digest shape. Both models are frozen
+  Pydantic models (`extra="forbid"`, matching the existing `Subject`/
+  `Resource`/`AuditEvent` convention), reuse PR 5's `RedactionClassification`,
+  and validate reference identifiers, evidence-source labels, digest
+  algorithm/value patterns, and (for adapter references) an open,
+  protocol-neutral `protocol` label — all taken directly from the vendored
+  contract fixtures.
+
+  **Evidence references remain structurally bounded — they are not evidence
+  trust.** Neither model has a field capable of holding a raw access token,
+  ID token, refresh token, JWT, bearer token, authorization header, cookie,
+  session secret, client secret, password, private key, raw claim set, or
+  raw protocol payload, and both reject unknown fields at construction. No
+  digest verification, signature verification, evidence retrieval,
+  evidence-provenance authentication, or trust-establishment behavior is
+  implemented or implied — `EvidenceDigest` carries a structurally
+  well-formed algorithm label and hex value only, never a claim that the
+  digest is authentic. This PR does **not** implement
+  `OperationAwareDecisionRequest`, context value objects, any policy or
+  condition model, or any evaluator behavior — those remain later,
+  separately-scoped roadmap PRs (Milestone 2, PR 7 onward). Neither model is
+  yet re-exported from `basis_core.domain` or listed in
+  `docs/public-api.md`'s stable public API table; per the roadmap's default
+  position, operation-aware symbols are added internally first and graduate
+  to the public API in a later, dedicated milestone (Milestone 11, PR 35).
+
+  Adds `tests/operation_aware/test_evidence.py` (schema-alignment,
+  valid/invalid construction cross-checked against every vendored
+  `identity-evidence-reference`/`adapter-evidence-reference` example,
+  immutability, equality, hashing, and dedicated security/data-minimization
+  coverage rejecting raw-evidence-shaped fields) and
+  `tests/operation_aware/test_evidence_boundaries.py` (import-boundary and
+  public-API-surface checks specific to the new module). 113 new tests
+  (1053 total, up from 940 after PR 5); all 4 quality gates green. No
+  existing v0.1.0 behavior, model, or public API changed.
+
 - **Operation-aware shared vocabulary value objects.** Adds
   `src/basis_core/domain/operation_aware_vocabulary.py` — the first
   production module added under `src/basis_core/` for `basis-core` v0.2.0
