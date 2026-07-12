@@ -17,17 +17,17 @@ This module is test-only and adds no production code. It:
     (implemented / future / non-runtime);
   - for **implemented** contracts (`redaction-classification`,
     `reason-code`, `identity-evidence-reference`,
-    `adapter-evidence-reference`, `operation-aware-decision-request`),
-    parametrizes construction over every vendored `valid` example
-    (must construct and produce the exact expected runtime type) and every
-    vendored `invalid` example (must be rejected with the precise exception
-    type the corresponding model test file already establishes);
+    `adapter-evidence-reference`, `operation-aware-decision-request`,
+    `policy-condition`), parametrizes construction over every vendored
+    `valid` example (must construct and produce the exact expected runtime
+    type) and every vendored `invalid` example (must be rejected with the
+    precise exception type the corresponding model test file already
+    establishes);
   - for **future** contracts whose `basis-core` model is scheduled for a
-    later roadmap PR (`policy-condition`, `policy-rule`, `policy-bundle`,
-    `trace-rule-evidence`, `evaluation-trace`,
-    `operation-aware-decision-response`, `audit-evidence`), visibly
-    `pytest.mark.skip`s every example with a reason naming the exact
-    milestone/PR that will implement it;
+    later roadmap PR (`policy-rule`, `policy-bundle`, `trace-rule-evidence`,
+    `evaluation-trace`, `operation-aware-decision-response`,
+    `audit-evidence`), visibly `pytest.mark.skip`s every example with a
+    reason naming the exact milestone/PR that will implement it;
   - for contracts that are **intentionally not `basis-core` runtime
     models** (`contract-metadata`, `gateway-audit-event`), visibly skips
     every example with a reason stating the architectural boundary.
@@ -39,9 +39,12 @@ contract) is represented among the parametrized test cases below.
 
 Non-goals (see the roadmap plan's PR 10 entry and this repository's
 `tests/operation_aware/README.md` scope boundaries): no model not yet
-implemented is added here; no policy/condition/bundle model, semantic
-validation, or evaluator behavior is implemented or exercised; no
-compatibility-snapshot fixtures are added (PR 11); no canonical
+implemented is added here; PR 12 registered `policy-condition` as
+implemented (structural shape only — no condition evaluation, operator
+dispatch, or field-path resolution is implemented or exercised anywhere in
+this repository); `policy-rule`/`policy-bundle` and every other
+not-yet-implemented contract remain skipped; no compatibility-snapshot
+fixtures are added (PR 11); no canonical
 compatibility-vector (`allow-basic`, `deny-precedence`, `default-deny`,
 `not-applicable`, `invalid-policy-bundle`) behavior is inspected or
 asserted — this module targets only the 14 contract YAMLs' own embedded
@@ -71,6 +74,7 @@ from basis_core.domain.operation_aware import (
     OperationAwareSafetyContext,
 )
 from basis_core.domain.operation_aware_vocabulary import ReasonCode, RedactionClassification
+from basis_core.policy.operation_aware.condition import PolicyCondition
 from tests.helpers.basis_schemas_snapshot import list_operation_aware_contracts
 from tests.helpers.operation_aware_contracts import (
     load_contract,
@@ -159,6 +163,13 @@ def _validate_operation_aware_request(example: object) -> OperationAwareDecision
     return OperationAwareDecisionRequest(**example)
 
 
+def _validate_policy_condition(example: object) -> PolicyCondition:
+    assert isinstance(example, dict), (
+        f"policy-condition example must be a bare mapping, got {type(example).__name__}."
+    )
+    return PolicyCondition(**example)
+
+
 # PR 6 evidence-reference fields and PR 7 context-object fields nested on
 # `OperationAwareDecisionRequest`. Asserted strongly typed (not raw dicts)
 # for any valid example that happens to carry the field — see
@@ -233,12 +244,15 @@ REGISTRY: dict[str, ConformanceEntry] = {
             invalid_exception=ValidationError,
             nested_type_checks=_REQUEST_NESTED_TYPE_CHECKS,
         ),
-        # ── Future: Milestone 4 (policy domain model) ────────────────────
+        # ── Implemented (PR 12) ──────────────────────────────────────────
         ConformanceEntry(
             name="policy-condition",
-            status=ContractStatus.FUTURE,
-            skip_reason=("basis-core PolicyCondition model is scheduled for Milestone 4 / PR 12"),
+            status=ContractStatus.IMPLEMENTED,
+            validator=_validate_policy_condition,
+            expected_type=PolicyCondition,
+            invalid_exception=ValidationError,
         ),
+        # ── Future: Milestone 4 (policy domain model) ────────────────────
         ConformanceEntry(
             name="policy-rule",
             status=ContractStatus.FUTURE,
