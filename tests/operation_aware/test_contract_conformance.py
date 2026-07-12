@@ -18,13 +18,13 @@ This module is test-only and adds no production code. It:
   - for **implemented** contracts (`redaction-classification`,
     `reason-code`, `identity-evidence-reference`,
     `adapter-evidence-reference`, `operation-aware-decision-request`,
-    `policy-condition`), parametrizes construction over every vendored
-    `valid` example (must construct and produce the exact expected runtime
-    type) and every vendored `invalid` example (must be rejected with the
-    precise exception type the corresponding model test file already
-    establishes);
+    `policy-condition`, `policy-rule`), parametrizes construction over
+    every vendored `valid` example (must construct and produce the exact
+    expected runtime type) and every vendored `invalid` example (must be
+    rejected with the precise exception type the corresponding model test
+    file already establishes);
   - for **future** contracts whose `basis-core` model is scheduled for a
-    later roadmap PR (`policy-rule`, `policy-bundle`, `trace-rule-evidence`,
+    later roadmap PR (`policy-bundle`, `trace-rule-evidence`,
     `evaluation-trace`, `operation-aware-decision-response`,
     `audit-evidence`), visibly `pytest.mark.skip`s every example with a
     reason naming the exact milestone/PR that will implement it;
@@ -42,9 +42,11 @@ Non-goals (see the roadmap plan's PR 10 entry and this repository's
 implemented is added here; PR 12 registered `policy-condition` as
 implemented (structural shape only — no condition evaluation, operator
 dispatch, or field-path resolution is implemented or exercised anywhere in
-this repository); `policy-rule`/`policy-bundle` and every other
-not-yet-implemented contract remain skipped; no compatibility-snapshot
-fixtures are added (PR 11); no canonical
+this repository); PR 13 registered `policy-rule` as implemented
+(structural shape only — no rule matching, condition evaluation, or deny
+precedence is implemented or exercised anywhere in this repository);
+`policy-bundle` and every other not-yet-implemented contract remain
+skipped; no compatibility-snapshot fixtures are added (PR 11); no canonical
 compatibility-vector (`allow-basic`, `deny-precedence`, `default-deny`,
 `not-applicable`, `invalid-policy-bundle`) behavior is inspected or
 asserted — this module targets only the 14 contract YAMLs' own embedded
@@ -75,6 +77,10 @@ from basis_core.domain.operation_aware import (
 )
 from basis_core.domain.operation_aware_vocabulary import ReasonCode, RedactionClassification
 from basis_core.policy.operation_aware.condition import PolicyCondition
+from basis_core.policy.operation_aware.rule import (
+    OperationAwarePolicyMatch,
+    OperationAwarePolicyRule,
+)
 from tests.helpers.basis_schemas_snapshot import list_operation_aware_contracts
 from tests.helpers.operation_aware_contracts import (
     load_contract,
@@ -105,9 +111,10 @@ class ConformanceEntry:
     must name either the roadmap milestone/PR that will implement the
     contract, or the architectural boundary that keeps it out of
     `basis-core`. `nested_type_checks` is optional and, today, populated
-    only for `operation-aware-decision-request` — it maps an optional
-    nested field name to the PR 6/PR 7 type it must reconstruct as, for
-    any valid example that happens to carry that field.
+    for `operation-aware-decision-request` (PR 6/PR 7 nested field types)
+    and `policy-rule` (its nested `match` field type, PR 13) — it maps an
+    optional nested field name to the type it must reconstruct as, for any
+    valid example that happens to carry that field.
     """
 
     name: str
@@ -168,6 +175,25 @@ def _validate_policy_condition(example: object) -> PolicyCondition:
         f"policy-condition example must be a bare mapping, got {type(example).__name__}."
     )
     return PolicyCondition(**example)
+
+
+def _validate_policy_rule(example: object) -> OperationAwarePolicyRule:
+    assert isinstance(example, dict), (
+        f"policy-rule example must be a bare mapping, got {type(example).__name__}."
+    )
+    return OperationAwarePolicyRule(**example)
+
+
+# `policy-rule` valid examples that carry a `match` field must reconstruct
+# it as the strongly-typed `OperationAwarePolicyMatch`, not a raw dict —
+# mirrors `_REQUEST_NESTED_TYPE_CHECKS`'s convention for PR 6/PR 7 nested
+# fields on `operation-aware-decision-request`. `conditions` is a list, not
+# a single nested field, so it is not represented here; PR 13's own
+# dedicated `test_policy_rule.py` fixture-conformance tests assert every
+# element of `conditions` reconstructs as `PolicyCondition` directly.
+_RULE_NESTED_TYPE_CHECKS: dict[str, type] = {
+    "match": OperationAwarePolicyMatch,
+}
 
 
 # PR 6 evidence-reference fields and PR 7 context-object fields nested on
@@ -252,15 +278,16 @@ REGISTRY: dict[str, ConformanceEntry] = {
             expected_type=PolicyCondition,
             invalid_exception=ValidationError,
         ),
-        # ── Future: Milestone 4 (policy domain model) ────────────────────
+        # ── Implemented (PR 13) ───────────────────────────────────────────
         ConformanceEntry(
             name="policy-rule",
-            status=ContractStatus.FUTURE,
-            skip_reason=(
-                "basis-core OperationAwarePolicyRule model (policy-rule contract) is "
-                "scheduled for Milestone 4 / PR 13"
-            ),
+            status=ContractStatus.IMPLEMENTED,
+            validator=_validate_policy_rule,
+            expected_type=OperationAwarePolicyRule,
+            invalid_exception=ValidationError,
+            nested_type_checks=_RULE_NESTED_TYPE_CHECKS,
         ),
+        # ── Future: Milestone 4 (policy domain model, continued) ─────────
         ConformanceEntry(
             name="policy-bundle",
             status=ContractStatus.FUTURE,
