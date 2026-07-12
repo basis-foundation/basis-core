@@ -44,7 +44,12 @@ SRC_ROOT = Path(__file__).parent.parent.parent / "src" / "basis_core"
 # `test_no_v01_module_imports_the_new_operation_aware_vocabulary_module`
 # below. Extend this set as later roadmap PRs add more operation-aware
 # modules under `src/basis_core/`.
-_OPERATION_AWARE_MODULE_PATHS = {SRC_ROOT / "domain" / "evidence.py"}
+_OPERATION_AWARE_MODULE_PATHS = {
+    SRC_ROOT / "domain" / "evidence.py",
+    # PR 13: `OperationAwarePolicyRule.reason_code` reuses `ReasonCode`
+    # unchanged (see `policy/operation_aware/rule.py`'s docstring).
+    SRC_ROOT / "policy" / "operation_aware" / "rule.py",
+}
 
 
 def _collect_imports(path: Path) -> list[str]:

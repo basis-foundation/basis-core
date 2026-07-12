@@ -15,6 +15,16 @@ Contents
                  `policy-condition` contract (PR 12). Inert structural data
                  only: no condition evaluation, no operator registry, no
                  operator whitelist, no field-path resolution.
+  rule.py        `OperationAwarePolicyRule`, `OperationAwarePolicyMatch`,
+                 `RuleEffect` — the operation-aware rule data model
+                 published by `basis-schemas` v0.2.0's `policy-rule`
+                 contract (PR 13). Inert structural data only: no rule
+                 matching, no condition evaluation, no deny precedence,
+                 no bundle-level behavior. Deliberately named
+                 `OperationAwarePolicyRule`, not `PolicyRule`, to avoid
+                 colliding with the existing v0.1.0 `PolicyRule` Protocol
+                 re-exported from `basis_core.policy` — that import
+                 remains unchanged.
 
 These models are policy *data*, not policy *evaluation*. Condition,
 rule, and bundle evaluation semantics remain blocked pending the
