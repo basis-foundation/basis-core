@@ -25,11 +25,25 @@ Contents
                  colliding with the existing v0.1.0 `PolicyRule` Protocol
                  re-exported from `basis_core.policy` — that import
                  remains unchanged.
+  bundle.py      `PolicyBundle`, `PolicyBundleScope` — the operation-aware
+                 policy bundle data model published by `basis-schemas`
+                 v0.2.0's `policy-bundle` contract (PR 14): the unit of
+                 policy identity, versioning, ownership, provenance,
+                 optional applicability scope, and rule grouping. Inert
+                 structural data only: no bundle evaluation, no scope-to-
+                 request applicability determination (PR 17), and no
+                 bundle-level structural/semantic validation pipeline —
+                 in particular, duplicate-`rule_id` rejection across a
+                 bundle's `rules` remains PR 15's explicit scope, not
+                 implemented here. No `validation_status` field exists;
+                 see `bundle.py`'s docstring.
 
 These models are policy *data*, not policy *evaluation*. Condition,
 rule, and bundle evaluation semantics remain blocked pending the
 architecture clarification named in Section 8 of the roadmap plan
-(Milestone 7).
+(Milestone 7). `PolicyBundle`'s own structural/semantic validation
+pipeline (duplicate `rule_id`/`condition_id` checks) is separately
+scoped, later roadmap work (PR 15), not implemented by `bundle.py`.
 
 Public API status: internal for now, exactly like every other
 operation-aware module added so far (`domain.operation_aware_vocabulary`,
