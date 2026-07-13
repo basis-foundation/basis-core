@@ -15,20 +15,32 @@ immutability, and schema alignment. It does not test, and must never
 test, scope-to-request applicability, bundle selection, bundle loading, or
 rule/condition evaluation — none of that exists in this module or this PR.
 
-Deferred vendored invalid example — "duplicate rule IDs within one bundle"
+Vendored invalid example — "duplicate rule IDs within one bundle" — and
+the PR 14 / PR 15 boundary
 ────────────────────────────────────────────────────────────────────────
 The vendored contract's own `examples.invalid` block includes one example
 ("duplicate rule IDs within one bundle") that depends on BUNDLE-level
 `rule_id`-uniqueness validation — a check the roadmap plan and
 `policy-bundle.yaml`'s own `constraints` explicitly assign to PR 15's
-separate structural/semantic validation pipeline, not to this PR's
-`PolicyBundle` model. `_DEFERRED_INVALID_REASONS` names this example
-explicitly; `TestFixtureConformance` both proves the deferral is scoped to
-exactly that one example (`test_only_duplicate_rule_id_example_is_deferred`)
-and proves it is *accepted* today, not merely "not tested"
-(`test_deferred_example_is_accepted_by_pr14_pending_pr15`) — visible,
-documented behavior, never a silent skip. See `bundle.py`'s docstring,
-"Deferred to PR 15", for the full rationale.
+separate structural/semantic validation pipeline
+(`basis_core.policy.operation_aware.validation.validate_policy_bundle`),
+not to this PR's `PolicyBundle` model. `_DEFERRED_INVALID_REASONS` names
+this example explicitly; `TestFixtureConformance` both proves the
+exclusion is scoped to exactly that one example
+(`test_only_duplicate_rule_id_example_is_deferred`) and proves that this
+module's own `PolicyBundle.model_validate` — the *structural* boundary
+only — still accepts it today
+(`test_deferred_example_is_accepted_by_pr14_pending_pr15`), which remains
+correct and unchanged: `PolicyBundle` itself was never meant to reject it.
+PR 15's `validate_policy_bundle` now rejects this same example at the
+semantic layer — see `tests/operation_aware/test_policy_validation.py`
+and `tests/operation_aware/test_contract_conformance.py`'s
+`TestPolicyBundleAllInvalidExamplesEnforced`, which is where global
+enforcement of this example now lives. Naming this test module's local
+exclusion "deferred" continues to describe this module's own scope
+accurately (`PolicyBundle` construction alone); it does not imply the
+example remains unvalidated anywhere in the codebase. See `bundle.py`'s
+docstring, "Deferred to PR 15", for the full rationale.
 
 Does not test any later, not-yet-implemented operation-aware model
 (canonical compatibility vectors, applicability, trace, audit, evaluator)
@@ -166,9 +178,16 @@ class TestFixtureConformance:
 
     def test_deferred_example_is_accepted_by_pr14_pending_pr15(self) -> None:
         # Documents, rather than hides, the PR 14/PR 15 boundary: this
-        # module does not implement duplicate-rule_id rejection, so the one
-        # vendored invalid example that depends on it constructs
-        # successfully today. PR 15 is expected to make this example raise.
+        # module (PolicyBundle's own structural construction) does not
+        # implement duplicate-rule_id rejection, so the one vendored
+        # invalid example that depends on it constructs successfully via
+        # plain PolicyBundle.model_validate, exactly as it always has. PR
+        # 15 has now landed and rejects this same example at the semantic
+        # layer via validate_policy_bundle — see
+        # tests/operation_aware/test_policy_validation.py — but that is a
+        # separate entry point this test does not (and must not) exercise;
+        # this test's job is only to prove PolicyBundle's own structural
+        # boundary was, and remains, correctly scoped.
         assert len(_DEFERRED_INVALID_EXAMPLES) == 1
         value = _invalid_example_value(_DEFERRED_INVALID_EXAMPLES[0])
         bundle = PolicyBundle.model_validate(value)
