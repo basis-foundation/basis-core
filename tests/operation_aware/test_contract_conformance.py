@@ -4,7 +4,7 @@ tests/operation_aware/test_contract_conformance.py — PR 10 of
 "Contract-fixture conformance test suite").
 
 A single, dedicated, exhaustive test module that validates every
-operation-aware model built so far (PRs 5-9, 12-14) against every vendored
+operation-aware model built so far (PRs 5-9, 12-15) against every vendored
 `valid`/`invalid` example published by all 14 `basis-schemas` v0.2.0
 operation-aware contracts under
 ``tests/fixtures/basis-schemas/v0.2.0/schemas/``, using PR 4's generic
@@ -22,12 +22,9 @@ This module is test-only and adds no production code. It:
     construction over every vendored `valid` example (must construct and
     produce the exact expected runtime type) and every vendored `invalid`
     example (must be rejected with the precise exception type the
-    corresponding model test file already establishes) — **except**
-    `policy-bundle`'s one vendored invalid example that depends on PR 15's
-    not-yet-implemented duplicate-`rule_id` check (see
-    `ConformanceEntry.deferred_invalid_reasons` below), which is visibly
-    `pytest.mark.skip`ped with a reason naming PR 15, never silently
-    dropped or force-passed;
+    corresponding model test file already establishes) — every invalid
+    example for every implemented contract is enforced, none skipped or
+    deferred;
   - for **future** contracts whose `basis-core` model is scheduled for a
     later roadmap PR (`trace-rule-evidence`, `evaluation-trace`,
     `operation-aware-decision-response`, `audit-evidence`), visibly
@@ -42,29 +39,33 @@ proves the registry's contract set matches what is actually discovered on
 disk, and that every discovered example (valid and invalid, for every
 contract) is represented among the parametrized test cases below.
 
-`ConformanceEntry.deferred_invalid_reasons` (PR 14)
-─────────────────────────────────────────────────────
-A small, targeted extension to the registry, added by PR 14: an
-**implemented** contract may name a `frozenset[str]` of vendored invalid-
-example `reason` strings that this suite does not yet enforce, because
-enforcing them would require behavior explicitly out of scope for the PR
-that registered the contract as implemented (see `bundle.py`'s docstring,
-"Deferred to PR 15", for the concrete case this exists for:
-`policy-bundle`'s "duplicate rule IDs within one bundle" example depends
-on BUNDLE-level `rule_id`-uniqueness validation, which is PR 15's
-explicit, separately-scoped responsibility, not PR 14's). A deferred
-example is still discovered, still counted, and still visibly
-`pytest.mark.skip`ped with a reason naming the deferring PR — it is never
-silently excluded from `_DISCOVERED_CONTRACTS`/`REGISTRY` bookkeeping, and
-every other invalid example for that same contract remains fully
-enforced. `TestRegistryConsistency` and `TestDeferredInvalidExamples`
-mechanically check that this mechanism is used narrowly and correctly:
-only `IMPLEMENTED` entries may set it, and every named reason must
-actually match a real invalid example the contract publishes today (so a
-future vendored-fixture rewording cannot silently stop deferring the
-right example, or silently defer the wrong one).
+`policy-bundle` validates through PR 15's explicit pipeline
+─────────────────────────────────────────────────────────────
+PR 14 registered `policy-bundle` as implemented but could not enforce one
+of its own vendored invalid examples ("duplicate rule IDs within one
+bundle"): rejecting it requires bundle-level `rule_id`-uniqueness
+validation, which `bundle.py`'s `PolicyBundle` model deliberately does not
+implement (see that module's docstring, "Deferred to PR 15"). This module
+previously deferred (visibly `pytest.mark.skip`ped) that one example via a
+now-removed `ConformanceEntry.deferred_invalid_reasons` mechanism.
 
-Non-goals (see the roadmap plan's PR 10/PR 14 entries and this
+PR 15 (`basis_core.policy.operation_aware.validation`) adds the explicit
+`validate_policy_bundle()` pipeline this suite's `policy-bundle` adapter
+now calls, instead of constructing only `PolicyBundle(**example)` — see
+`_validate_policy_bundle` below. All 13 vendored `policy-bundle` invalid
+examples, including the duplicate-`rule_id` one, are therefore now
+actively enforced, and the deferral mechanism (`ConformanceEntry.
+deferred_invalid_reasons`, `_BUNDLE_DEFERRED_INVALID_REASONS`,
+`_deferred_reason_for`, and `TestDeferredInvalidExamples`) has been
+removed as unused complexity — no other contract ever needed it. Because
+`validate_policy_bundle` raises either `StructuralPolicyValidationError`
+or `SemanticPolicyValidationError`, both subclasses of the single root
+`PolicyBundleValidationError`, `policy-bundle`'s `ConformanceEntry.
+invalid_exception` is the root type, not `pydantic.ValidationError` — see
+`docs/implementation/basis-core-v0.2-operation-aware-plan.md`'s PR 15
+entry.
+
+Non-goals (see the roadmap plan's PR 10/PR 14/PR 15 entries and this
 repository's `tests/operation_aware/README.md` scope boundaries): no
 model not yet implemented is added here; PR 12 registered
 `policy-condition` as implemented (structural shape only — no condition
@@ -72,19 +73,23 @@ evaluation, operator dispatch, or field-path resolution is implemented or
 exercised anywhere in this repository); PR 13 registered `policy-rule` as
 implemented (structural shape only — no rule matching, condition
 evaluation, or deny precedence is implemented or exercised anywhere in
-this repository); PR 14 registers `policy-bundle` as implemented
-(structural shape only — no bundle evaluation, no scope-to-request
-applicability determination, and no bundle-level structural/semantic
-validation pipeline is implemented or exercised anywhere in this
-repository); every other not-yet-implemented contract remains skipped; no
-compatibility-snapshot fixtures are added (PR 11); no canonical
-compatibility-vector (`allow-basic`, `deny-precedence`, `default-deny`,
-`not-applicable`, `invalid-policy-bundle`) behavior is inspected or
-asserted — this module targets only the 14 contract YAMLs' own embedded
-`examples.valid`/`examples.invalid` blocks (canonical-vector conformance
-is PR 16, later, separately-scoped roadmap work). `OperationAwareDecisionRequest`
-construction/type assertions here are intentionally minimal — full
-serialization round-trip coverage remains PR 9's dedicated scope
+this repository); PR 14 registered `policy-bundle` as implemented, and
+PR 15 completes its enforcement via the explicit validation pipeline
+(structural shape and duplicate-`rule_id`/`condition_id` semantic checks
+only — no bundle evaluation, no scope-to-request applicability
+determination, and no evaluator is implemented or exercised anywhere in
+this repository); every other not-yet-implemented contract remains
+skipped; no compatibility-snapshot fixtures are added (PR 11); no
+canonical compatibility-vector (`allow-basic`, `deny-precedence`,
+`default-deny`, `not-applicable`, `invalid-policy-bundle`) behavior is
+inspected or asserted — this module targets only the 14 contract YAMLs'
+own embedded `examples.valid`/`examples.invalid` blocks (canonical-vector
+conformance is PR 16, later, separately-scoped roadmap work; the
+`invalid-policy-bundle` canonical-vector fixture is instead exercised
+directly by `tests/operation_aware/test_policy_validation.py`, per PR 15's
+own roadmap entry). `OperationAwareDecisionRequest` construction/type
+assertions here are intentionally minimal — full serialization round-trip
+coverage remains PR 9's dedicated scope
 (`test_decision_request_roundtrip.py`) and is not duplicated here.
 """
 
@@ -113,6 +118,10 @@ from basis_core.policy.operation_aware.condition import PolicyCondition
 from basis_core.policy.operation_aware.rule import (
     OperationAwarePolicyMatch,
     OperationAwarePolicyRule,
+)
+from basis_core.policy.operation_aware.validation import (
+    PolicyBundleValidationError,
+    validate_policy_bundle,
 )
 from tests.helpers.basis_schemas_snapshot import list_operation_aware_contracts
 from tests.helpers.operation_aware_contracts import (
@@ -157,11 +166,6 @@ class ConformanceEntry:
     invalid_exception: type[Exception] | None = None
     skip_reason: str | None = None
     nested_type_checks: dict[str, type] | None = None
-    deferred_invalid_reasons: frozenset[str] | None = None
-    """Vendored invalid-example `reason` strings this IMPLEMENTED entry
-    does not yet enforce — see this module's docstring,
-    `ConformanceEntry.deferred_invalid_reasons`. `None`/empty for every
-    entry except `policy-bundle` today."""
 
 
 # ── Validator adapters (implemented contracts only) ─────────────────────
@@ -226,7 +230,7 @@ def _validate_policy_bundle(example: object) -> PolicyBundle:
     assert isinstance(example, dict), (
         f"policy-bundle example must be a bare mapping, got {type(example).__name__}."
     )
-    return PolicyBundle(**example)
+    return validate_policy_bundle(example)
 
 
 # `policy-rule` valid examples that carry a `match` field must reconstruct
@@ -250,12 +254,6 @@ _RULE_NESTED_TYPE_CHECKS: dict[str, type] = {
 _BUNDLE_NESTED_TYPE_CHECKS: dict[str, type] = {
     "scope": PolicyBundleScope,
 }
-
-# See this module's docstring, `ConformanceEntry.deferred_invalid_reasons`,
-# and `bundle.py`'s docstring, "Deferred to PR 15".
-_BUNDLE_DEFERRED_INVALID_REASONS: frozenset[str] = frozenset(
-    {"duplicate rule IDs within one bundle"}
-)
 
 
 # PR 6 evidence-reference fields and PR 7 context-object fields nested on
@@ -355,9 +353,8 @@ REGISTRY: dict[str, ConformanceEntry] = {
             status=ContractStatus.IMPLEMENTED,
             validator=_validate_policy_bundle,
             expected_type=PolicyBundle,
-            invalid_exception=ValidationError,
+            invalid_exception=PolicyBundleValidationError,
             nested_type_checks=_BUNDLE_NESTED_TYPE_CHECKS,
-            deferred_invalid_reasons=_BUNDLE_DEFERRED_INVALID_REASONS,
         ),
         # ── Future: Milestone 8 (trace evidence) ─────────────────────────
         ConformanceEntry(
@@ -521,19 +518,6 @@ class _CaseMeta:
 
     contract: str
     status: str
-    deferred: bool = False
-
-
-def _deferred_reason_for(entry: ConformanceEntry, raw: object) -> str | None:
-    """Return the vendored `reason` string for `raw` if `entry` explicitly
-    defers that specific invalid example (see this module's docstring,
-    `ConformanceEntry.deferred_invalid_reasons`); `None` otherwise."""
-    if not entry.deferred_invalid_reasons or not isinstance(raw, dict):
-        return None
-    reason = raw.get("reason")
-    if isinstance(reason, str) and reason in entry.deferred_invalid_reasons:
-        return reason
-    return None
 
 
 def _build_cases(
@@ -549,12 +533,9 @@ def _build_cases(
     `TestRegistryInventory.test_registry_matches_discovered_contracts`,
     rather than a silent omission or a confusing collection-time crash.
 
-    For `kind == "invalid"`, an `IMPLEMENTED` entry's own
-    `deferred_invalid_reasons` (if any) additionally marks the matching
-    example(s) `pytest.mark.skip`, with a reason naming the deferring PR —
-    see this module's docstring, `ConformanceEntry.deferred_invalid_reasons`.
-    Every other example for that same `IMPLEMENTED` contract is enforced
-    exactly as before.
+    Every example for an `IMPLEMENTED` contract is enforced (PR 15 removed
+    the one deferral this suite previously carried for `policy-bundle`'s
+    duplicate-`rule_id` example — see this module's docstring).
     """
     params: list[object] = []
     meta: list[_CaseMeta] = []
@@ -571,36 +552,14 @@ def _build_cases(
                 else _invalid_example_label(raw, index)
             )
             marks = []
-            deferred_reason = _deferred_reason_for(entry, raw) if kind == "invalid" else None
-            if entry.status == ContractStatus.IMPLEMENTED and deferred_reason is None:
+            if entry.status == ContractStatus.IMPLEMENTED:
                 test_id = f"{contract}-{kind}-{label}"
-            elif entry.status == ContractStatus.IMPLEMENTED:
-                # deferred_reason is not None: this specific invalid
-                # example is explicitly excluded from enforcement, not the
-                # whole contract.
-                test_id = f"{contract}-deferred-{kind}-{label}"
-                marks.append(
-                    pytest.mark.skip(
-                        reason=(
-                            f"policy-bundle example {deferred_reason!r} depends on PR 15's "
-                            "bundle-level duplicate rule_id validation, not implemented by "
-                            "PR 14's PolicyBundle model — see bundle.py's docstring, "
-                            "'Deferred to PR 15'."
-                        )
-                    )
-                )
             else:
                 test_id = f"{contract}-skipped-{kind}-{label}"
                 assert entry.skip_reason
                 marks.append(pytest.mark.skip(reason=entry.skip_reason))
             params.append(pytest.param(contract, raw, id=test_id, marks=marks))
-            meta.append(
-                _CaseMeta(
-                    contract=contract,
-                    status=entry.status,
-                    deferred=deferred_reason is not None,
-                )
-            )
+            meta.append(_CaseMeta(contract=contract, status=entry.status))
     return params, meta
 
 
@@ -631,30 +590,6 @@ class TestRegistryConsistency:
         else:
             assert entry.skip_reason, f"{contract}: not implemented but has no skip_reason"
             assert entry.validator is None, f"{contract}: not implemented but declares a validator"
-            assert entry.deferred_invalid_reasons is None, (
-                f"{contract}: not implemented but declares deferred_invalid_reasons — "
-                "deferral only makes sense for a contract this suite otherwise enforces"
-            )
-
-    @pytest.mark.parametrize(
-        "contract", sorted(c for c, e in REGISTRY.items() if e.deferred_invalid_reasons)
-    )
-    def test_deferred_invalid_reasons_match_real_vendored_examples(self, contract: str) -> None:
-        """Every reason named in `deferred_invalid_reasons` must match a
-        `reason` actually published by that contract's own vendored
-        `examples.invalid` today — guards against the deferral silently
-        going stale (matching nothing, after a fixture reword) or silently
-        widening (matching more than the one intended example)."""
-        entry = REGISTRY[contract]
-        assert entry.deferred_invalid_reasons
-        _, invalid_examples = _EXAMPLES_BY_CONTRACT[contract]
-        published_reasons = {ex.get("reason") for ex in invalid_examples if isinstance(ex, dict)}
-        unmatched = entry.deferred_invalid_reasons - published_reasons
-        assert not unmatched, (
-            f"{contract}: deferred_invalid_reasons names reason(s) not found among "
-            f"vendored invalid examples: {sorted(unmatched)}. Published reasons: "
-            f"{sorted(r for r in published_reasons if r)}."
-        )
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -754,49 +689,31 @@ class TestInvalidExampleConformance:
             entry.validator(value)
 
 
-# ══════════════════════════════════════════════════════════════════════════
-# Deferred invalid examples (PR 14) — visible, documented, never silent
-# ══════════════════════════════════════════════════════════════════════════
+class TestPolicyBundleAllInvalidExamplesEnforced:
+    """PR 15 activated enforcement of the one `policy-bundle` invalid
+    example ("duplicate rule IDs within one bundle") that PR 14 could not
+    yet reject — see this module's docstring. All 13 vendored
+    `policy-bundle` invalid examples are enforced identically now; none
+    remain deferred or skipped."""
 
-
-class TestDeferredInvalidExamples:
-    """Proves the `deferred_invalid_reasons` mechanism (this module's
-    docstring) behaves as documented for `policy-bundle`'s one deferred
-    example: it is still discovered and counted, it is visibly skipped
-    (not silently dropped, and not force-passed), every *other* invalid
-    example for the same contract remains fully enforced, and the
-    underlying model genuinely does accept the deferred example today
-    (matching `test_policy_bundle.py`'s own
-    `test_deferred_example_is_accepted_by_pr14_pending_pr15`)."""
-
-    def test_exactly_one_case_is_marked_deferred(self) -> None:
-        deferred = [m for m in _INVALID_META if m.deferred]
-        assert len(deferred) == 1
-        assert deferred[0].contract == "policy-bundle"
-
-    def test_policy_bundle_has_thirteen_invalid_examples_twelve_enforced(self) -> None:
+    def test_policy_bundle_has_thirteen_invalid_examples_all_enforced(self) -> None:
         _, invalid_examples = _EXAMPLES_BY_CONTRACT["policy-bundle"]
         assert len(invalid_examples) == 13
         policy_bundle_meta = [m for m in _INVALID_META if m.contract == "policy-bundle"]
         assert len(policy_bundle_meta) == 13
-        enforced = [m for m in policy_bundle_meta if not m.deferred]
-        assert len(enforced) == 12
 
-    def test_deferred_example_actually_constructs_without_raising(self) -> None:
-        # The flip side of TestInvalidExampleConformance: this proves the
-        # skip is not hiding an example that would have failed for an
-        # unrelated reason — PolicyBundle genuinely accepts it today,
-        # pending PR 15.
+    def test_duplicate_rule_id_example_is_actively_rejected(self) -> None:
         _, invalid_examples = _EXAMPLES_BY_CONTRACT["policy-bundle"]
-        (deferred_entry,) = [
+        (entry,) = [
             ex
             for ex in invalid_examples
             if isinstance(ex, dict) and ex.get("reason") == "duplicate rule IDs within one bundle"
         ]
-        entry = REGISTRY["policy-bundle"]
-        assert entry.validator is not None
-        result = entry.validator(_invalid_example_value(deferred_entry))
-        assert type(result) is PolicyBundle
+        registry_entry = REGISTRY["policy-bundle"]
+        assert registry_entry.validator is not None
+        assert registry_entry.invalid_exception is not None
+        with pytest.raises(registry_entry.invalid_exception):
+            registry_entry.validator(_invalid_example_value(entry))
 
 
 # ══════════════════════════════════════════════════════════════════════════

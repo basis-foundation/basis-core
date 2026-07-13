@@ -30,20 +30,36 @@ Contents
                  v0.2.0's `policy-bundle` contract (PR 14): the unit of
                  policy identity, versioning, ownership, provenance,
                  optional applicability scope, and rule grouping. Inert
-                 structural data only: no bundle evaluation, no scope-to-
-                 request applicability determination (PR 17), and no
-                 bundle-level structural/semantic validation pipeline —
-                 in particular, duplicate-`rule_id` rejection across a
-                 bundle's `rules` remains PR 15's explicit scope, not
-                 implemented here. No `validation_status` field exists;
-                 see `bundle.py`'s docstring.
+                 structural data only: no bundle evaluation and no scope-
+                 to-request applicability determination (PR 17). Does not
+                 itself reject duplicate `rule_id` values across `rules` —
+                 that is `validation.py`'s explicit responsibility. No
+                 `validation_status` field exists; see `bundle.py`'s
+                 docstring.
+  validation.py  `PolicyBundleValidationError`, `StructuralPolicyValidation
+                 Error`, `SemanticPolicyValidationError`,
+                 `DuplicateRuleIdError`, `DuplicateConditionIdError`,
+                 `validate_policy_bundle()` — the explicit `PolicyBundle`
+                 structural/semantic validation pipeline (PR 15):
+                 structural failures (malformed shape, wrapped from
+                 `pydantic.ValidationError` with the original preserved as
+                 `__cause__`) are distinguished from semantic failures
+                 (duplicate `rule_id` across `bundle.rules`; duplicate
+                 `condition_id` within one rule). `validate_policy_bundle`
+                 is invoked *before* any evaluation entry point exists, so
+                 an invalid bundle can never reach evaluation and can
+                 never produce `ALLOW` — see `validation.py`'s own
+                 docstring for the full rationale, including how it
+                 relates to PR 13's own rule-level `condition_id`
+                 uniqueness check. No evaluation, applicability, or
+                 evaluation-result concept is implemented here.
 
 These models are policy *data*, not policy *evaluation*. Condition,
 rule, and bundle evaluation semantics remain blocked pending the
 architecture clarification named in Section 8 of the roadmap plan
-(Milestone 7). `PolicyBundle`'s own structural/semantic validation
-pipeline (duplicate `rule_id`/`condition_id` checks) is separately
-scoped, later roadmap work (PR 15), not implemented by `bundle.py`.
+(Milestone 7). `validation.py`'s structural/semantic validation pipeline
+(PR 15) validates policy *data*, not policy *decisions* — it returns a
+validated `PolicyBundle`, never an authorization result.
 
 Public API status: internal for now, exactly like every other
 operation-aware module added so far (`domain.operation_aware_vocabulary`,
