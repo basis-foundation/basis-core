@@ -68,14 +68,16 @@ roadmap's own PR 19 entry does not authorize
 (`allow`/`deny`/`error`/`skipped`/`not_applicable` are explicitly listed as
 selector outcomes this PR must not create).
 
-No bundle iteration, no candidate selection, no ordering (PR 20 boundary)
+No bundle iteration in `evaluate_rule_selectors` itself
 ────────────────────────────────────────────────────────────────────────
 `evaluate_rule_selectors` takes exactly one already-typed rule and one
 already-typed request. It does not accept a `PolicyBundle`, a list of
 rules, or any iterable of candidates, and does not sort, rank, or
-tie-break anything. Deterministic candidate-rule ordering and stable
-`rule_id` tie-breaking are PR 20's separately-scoped responsibility
-(roadmap plan, Milestone 6) — see that PR's entry for what remains.
+tie-break anything itself. Deterministic multi-rule candidate ordering is
+`select_candidate_rules`'s separate, additive responsibility (PR 20 — see
+"PR 20 addition" below); it is implemented by calling
+`evaluate_rule_selectors` once per rule, unchanged, never by duplicating
+or reimplementing this function's single-rule logic.
 
 Selector-to-request mapping (twenty categories, ADR-0004 §6 /
 `policy-rule.yaml`'s `match_shape`)
@@ -211,13 +213,74 @@ performed, so no import of `PolicyCondition` is needed beyond what
 `basis_core.policy.engine`, `basis_core.policy.rules`,
 `basis_core.enforcement`, or `basis_core.audit`.
 
+PR 20 addition — deterministic candidate-rule ordering
+────────────────────────────────────────────────────────────────────────
+The roadmap's PR 20 entry ("Selector determinism/ordering tests") names
+only a test-file extension (`tests/operation_aware/test_selector.py`), on
+the assumption that a multi-rule candidate-selection entry point already
+existed. Inspection at PR 20 time found that PR 19 deliberately implements
+only the single-rule `evaluate_rule_selectors` above and explicitly
+disclaims "bundle iteration, candidate selection, candidate ordering, rule
+sorting" as out of its scope. There was therefore no production behavior
+whose ordering the roadmap-required test could exercise without the test
+itself performing the sort — which would only prove the test code is
+deterministic, not `basis-core`. PR 20 adds the smallest production
+function that closes this gap:
+
+  CandidateRuleEvaluation   An immutable `(rule, selector_evaluation)`
+                             pairing — one already-typed
+                             `OperationAwarePolicyRule` alongside the
+                             `SelectorEvaluation` `evaluate_rule_selectors`
+                             produced for it against one request. Carries
+                             no new fields beyond that association: no
+                             duplicated rule data, no ordering metadata, no
+                             priority/weight/rank field.
+  select_candidate_rules()   `(Iterable[OperationAwarePolicyRule],
+                              OperationAwareDecisionRequest) ->
+                              tuple[CandidateRuleEvaluation, ...]`. Calls
+                             `evaluate_rule_selectors` once per rule
+                             (unchanged, not reimplemented) and returns
+                             every rule's evaluation — matched,
+                             not_matched, and not_matched-with-conditions-
+                             pending alike — as an immutable tuple sorted
+                             by exact ascending lexical `rule.rule_id`.
+                             `rule_id` is a stable deterministic
+                             tie-breaker only (ADR-0002 §8; ADR-0004 §10)
+                             — it is not authorization precedence, rule
+                             priority, or evaluation order in any
+                             normative sense; no other ordering signal
+                             (input list position, dict/set iteration
+                             order, `rule.effect`, selector result,
+                             `conditions_pending`) affects the output.
+
+Candidate semantics — all evaluated rules, not matched-only: ADR-0003 §5
+("Rule Evaluation Evidence") requires rule-level trace evidence recording
+"what happened when each candidate rule was considered," including a
+`match / no-match / error` field per rule, and the roadmap's own PR 26
+("Trace assembly function") is explicit that `EvaluationTrace` is
+assembled "from Milestone 6's selector output" — i.e., directly from what
+this function returns. A matched-only filter here would silently discard
+the not_matched (and not_matched-pending-conditions) evidence a future
+trace stage needs to represent honestly, so `select_candidate_rules` keeps
+every rule's evaluation, filtering nothing.
+
+`select_candidate_rules` performs no deduplication and does not detect or
+reject duplicate `rule_id` values. Bundle-level `rule_id` uniqueness is
+`validation.py`'s (PR 15) responsibility, already enforced upstream of
+this function for any rule collection sourced from a validated
+`PolicyBundle`; this function accepts a generic `Iterable` and does not
+re-validate its input, so a caller that bypasses bundle validation and
+supplies duplicate `rule_id` values will see both evaluations preserved,
+side by side, in the sort's stable relative order — never silently merged
+or overwritten (no `{rule.rule_id: rule}` dict-collapse is used anywhere
+in this function).
+
 Not implemented by this module (deferred to later, separately-scoped
-roadmap PRs): candidate-rule ordering and stable `rule_id` tie-breaking
-(PR 20); condition operator registry, field-path resolution, and condition
-evaluation (Milestone 7, PRs 21-23, architecture-gated); rule-effect
-application, deny precedence, default deny, and any final authorization
-outcome (Milestone 9, PR 27 onward); evaluation traces and audit evidence
-(Milestone 8 onward).
+roadmap PRs): condition operator registry, field-path resolution, and
+condition evaluation (Milestone 7, PRs 21-23, architecture-gated);
+rule-effect application, deny precedence, default deny, and any final
+authorization outcome (Milestone 9, PR 27 onward); evaluation traces and
+audit evidence (Milestone 8 onward).
 
 Public API status: internal to the operation-aware package for now,
 exactly like every other operation-aware module added so far. Not
@@ -229,7 +292,7 @@ to the stable public API (Milestone 11, PR 35).
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from enum import Enum
 
@@ -240,9 +303,11 @@ from basis_core.policy.operation_aware.rule import (
 )
 
 __all__ = [
+    "CandidateRuleEvaluation",
     "SelectorEvaluation",
     "SelectorMatchResult",
     "evaluate_rule_selectors",
+    "select_candidate_rules",
 ]
 
 
@@ -667,4 +732,110 @@ def evaluate_rule_selectors(
     return SelectorEvaluation(
         result=SelectorMatchResult.MATCHED,
         conditions_pending=False,
+    )
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# Deterministic candidate-rule selection (PR 20)
+# ══════════════════════════════════════════════════════════════════════════
+
+
+@dataclass(frozen=True, slots=True)
+class CandidateRuleEvaluation:
+    """
+    An immutable association between one already-typed
+    `OperationAwarePolicyRule` and the `SelectorEvaluation`
+    `evaluate_rule_selectors` produced for it against one request.
+
+    This is the unit `select_candidate_rules` returns, one per input rule.
+    It duplicates no rule field: `rule` is the same object the caller
+    supplied (never copied, reconstructed, or partially re-serialized),
+    and `selector_evaluation` is exactly what `evaluate_rule_selectors`
+    already returned for that rule — this type adds no new matching,
+    ordering, effect, or outcome semantics of its own. See this module's
+    docstring, "PR 20 addition", for the full rationale, including why
+    candidate output preserves every evaluated rule rather than
+    matched-only rules.
+
+    A plain, frozen `dataclasses.dataclass` — not a Pydantic model — for
+    the same reason `SelectorEvaluation` is one: a pure in-process function
+    result, never constructed from untrusted wire input, never serialized,
+    requiring no field validation beyond what `rule`
+    (`OperationAwarePolicyRule`) and `selector_evaluation`
+    (`SelectorEvaluation`) already enforce on their own construction.
+    """
+
+    rule: OperationAwarePolicyRule
+    selector_evaluation: SelectorEvaluation
+
+
+def select_candidate_rules(
+    rules: Iterable[OperationAwarePolicyRule],
+    request: OperationAwareDecisionRequest,
+) -> tuple[CandidateRuleEvaluation, ...]:
+    """
+    Evaluate every rule in `rules` against `request` and return the result
+    as an immutable, deterministically ordered tuple of
+    `CandidateRuleEvaluation`.
+
+    Ordering: the returned tuple is sorted by exact ascending lexical
+    `rule.rule_id` — the stable, deterministic tie-breaker ADR-0002 §8 and
+    ADR-0004 §10 both name for when no other ordering signal is defined.
+    `rule_id` ordering here is a determinism guarantee only; it carries no
+    authorization precedence, priority, or evaluation-order meaning. Input
+    list position, dict/set iteration order used to construct `rules`,
+    `rule.effect`, the resulting `SelectorEvaluation.result`, and
+    `SelectorEvaluation.conditions_pending` never affect this output order
+    — see this module's docstring, "PR 20 addition", and this function's
+    final PR report for the determinism coverage this guarantees.
+
+    Filtering: none. Every rule in `rules` is evaluated and included in the
+    output, whether its selector evaluation is `matched`, `not_matched`, or
+    `not_matched` with `conditions_pending=True` — see "PR 20 addition" for
+    why matched-only filtering would be an unsupported, silently invented
+    semantic.
+
+    Duplicates: this function performs no deduplication and does not
+    detect or reject duplicate `rule_id` values in `rules`. Bundle-level
+    `rule_id` uniqueness is `validation.py`'s (PR 15) responsibility; this
+    function trusts that a rule collection sourced from an already-
+    validated `PolicyBundle` is already unique and does not re-check it. A
+    caller that supplies duplicate `rule_id` values directly (bypassing
+    bundle validation) will see every one of them preserved in the output,
+    in the sort's stable relative order — never collapsed via a
+    `{rule.rule_id: rule}`-shaped mapping, which could otherwise silently
+    hide a duplicate by letting one overwrite another.
+
+    Purity: reads `rules` and `request` only. Does not mutate `rules` (nor
+    any rule within it), `request`, or any nested request context object;
+    does not sort a caller-owned list in place (`sorted()` always returns a
+    new list, and this function always returns a new tuple built from it).
+    Performs no I/O, no network access, no clock access, and no
+    random-value access.
+
+    Args:
+        rules: any iterable of already-typed, already-validated
+            `OperationAwarePolicyRule` instances — a `list`, a `tuple`, a
+            generator over a `dict`'s values, a set-derived sequence, or a
+            `PolicyBundle.rules` array. Never mutated; consumed at most
+            once regardless of iterable type.
+        request: an already-constructed `OperationAwareDecisionRequest`.
+
+    Returns:
+        A `tuple[CandidateRuleEvaluation, ...]`, one entry per rule in
+        `rules`, sorted by `rule.rule_id` ascending. Empty if `rules` is
+        empty. A single-element tuple if `rules` has exactly one rule.
+    """
+    evaluations = tuple(
+        CandidateRuleEvaluation(
+            rule=rule,
+            selector_evaluation=evaluate_rule_selectors(rule, request),
+        )
+        for rule in rules
+    )
+    return tuple(
+        sorted(
+            evaluations,
+            key=lambda candidate: candidate.rule.rule_id,
+        )
     )
