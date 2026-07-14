@@ -54,12 +54,28 @@ Contents
                  uniqueness check. No evaluation, applicability, or
                  evaluation-result concept is implemented here.
 
-These models are policy *data*, not policy *evaluation*. Condition,
-rule, and bundle evaluation semantics remain blocked pending the
-architecture clarification named in Section 8 of the roadmap plan
-(Milestone 7). `validation.py`'s structural/semantic validation pipeline
-(PR 15) validates policy *data*, not policy *decisions* — it returns a
-validated `PolicyBundle`, never an authorization result.
+These models are policy *data*, not policy *evaluation*. `validation.py`'s
+structural/semantic validation pipeline (PR 15) validates policy *data*,
+not policy *decisions* — it returns a validated `PolicyBundle`, never an
+authorization result.
+
+  selector.py    `evaluate_rule_selectors()`, `select_candidate_rules()` —
+                 deterministic structural `match`-criteria evaluation
+                 (Milestone 6, PR 19-20). Does not evaluate `conditions`;
+                 a rule whose structural match is satisfied but which still
+                 carries conditions is reported `not_matched` with
+                 `conditions_pending=True`, never a premature `matched`.
+  operators.py   `ConditionResult`, `ConditionEvaluation`,
+                 `evaluate_condition()` — the approved, finite
+                 ten-operator condition registry and standalone
+                 `PolicyCondition` evaluation (Milestone 7, PR 22),
+                 implementing exactly the `basis-architecture`-approved
+                 clarification named in Section 8 of the roadmap plan.
+                 Evaluates one condition against one
+                 `OperationAwareDecisionRequest` only — rule-level
+                 condition-array iteration and aggregation, selector
+                 integration, and trace evidence remain PR 23 and later,
+                 separately-scoped work.
 
 Public API status: internal for now, exactly like every other
 operation-aware module added so far (`domain.operation_aware_vocabulary`,

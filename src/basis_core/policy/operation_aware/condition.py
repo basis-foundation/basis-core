@@ -41,14 +41,18 @@ field-path resolution, or operator dispatch:
     executable expression of any kind can be constructed here.
 
 Condition execution (match/no-match/error determination, operator
-dispatch, field-path resolution against a real request) is blocked pending
-the architecture clarification the roadmap plan names in Section 8
-(Milestone 7, PRs 21-23). This module implements none of it.
+dispatch, field-path resolution against a real request) is implemented
+separately, in `operators.py` (Milestone 7, PR 22 — the architecture
+clarification named in Section 8 was approved and is now the governing
+source for that module's behavior). This module remains inert structural
+data only and implements none of it; `PolicyCondition` gains no
+`evaluate()`/`matches()` method and no execution behavior of any kind.
 
 Not implemented by this module (deferred to later, separately-scoped
 roadmap PRs): `OperationAwarePolicyRule` (PR 13), `PolicyBundle` (PR 14),
-condition evaluation (PR 22-23), and any trace/audit assembly that would
-reference conditions (Milestone 8+).
+rule-level condition-array iteration and aggregation (PR 23, built on top
+of `operators.py`'s standalone evaluation), and any trace/audit assembly
+that would reference conditions (Milestone 8+).
 
 Import boundary
 ────────────────
