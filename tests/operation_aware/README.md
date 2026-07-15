@@ -195,6 +195,38 @@ conversion from any internal evaluator result (PR 22/23's
 semantics of any kind is implemented or tested here — those remain later,
 separately-scoped roadmap PRs (PR 25 onward).
 
+## EvaluationTrace model (Milestone 8, PR 25)
+
+`test_evaluation_trace.py` tests the second production module added under
+`src/basis_core/audit/operation_aware/`:
+`basis_core.audit.operation_aware.evaluation_trace`, which implements
+`EvaluationTrace`, `EvaluationStatus`, `TraceOutcome`,
+`TraceBundleApplicability`, and `TraceFailureReason` — the bounded,
+deterministic, request-level trace model published by `basis-schemas`
+v0.2.0's `evaluation-trace` contract, reusing PR 24's `TraceRuleEvidence`
+for `rule_evidence` unchanged. Covers construction (valid/invalid, cross-
+checked against every vendored example), the required-key-versus-nullable
+distinction for `outcome`/`bundle_applicability` (present, possibly `null`,
+never omitted), the closed `evaluation_status`/`outcome`/
+`bundle_applicability`/`failure_reason` vocabularies (each defined locally
+in this module rather than imported from `policy/` or reused from v0.1.0 —
+`audit/` may import only `domain/`), every published cross-field invariant
+(`outcome` null iff `evaluation_status` failed; `failure_reason` non-null
+iff failed; a `rule_result: error` entry forces `evaluation_status: failed`;
+`outcome`/`bundle_applicability` agreement while completed; a
+`not_applicable` bundle requires empty `rule_evidence`; `rule_id` uniqueness
+across `rule_evidence`), deterministic preservation (never sorting) of
+supplied `rule_evidence` order, immutability, boundedness, this model's own
+serialization override (why the repository's general
+`exclude_none=True` convention is unsafe for `outcome`/`bundle_applicability`
+unmodified), and that the existing v0.1.0
+`basis_core.audit.trace.DecisionTrace`/`RuleEvaluation` are unchanged.
+`evaluation-trace` is also now registered as `ContractStatus.IMPLEMENTED` in
+`test_contract_conformance.py`. No trace assembly, no conversion from any
+internal evaluator result, no `OperationAwareDecisionResponse`, and no
+`AuditEvidence` is implemented or tested here — those remain later,
+separately-scoped roadmap PRs (PR 26 onward).
+
 ## Anticipated future test files
 
 The files below are **anticipated, not yet implemented**. Each is added by
@@ -206,7 +238,6 @@ test_decision_request_roundtrip.py
 test_policy_condition.py
 test_policy_rule.py
 test_policy_bundle.py
-test_evaluation_trace.py
 test_operation_aware_response.py
 test_audit_evidence.py
 test_operation_aware_engine.py
