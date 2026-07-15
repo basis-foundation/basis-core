@@ -13,6 +13,9 @@ Also asserts intra-package import rules:
   - policy/ does not import from audit/, enforcement/, or adapters/
   - enforcement/ does not import from adapters/
   - audit/ does not import from enforcement/ or adapters/
+  - evaluation/ (including the recursively-scanned evaluation/operation_aware/
+    subpackage, first created by PR 26) does not import from adapters/ or
+    enforcement/
 
 These tests use ast.parse() to inspect source files statically — they do not
 execute any imports and do not depend on module loading order.
@@ -300,3 +303,51 @@ def test_decisions_does_not_import_from_enforcement() -> None:
     imports = all_imports_in("decisions")
     violations = [(f, m) for f, m in imports if m.startswith("basis_core.enforcement")]
     assert violations == [], f"decisions/ imports from enforcement/: {violations}"
+
+
+def test_evaluation_operation_aware_does_not_import_from_adapters_or_enforcement() -> None:
+    """
+    `evaluation/operation_aware/` (first created by PR 26 — see
+    `docs/implementation/basis-core-v0.2-operation-aware-plan.md`, Milestone
+    8) is the pure evaluation orchestration layer added by `basis-
+    architecture` ADR-0006. Per `docs/import-boundaries.md`, it legally
+    imports `basis_core.domain`, `basis_core.decisions`, `basis_core.policy`,
+    and `basis_core.audit` (and its own siblings under `evaluation/`), but
+    must never import `basis_core.adapters` or `basis_core.enforcement` —
+    both sit above it in the dependency graph.
+
+    This scans recursively (mirroring
+    `test_audit_operation_aware_does_not_import_from_policy_enforcement_or_adapters`
+    above) so it also covers any future descendant modules added under
+    `evaluation/operation_aware/` (e.g. `engine.py`, `response_assembly.py`,
+    per the roadmap's later, separately-scoped PRs) without requiring a new
+    test each time.
+    """
+    pkg_dir = SRC_ROOT / "evaluation" / "operation_aware"
+    imports: list[tuple[str, str]] = []
+    for py_file in sorted(pkg_dir.rglob("*.py")):
+        for module in collect_imports(py_file):
+            imports.append((py_file.name, module))
+    violations = [
+        (fname, mod)
+        for fname, mod in imports
+        if mod.startswith("basis_core.adapters") or mod.startswith("basis_core.enforcement")
+    ]
+    assert violations == [], f"evaluation/operation_aware/ imports a forbidden layer: {violations}"
+
+
+def test_evaluation_does_not_import_from_adapters_or_enforcement() -> None:
+    """
+    Top-level guard mirroring the package-level rule in
+    `docs/import-boundaries.md`: no module directly under
+    `src/basis_core/evaluation/` (non-recursive; the nested
+    `operation_aware/` package has its own recursive guard above) may import
+    `basis_core.adapters` or `basis_core.enforcement`.
+    """
+    imports = all_imports_in("evaluation")
+    violations = [
+        (fname, mod)
+        for fname, mod in imports
+        if mod.startswith("basis_core.adapters") or mod.startswith("basis_core.enforcement")
+    ]
+    assert violations == [], f"evaluation/ imports a forbidden layer: {violations}"
