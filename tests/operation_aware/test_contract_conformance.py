@@ -19,14 +19,14 @@ This module is test-only and adds no production code. It:
     `reason-code`, `identity-evidence-reference`,
     `adapter-evidence-reference`, `operation-aware-decision-request`,
     `policy-condition`, `policy-rule`, `policy-bundle`,
-    `trace-rule-evidence`), parametrizes construction over every vendored
-    `valid` example (must construct and produce the exact expected runtime
-    type) and every vendored `invalid` example (must be rejected with the
-    precise exception type the corresponding model test file already
-    establishes) — every invalid example for every implemented contract is
-    enforced, none skipped or deferred;
+    `trace-rule-evidence`, `evaluation-trace`), parametrizes construction
+    over every vendored `valid` example (must construct and produce the
+    exact expected runtime type) and every vendored `invalid` example (must
+    be rejected with the precise exception type the corresponding model
+    test file already establishes) — every invalid example for every
+    implemented contract is enforced, none skipped or deferred;
   - for **future** contracts whose `basis-core` model is scheduled for a
-    later roadmap PR (`evaluation-trace`, `operation-aware-decision-response`,
+    later roadmap PR (`operation-aware-decision-response`,
     `audit-evidence`), visibly `pytest.mark.skip`s every example with a
     reason naming the exact milestone/PR that will implement it;
   - for contracts that are **intentionally not `basis-core` runtime
@@ -80,9 +80,14 @@ determination, and no evaluator is implemented or exercised anywhere in
 this repository); PR 24 registered `trace-rule-evidence` as implemented
 (bounded per-rule trace-evidence shape only — no trace assembly, no
 conversion from any internal evaluator result, and no evaluation semantics
-of any kind is implemented or exercised anywhere in this repository); every
-other not-yet-implemented contract remains skipped; no compatibility-snapshot
-fixtures are added (PR 11); no
+of any kind is implemented or exercised anywhere in this repository); PR 25
+registered `evaluation-trace` as implemented (bounded, deterministic,
+request-level trace shape only, reusing `trace-rule-evidence` for
+`rule_evidence` — no trace assembly, no conversion from any internal
+evaluator result, and no evaluation semantics of any kind is implemented or
+exercised anywhere in this repository); every other not-yet-implemented
+contract remains skipped; no compatibility-snapshot fixtures are added (PR
+11); no
 canonical compatibility-vector (`allow-basic`, `deny-precedence`,
 `default-deny`, `not-applicable`, `invalid-policy-bundle`) behavior is
 inspected or asserted — this module targets only the 14 contract YAMLs'
@@ -105,6 +110,7 @@ from collections.abc import Callable
 import pytest
 from pydantic import ValidationError
 
+from basis_core.audit.operation_aware.evaluation_trace import EvaluationTrace
 from basis_core.audit.operation_aware.trace_rule_evidence import TraceRuleEvidence
 from basis_core.decisions.operation_aware import OperationAwareDecisionRequest
 from basis_core.domain.evidence import AdapterEvidenceReference, IdentityEvidenceReference
@@ -244,6 +250,13 @@ def _validate_trace_rule_evidence(example: object) -> TraceRuleEvidence:
     return TraceRuleEvidence(**example)
 
 
+def _validate_evaluation_trace(example: object) -> EvaluationTrace:
+    assert isinstance(example, dict), (
+        f"evaluation-trace example must be a bare mapping, got {type(example).__name__}."
+    )
+    return EvaluationTrace(**example)
+
+
 # `policy-rule` valid examples that carry a `match` field must reconstruct
 # it as the strongly-typed `OperationAwarePolicyMatch`, not a raw dict —
 # mirrors `_REQUEST_NESTED_TYPE_CHECKS`'s convention for PR 6/PR 7 nested
@@ -375,11 +388,13 @@ REGISTRY: dict[str, ConformanceEntry] = {
             expected_type=TraceRuleEvidence,
             invalid_exception=ValidationError,
         ),
-        # ── Future: Milestone 8 (trace evidence) ─────────────────────────
+        # ── Implemented (PR 25) ────────────────────────────────────────────
         ConformanceEntry(
             name="evaluation-trace",
-            status=ContractStatus.FUTURE,
-            skip_reason=("basis-core evaluation-trace model is scheduled for Milestone 8 / PR 25"),
+            status=ContractStatus.IMPLEMENTED,
+            validator=_validate_evaluation_trace,
+            expected_type=EvaluationTrace,
+            invalid_exception=ValidationError,
         ),
         # ── Future: Milestone 10 (response and AuditEvidence) ────────────
         ConformanceEntry(

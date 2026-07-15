@@ -55,6 +55,10 @@ _OPERATION_AWARE_MODULE_PATHS = {
     # "Import boundary" — `domain/` is the one layer `audit/` may import
     # from).
     SRC_ROOT / "audit" / "operation_aware" / "trace_rule_evidence.py",
+    # PR 25: `EvaluationTrace.reason_code` reuses `ReasonCode` unchanged
+    # (see `audit/operation_aware/evaluation_trace.py`'s docstring,
+    # "Vocabulary ownership" — same `domain/`-only import boundary as PR 24).
+    SRC_ROOT / "audit" / "operation_aware" / "evaluation_trace.py",
 }
 
 
