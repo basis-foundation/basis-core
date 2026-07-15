@@ -49,6 +49,12 @@ _OPERATION_AWARE_MODULE_PATHS = {
     # PR 13: `OperationAwarePolicyRule.reason_code` reuses `ReasonCode`
     # unchanged (see `policy/operation_aware/rule.py`'s docstring).
     SRC_ROOT / "policy" / "operation_aware" / "rule.py",
+    # PR 24: `TraceRuleEvidence.reason_code` /
+    # `TraceConditionEvidence.reason_code` reuse `ReasonCode` unchanged
+    # (see `audit/operation_aware/trace_rule_evidence.py`'s docstring,
+    # "Import boundary" — `domain/` is the one layer `audit/` may import
+    # from).
+    SRC_ROOT / "audit" / "operation_aware" / "trace_rule_evidence.py",
 }
 
 
