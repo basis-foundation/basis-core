@@ -601,27 +601,49 @@ src/basis_core/
 │       ├── applicability.py            # bundle-scope applicability
 │       ├── selector.py                 # rule match-criteria evaluation
 │       ├── operators.py                # condition operator registry — Milestone 7, gated
-│       ├── condition_eval.py           # condition evaluation integration — Milestone 7, gated
-│       ├── trace_assembly.py           # rule evidence → EvaluationTrace
-│       ├── engine.py                   # OperationAwarePolicyEngine
-│       └── response_assembly.py        # response + AuditEvidence assembly
+│       └── condition_eval.py           # condition evaluation integration — Milestone 7, gated
 ├── audit/
 │   └── operation_aware/
 │       ├── trace_rule_evidence.py      # TraceRuleEvidence
 │       ├── evaluation_trace.py         # EvaluationTrace
 │       └── audit_evidence.py           # AuditEvidence
+├── evaluation/
+│   ├── __init__.py
+│   └── operation_aware/
+│       ├── __init__.py
+│       ├── trace_assembly.py           # rule evidence → EvaluationTrace (orchestration, not semantics)
+│       ├── engine.py                   # sequences policy-owned applicability/selection/condition/effect-aggregation stages
+│       └── response_assembly.py        # response + AuditEvidence assembly
 └── enforcement/
     └── operation_aware.py              # OperationAwareEnforcementPoint
 ```
 
+Per `basis-architecture` ADR-0006 ("Introduce a Pure Evaluation Orchestration
+Layer"), `trace_assembly.py`, `engine.py`, and `response_assembly.py` are
+**evaluation-owned orchestration**, not policy-owned semantics, and live
+under `evaluation/operation_aware/` rather than `policy/operation_aware/`.
+`policy/operation_aware/` retains every module that implements executable
+authorization semantics: applicability, candidate selection, selector
+matching, condition evaluation, and (added by the milestones after this one)
+rule-effect aggregation, deny precedence, allow determination, default deny,
+and `NOT_APPLICABLE`/final-outcome semantics. The evaluation engine invokes
+those policy-owned operations; it does not reimplement them.
+
+**Supersession note:** ADR-0006 supersedes the earlier draft placement of
+`trace_assembly.py`, `engine.py`, and `response_assembly.py` under
+`policy/operation_aware/`; these orchestration modules are now planned under
+`evaluation/operation_aware/` (module tree above). Later PR entries in this
+document (PR 26, PR 27, PR 31) reference this note rather than repeating the
+move's rationale at each file listing.
+
 This mirrors the existing `domain → {decisions, policy, audit, adapters} →
-enforcement` import graph exactly (`docs/import-boundaries.md`): every new
-module under `policy/operation_aware/` may import from `domain/` (including
-the new `domain/evidence.py` and `domain/operation_aware.py`) but not from
-`audit/` or `enforcement/`; every new module under `audit/operation_aware/`
-may import from `domain/` only; `enforcement/operation_aware.py` may import
-from everything. No new edge is added to the dependency graph — only new
-nodes that follow the existing edges.
+enforcement` import graph, extended per ADR-0006: `evaluation/` is a new
+node in the dependency graph, sitting between `policy/`+`audit/` and
+`enforcement/` — it does not add a new edge into `policy/` or `audit/` from
+below, only a new node that legally imports both from above. See
+`docs/import-boundaries.md` for the authoritative per-module permission
+matrix (including the `policy/` architecture-ceiling-vs-legacy-local-rule
+distinction), not repeated here.
 
 **Serialization boundaries.** Every new model is a Pydantic `BaseModel`
 (matching every existing kernel model), serialized with `model_dump(mode="json")`
@@ -731,15 +753,31 @@ policy/operation_aware/selector.py                          (match-criteria eval
     ↓
 policy/operation_aware/{operators,condition_eval}.py         (condition evaluation — gated, Milestone 7)
     ↓
-policy/operation_aware/engine.py  (OperationAwarePolicyEngine — deny-precedence aggregation)
-    ↓
-policy/operation_aware/trace_assembly.py, response_assembly.py
-audit/operation_aware/{trace_rule_evidence,evaluation_trace,audit_evidence}.py
+policy/operation_aware/{effect aggregation, deny precedence, default deny, NOT_APPLICABLE, final-outcome modules — Milestone 9-10, policy-owned}
+    ↓                                        ↓
+    ↓                          audit/operation_aware/{trace_rule_evidence,evaluation_trace,audit_evidence}.py
+    ↓                                        ↓
+    └──────────────→  evaluation/operation_aware/trace_assembly.py, engine.py, response_assembly.py
+                       (orchestration only — invokes the policy-owned stages above and audit-owned
+                        trace/evidence models; implements none of their semantics)
     ↓
 decisions/operation_aware.py  (OperationAwareDecisionResponse — response assembly output)
     ↓
 enforcement/operation_aware.py  (OperationAwareEnforcementPoint — public entry point)
 ```
+
+Read this as: **policy-owned evaluation facts flow down into evaluation
+orchestration, which flows down into decision/trace/response artifacts,
+which flow down into enforcement.** `evaluation/operation_aware/engine.py`
+invokes the policy-owned applicability, selection, condition-evaluation, and
+effect-aggregation operations above it and carries their typed results into
+trace assembly and response assembly — it does not reimplement selector
+semantics, condition semantics, operator semantics, effect aggregation, deny
+precedence, default deny, or applicability semantics. Ordering in this
+diagram reflects data flow through orchestration stages, not authorization
+precedence — deny-precedence itself is decided entirely within the
+policy-owned effect-aggregation stage, before evaluation orchestration ever
+runs.
 
 This is the same shape the brief's template describes, instantiated against
 this repository's actual package layout:
@@ -753,12 +791,20 @@ typed domain model (OperationAwareDecisionRequest, PolicyBundle, PolicyRule, Pol
     ↓
 semantic validation (bundle scope well-formed, rule_id/condition_id uniqueness, effect closed-vocabulary, at-least-one-of match/conditions)
     ↓
-deterministic evaluator (OperationAwarePolicyEngine: applicability → selection → condition evaluation → deny-precedence aggregation)
+policy-owned deterministic evaluation (applicability → selection → condition evaluation → effect aggregation → deny-precedence/default-deny/NOT_APPLICABLE/final-outcome semantics)
     ↓
-trace + decision + AuditEvidence (EvaluationTrace/TraceRuleEvidence, OperationAwareDecisionResponse, AuditEvidence — assembled, not mutated in place)
+evaluation orchestration (evaluation/operation_aware/engine.py invokes the policy-owned stages above and carries their typed results forward — no semantic reimplementation)
+    ↓
+trace + decision + AuditEvidence (EvaluationTrace/TraceRuleEvidence, OperationAwareDecisionResponse, AuditEvidence — assembled by evaluation/operation_aware/{trace_assembly,response_assembly}.py, not mutated in place)
     ↓
 serialization boundary (Pydantic model_dump(mode="json"), same convention as AuditEvent today)
 ```
+
+**Import legality reminder:** `evaluation/` legally imports both `policy/`
+and `audit/` (it is the one package permitted to sit above both — see
+`docs/import-boundaries.md`). `policy/` and `audit/` remain mutually isolated
+siblings; neither imports the other, and neither imports `evaluation/`.
+`evaluation/` must not import `adapters/` or `enforcement/`.
 
 **Raw YAML dictionaries never become the evaluator's primary internal
 representation.** Every stage past "structural validation" operates on typed,
@@ -1943,46 +1989,147 @@ Compatibility risk: none.
 Blocked by architecture decision: no.
 
 **PR 26 — Trace assembly function.**
-Objective: a pure function assembling `EvaluationTrace` from Milestone 6's
-selector output (and, once available, Milestone 7's condition evidence) —
-explicitly documented, in both code comment and this plan, that
-`condition_results` will be empty/absent for every rule until Milestone 7
-lands, so the trace is always honest about what was and was not evaluated.
-Files: `src/basis_core/policy/operation_aware/trace_assembly.py`; test:
+Objective: a pure function, owned by the `evaluation/` orchestration layer
+(ADR-0006), assembling `EvaluationTrace` from Milestone 6's selector output
+and Milestone 7's condition evidence. **PR 23 (condition evaluation
+integration) is merged and on `main`** — `TraceRuleEvidence.condition_results`
+is no longer a future capability at this point in the roadmap. PR 26 must use
+the current ordered condition-evaluation results whenever conditions were
+actually evaluated:
+
+- conditions evaluated → include bounded, ordered condition evidence in the
+  assembled `TraceRuleEvidence`.
+- selector mismatch (conditions were never reached) → `condition_results` is
+  absent; do not invent condition evidence for a rule whose conditions were
+  never evaluated.
+- rule authored with no `conditions` → `condition_results` is absent; do not
+  invent condition evidence for a rule that has none to evaluate.
+
+Do not introduce temporary fallback behavior (e.g. `unknown`,
+`not_evaluated`, or a synthetic "skipped condition" value) for a milestone
+gap that no longer exists — PR 23 already closed it. The stale "empty/absent
+until Milestone 7" framing that appeared in earlier drafts of this PR is
+superseded by PR 23's merge and must not appear in the current acceptance
+criteria.
+
+PR 26's operational acceptance criteria (ownership rationale is Section
+5/6's, not repeated here):
+
+- **Input:** already-evaluated policy facts (Milestone 6 selector output,
+  Milestone 7 condition-evaluation results) — never re-derives them.
+- **Output:** actual `TraceRuleEvidence` and `EvaluationTrace` instances,
+  preserving rule and condition ordering exactly as produced upstream, using
+  explicit source-to-trace enum mappings and bounded reason
+  codes/explanations.
+- **Condition evidence:** uses the current ordered condition-evaluation
+  results per the objective above (evaluated → included; not reached or
+  absent → omitted, never invented).
+- **No authorization outcome derived:** does not evaluate selectors or
+  conditions, determine applicability, aggregate effects, apply deny
+  precedence/default deny/`NOT_APPLICABLE`, or choose final decision reasons
+  — a complete `EvaluationTrace` requires `evaluation_status`, `outcome`,
+  `bundle_applicability`, and `failure_reason`, which PR 26 receives as
+  already-determined trace-level state through a narrow typed assembly
+  input, never derives itself.
+- **No policy semantics implemented:** all combining/precedence/outcome
+  logic remains policy-owned (see the module-tree note above); PR 26 is not
+  the place it's added even provisionally.
+- **Out of scope entirely:** response assembly, audit-evidence persistence,
+  enforcement.
+- **Purity:** copies no raw request/policy/condition/evidence values;
+  performs no I/O; uses no clock or randomness; generates no identifiers.
+
+(This plan does not define the assembly input's concrete function
+signature — see Section 6's note on not prescribing signatures.)
+
+Files: `src/basis_core/evaluation/__init__.py` (new package);
+`src/basis_core/evaluation/operation_aware/__init__.py` (new package);
+`src/basis_core/evaluation/operation_aware/trace_assembly.py` (see Section 5
+for this module's superseded earlier placement); test:
 `tests/operation_aware/test_trace_assembly.py`.
 Non-goals: no response assembly yet (Milestone 10).
-Dependencies: PR 20, PR 25. (Not blocked on Milestone 7 — ships with
-condition evidence honestly absent, per Section 8's explicit allowance.)
-Architecture/schema references: ADR-0002 §13; ADR-0003 §4.
-Required tests: assembly from match-only selector output produces a valid,
-honest `EvaluationTrace`.
+Dependencies: PR 20, PR 23, PR 25.
+Architecture/schema references: ADR-0002 §13; ADR-0003 §4; basis-architecture
+ADR-0006.
+Required tests: assembly from selector output (with and without evaluated
+conditions) produces a valid, honest `EvaluationTrace`; a recursive
+import-boundary test for `src/basis_core/evaluation/operation_aware/`
+(mirroring `tests/test_import_boundaries.py`'s existing recursive guard for
+`audit/operation_aware/`) asserting it imports only from `basis_core.domain`,
+`basis_core.decisions`, `basis_core.policy`, and `basis_core.audit`, and
+never from `basis_core.adapters` or `basis_core.enforcement`. This PR is the
+first to create `src/basis_core/evaluation/`, so it is also the first PR
+that can add this guard — no earlier PR could have.
 Completion criteria: green.
 Compatibility risk: none.
 Blocked by architecture decision: no (this PR is explicitly designed to be
-unblocked; only PR 22/23 are blocked).
+unblocked; PR 22/23 unblocked and merged during Milestone 7).
 
 ### Milestone 9 — Decision aggregation
 
-**PR 27 — `OperationAwarePolicyEngine`.**
-Objective: implement deny-precedence + default-deny + not-applicable +
-evaluation-failure aggregation over `EvaluationTrace`-shaped rule evidence,
-mirroring `PolicyEngine`'s deny-overrides *shape* (Section 2.3) but operating
-over the new data model — explicitly a new, separate class, not a subclass
-or modification of `PolicyEngine`.
-Files: `src/basis_core/policy/operation_aware/engine.py`.
-Non-goals: no `EnforcementPoint` integration yet (Milestone 11).
+**PR 27 — Effect aggregation and final-outcome semantics (policy-owned) +
+evaluation engine orchestration.**
+Objective: two ownership-separated pieces, per ADR-0006:
+
+1. **Policy-owned** (`policy/operation_aware/`): implement deny-precedence,
+   default-deny, `NOT_APPLICABLE`, allow determination, and final
+   authorization-outcome semantics as pure, executable rule-effect
+   combination logic over rule evidence — mirroring `PolicyEngine`'s
+   deny-overrides *shape* (Section 2.3) but operating over the new data
+   model. Use the roadmap's existing filenames for this logic; this plan
+   does not rename them.
+2. **Evaluation-owned** (`evaluation/operation_aware/engine.py`): the
+   orchestration engine that invokes policy-owned applicability, candidate
+   selection, selector evaluation, condition evaluation, and effect
+   aggregation, in sequence, carrying each stage's typed result into the
+   next and into trace assembly (PR 26). The evaluation engine invokes the
+   policy-owned effect-combination operation and carries its typed result
+   into subsequent stages — it does not itself combine rule effects.
+
+Files: policy-owned aggregation/precedence/outcome modules under
+`src/basis_core/policy/operation_aware/` (filenames as this plan already
+establishes elsewhere in this section — no new filenames invented here);
+`src/basis_core/evaluation/operation_aware/engine.py` (see Section 5 for this
+module's superseded earlier placement).
+Non-goals: no `EnforcementPoint` integration yet (Milestone 11). The
+evaluation engine must not reimplement selector semantics, condition
+semantics, operator semantics, effect aggregation, deny precedence, default
+deny, or applicability semantics — it invokes the policy-owned operations
+above and carries their typed results forward.
 Dependencies: PR 15 (bundle validation), PR 26 (trace assembly).
-Architecture/schema references: ADR-0002 §4-7,14; `policy-rule-model.md` §9.
+Architecture/schema references: ADR-0002 §4-7,14; `policy-rule-model.md` §9;
+basis-architecture ADR-0006.
 Required tests: deny-precedence beats allow; default-deny when no allow
 matches; not-applicable when no bundle scope covers the request; invalid
-bundle never reaches an `ALLOW`/`DENY` outcome.
+bundle never reaches an `ALLOW`/`DENY` outcome; the evaluation engine's
+recursive import-boundary test (established by PR 26) continues to pass with
+`engine.py` added to `evaluation/operation_aware/`.
 Completion criteria: unit-level correctness for all four logical categories.
 Compatibility risk: **naming/behavioral collision risk with `PolicyEngine` —
-mitigated by keeping the two classes fully independent**, per Section 5;
-this PR's tests include an explicit regression check that constructing an
-`OperationAwarePolicyEngine` has no observable effect on any existing
-`PolicyEngine` instance (no shared mutable state).
+mitigated by keeping the classes fully independent**, per Section 5; this
+PR's tests include an explicit regression check that constructing the new
+evaluation engine has no observable effect on any existing `PolicyEngine`
+instance (no shared mutable state).
 Blocked by architecture decision: no.
+
+**Naming note (not resolved by this PR):** the roadmap's Section 5 naming
+strategy names this evaluator `OperationAwarePolicyEngine` and, before this
+alignment pass, planned to implement it at `policy/operation_aware/engine.py`
+— a location where a class named `*PolicyEngine` matched its package. Moving
+`engine.py` to `evaluation/operation_aware/` (this update) creates a naming
+tension: `OperationAwarePolicyEngine` would now be implemented inside the
+`evaluation/` package, which does not match ADR-0006's `evaluation/`-invokes-
+`policy/` ownership split as cleanly as the pre-ADR-0006 name suggests. Every
+occurrence of `OperationAwarePolicyEngine` in this document (Section 5,
+Section 6, Section 11, this milestone) is left unrenamed here — this is a
+documentation/roadmap-alignment PR, not an API-naming decision, and the type
+does not yet exist in code. A future naming decision (analogous to Milestone
+11 PR 33's short design-note treatment of `OperationAwareEnforcementPoint`)
+should resolve whether the orchestration class keeps the `*PolicyEngine`
+name, is renamed to something evaluation-scoped (e.g. an
+`*EvaluationEngine`-shaped name), or is split into a thin evaluation-owned
+orchestrator plus a policy-owned aggregator with two distinct names. That
+decision belongs to whoever implements PR 27, not to this alignment PR.
 
 **PR 28 — Combining-algorithm canonical-vector-shaped unit tests.**
 Objective: unit-level (not yet fixture-wired — that is Milestone 12)
@@ -2034,16 +2181,27 @@ Compatibility risk: none — does not touch `audit/events.py`'s `AuditEvent`.
 Blocked by architecture decision: no.
 
 **PR 31 — Response + AuditEvidence assembly.**
-Objective: pure functions wiring `OperationAwarePolicyEngine`'s aggregation
-result (PR 27) and `EvaluationTrace` (PR 26) into a
-`(OperationAwareDecisionResponse, AuditEvidence)` pair — no I/O, no
-persistence.
-Files: `src/basis_core/policy/operation_aware/response_assembly.py`.
+Objective: pure functions, owned by the `evaluation/` orchestration layer
+(ADR-0006), wiring the policy-owned aggregation result (PR 27) and
+`EvaluationTrace` (PR 26) into a `(OperationAwareDecisionResponse,
+AuditEvidence)` pair — no I/O, no persistence. Response assembly consumes
+already-determined evaluation results and an already-assembled
+`EvaluationTrace`; it constructs the operation-aware response contract,
+preserves response/trace agreement, and may construct bounded kernel audit
+evidence now that `AuditEvidence` (PR 30) exists. It performs no audit
+persistence, records no gateway-only enforcement facts (`GatewayAuditEvent`
+remains the gateway's, per ADR-0003 and Section 9), and performs no runtime
+enforcement.
+Files: `src/basis_core/evaluation/operation_aware/response_assembly.py` (see
+Section 5 for this module's superseded earlier placement).
 Non-goals: none.
 Dependencies: PR 27, PR 29, PR 30.
-Architecture/schema references: ADR-0002 §14-15; ADR-0003 §2,14.
+Architecture/schema references: ADR-0002 §14-15; ADR-0003 §2,14; basis-architecture
+ADR-0006.
 Required tests: assembly correctness for all four combining categories
-(allow/deny/not-applicable/failed).
+(allow/deny/not-applicable/failed); the `evaluation/operation_aware/`
+recursive import-boundary test (established by PR 26) continues to pass with
+`response_assembly.py` added.
 Completion criteria: green.
 Compatibility risk: none.
 Blocked by architecture decision: no.
@@ -2085,10 +2243,13 @@ Compatibility risk: none.
 Blocked by architecture decision: no.
 
 **PR 34 — `OperationAwareEnforcementPoint` implementation.**
-Objective: compose `OperationAwarePolicyEngine` + bundle validation (PR 15)
-into a fail-closed `evaluate()` that never raises, returning
-`OperationAwareDecisionResponse` (+ trace + `AuditEvidence`, per PR 33's
-recorded shape decision).
+Objective: compose the `evaluation/operation_aware/` orchestration engine
+(PR 27, which itself invokes policy-owned bundle validation from PR 15 and
+every other policy-owned semantic stage) into a fail-closed `evaluate()`
+that never raises, returning `OperationAwareDecisionResponse` (+ trace +
+`AuditEvidence`, per PR 33's recorded shape decision). `enforcement/`
+imports `evaluation/` directly for this composition — it does not reach past
+`evaluation/` into `policy/`'s semantic modules itself.
 Files: `src/basis_core/enforcement/operation_aware.py`.
 Non-goals: no audit *persistence* (Section 9 — `basis-core` does not write
 `AuditEvidence` anywhere); no shared state with `EnforcementPoint`.
@@ -2112,7 +2273,12 @@ Files: `docs/public-api.md`, `src/basis_core/{domain,decisions,policy,audit,
 enforcement}/__init__.py`, `tests/test_public_api.py` (extended, not
 replaced).
 Non-goals: no existing `__all__` entry removed or reordered in a
-meaning-changing way.
+meaning-changing way. `evaluation/` and `evaluation/operation_aware/` are
+deliberately excluded from this list — the evaluation package remains
+internal for the implementation milestones this plan scopes; it gains no
+`__all__`, no public export, and no `docs/public-api.md` entry here. Whether
+and how to expose it is a later public-integration milestone's decision, not
+this PR's.
 Dependencies: PR 34.
 Architecture/schema references: Section 11 of this plan;
 `docs/breaking-change-discipline.md`'s "Additive changes" list.
@@ -2204,14 +2370,38 @@ Objective: extend `test_import_boundaries.py` to statically verify every new
 `operation_aware/` module obeys the same layering rules as its
 non-operation-aware sibling package (Section 5's dependency-graph diagram),
 and add a `docs/kernel-constitution.md` cross-check confirming no
-Invariant (1-10) was violated by any Milestone 1-12 addition.
+Invariant (1-10) was violated by any Milestone 1-12 addition. Recursive
+per-package boundary state entering this PR, and this PR's job for each:
+
+- `audit/operation_aware/` — already has a dedicated recursive guard
+  (`tests/test_import_boundaries.py::test_audit_operation_aware_does_not_import_from_policy_enforcement_or_adapters`),
+  added ahead of this milestone. This PR confirms it stays current as later
+  audit-owned modules (e.g. `audit_evidence.py`, Milestone 10) are added, but
+  does not need to create it.
+- `policy/operation_aware/` — **no recursive guard exists yet.** This PR adds
+  one, asserting every module under `src/basis_core/policy/operation_aware/`
+  (recursively) imports only from `basis_core.domain`, `basis_core.decisions`,
+  and its own `policy/operation_aware/` siblings, and never from
+  `basis_core.audit`, `basis_core.evaluation`, `basis_core.adapters`, or
+  `basis_core.enforcement`. This guard uses the operation-aware ceiling
+  (`domain` + `decisions`), not the stricter legacy rule
+  `tests/test_models.py::test_policy_does_not_import_from_decisions` enforces
+  for `policy/engine.py`/`policy/rules.py` — the two rules are intentionally
+  different in scope and this PR must not collapse them into one.
+- `evaluation/operation_aware/` — already has a dedicated recursive guard,
+  required as part of PR 26 (Milestone 8) when that PR first creates
+  `src/basis_core/evaluation/`. This PR confirms it stays current as later
+  evaluation-owned modules (`engine.py` at PR 27, `response_assembly.py` at
+  PR 31) are added, but does not need to create it.
+
 Files: `tests/test_import_boundaries.py` (extended).
 Non-goals: no relaxation of any existing boundary rule.
 Dependencies: PR 39.
 Architecture/schema references: `docs/import-boundaries.md`,
-`docs/kernel-constitution.md`.
+`docs/kernel-constitution.md`; basis-architecture ADR-0006.
 Required tests: AST-level import checks for every new module, mirroring the
-existing test's methodology exactly.
+existing test's methodology exactly, including the `policy/operation_aware/`
+recursive guard this PR adds.
 Completion criteria: green; zero new edges in the dependency graph beyond
 those Section 5 pre-declared.
 Compatibility risk: none (verification-only).
