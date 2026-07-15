@@ -76,6 +76,20 @@ authorization result.
                  condition-array iteration and aggregation, selector
                  integration, and trace evidence remain PR 23 and later,
                  separately-scoped work.
+  condition_eval.py  `RuleConditionResult`, `RuleConditionEvaluation`,
+                 `evaluate_rule_conditions()` — rule-level condition
+                 evaluation integration (Milestone 7, PR 23): combines
+                 `selector.py`'s structural match classification with
+                 `operators.py`'s standalone per-condition evaluation into
+                 one ordered, bounded, rule-level result. Evaluates every
+                 authored condition in array order, in full, for a
+                 structurally matched rule with conditions pending; never
+                 evaluates conditions for a structurally nonmatching rule.
+                 Does not construct `TraceRuleEvidence`, does not import
+                 `basis_core.audit`, and does not implement rule effects,
+                 deny precedence, or any final authorization outcome —
+                 those remain Milestone 8 and Milestone 9 onward,
+                 separately-scoped work.
 
 Public API status: internal for now, exactly like every other
 operation-aware module added so far (`domain.operation_aware_vocabulary`,
