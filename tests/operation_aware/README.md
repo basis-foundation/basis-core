@@ -173,6 +173,28 @@ trust establishment of any kind is implemented or tested here.
 or evaluator code is not implemented or tested here — those remain later,
 separately-scoped roadmap PRs (Milestone 2, PR 8 onward).
 
+## TraceRuleEvidence model (Milestone 8, PR 24)
+
+`test_trace_rule_evidence.py` tests the first production module added
+under `src/basis_core/audit/operation_aware/`:
+`basis_core.audit.operation_aware.trace_rule_evidence`, which implements
+`TraceRuleEvidence`, `TraceConditionEvidence`, `TraceRuleEffect`,
+`RuleResult`, and `TraceConditionResult` — the bounded, immutable per-rule
+trace evidence model published by `basis-schemas` v0.2.0's
+`trace-rule-evidence` contract. Covers construction (valid/invalid, cross-
+checked against every vendored example), the closed `effect`/`rule_result`/
+condition-`result` vocabularies, the condition-error-forces-rule-error
+cross-field invariant, condition_id uniqueness within `condition_results`,
+immutability, extra-field rejection, boundedness (no raw rule/condition/
+request/evidence content), serialization, and that the existing v0.1.0
+`basis_core.audit.trace.RuleEvaluation` is unchanged. `trace-rule-evidence`
+is also now registered as `ContractStatus.IMPLEMENTED` in
+`test_contract_conformance.py`. No trace assembly, no `EvaluationTrace`, no
+conversion from any internal evaluator result (PR 22/23's
+`ConditionEvaluation`/`RuleConditionEvaluation`), and no evaluation
+semantics of any kind is implemented or tested here — those remain later,
+separately-scoped roadmap PRs (PR 25 onward).
+
 ## Anticipated future test files
 
 The files below are **anticipated, not yet implemented**. Each is added by

@@ -273,6 +273,28 @@ def test_audit_does_not_import_from_policy() -> None:
     assert violations == [], f"audit/ imports from policy/: {violations}"
 
 
+def test_audit_operation_aware_does_not_import_from_policy_enforcement_or_adapters() -> None:
+    """
+    The top-level audit/ scanner above is non-recursive and does not cover
+    the nested `audit/operation_aware/` package. This test protects that
+    nested package specifically, scanning recursively so it also covers any
+    future descendant modules added under it.
+    """
+    pkg_dir = SRC_ROOT / "audit" / "operation_aware"
+    imports: list[tuple[str, str]] = []
+    for py_file in sorted(pkg_dir.rglob("*.py")):
+        for module in collect_imports(py_file):
+            imports.append((py_file.name, module))
+    violations = [
+        (fname, mod)
+        for fname, mod in imports
+        if mod.startswith("basis_core.policy")
+        or mod.startswith("basis_core.enforcement")
+        or mod.startswith("basis_core.adapters")
+    ]
+    assert violations == [], f"audit/operation_aware/ imports a forbidden layer: {violations}"
+
+
 def test_decisions_does_not_import_from_enforcement() -> None:
     """decisions/ defines the boundary contract; it must not import enforcement/."""
     imports = all_imports_in("decisions")
