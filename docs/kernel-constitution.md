@@ -18,11 +18,13 @@ When a proposed change raises the question "does this belong in basis-core?" —
 
 basis-core is the authorization kernel. It is not a gateway, an API server, a database layer, a user interface, a deployment system, or a protocol adapter implementation.
 
-The kernel contains exactly: domain primitives, decision contracts, policy evaluation semantics, enforcement boundary semantics, failure mode contracts, audit event contracts, the audit writer protocol, and adapter interface contracts. Nothing beyond this list belongs here.
+The kernel contains exactly: domain primitives, decision contracts, policy evaluation semantics, pure evaluation orchestration semantics, enforcement boundary semantics, failure mode contracts, audit event contracts, the audit writer protocol, and adapter interface contracts. Nothing beyond this list belongs here.
+
+The evaluation orchestration layer (`evaluation/`, per basis-architecture ADR-0006) is the pure, deterministic kernel orchestration layer that invokes policy-owned semantic operations and composes their typed results into bounded decision, trace, response, and kernel audit-evidence artifacts. It does not implement authorization semantics itself — that remains `policy/`'s responsibility, per Invariant 5 and 9 below and `docs/import-boundaries.md`. It inherits every kernel invariant below unchanged (isolated, non-transporting, protocol-agnostic, identity-provider-agnostic, deterministic, fail-closed) and additionally remains synchronous, offline, free of clocks and randomness, and free of audit persistence and runtime enforcement — those two remain `audit/`'s and `enforcement/`'s responsibilities respectively.
 
 A change that introduces infrastructure — HTTP frameworks, database clients, cloud SDKs, container tooling, identity provider SDKs — violates this invariant regardless of how the motivation is framed.
 
-*Governed by*: `docs/kernel-boundary.md`, `docs/import-boundaries.md`, `docs/architecture/basis-ecosystem.md` (basis-architecture), `docs/kernel-boundary-rules.md` (basis-architecture).
+*Governed by*: `docs/kernel-boundary.md`, `docs/import-boundaries.md`, `docs/architecture/basis-ecosystem.md` (basis-architecture), `docs/kernel-boundary-rules.md` (basis-architecture), ADR-0006 (basis-architecture).
 
 ### 2. The kernel evaluates; it does not transport
 
