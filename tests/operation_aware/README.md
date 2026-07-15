@@ -227,6 +227,45 @@ internal evaluator result, no `OperationAwareDecisionResponse`, and no
 `AuditEvidence` is implemented or tested here — those remain later,
 separately-scoped roadmap PRs (PR 26 onward).
 
+## Trace assembly (Milestone 8, PR 26)
+
+`test_trace_assembly.py` tests the first production module added under the
+new `src/basis_core/evaluation/` package:
+`basis_core.evaluation.operation_aware.trace_assembly`, which implements
+`assemble_rule_evidence()` and `assemble_evaluation_trace()` — pure,
+deterministic functions translating already-evaluated policy facts
+(`OperationAwarePolicyRule` plus PR 23's
+`policy.operation_aware.condition_eval.RuleConditionEvaluation`) into PR
+24/PR 25's `TraceRuleEvidence`/`EvaluationTrace` (both unmodified), per
+`basis-architecture` ADR-0006. Covers: a matched rule with no conditions; a
+selector mismatch (conditions never reached, `condition_results` absent —
+never invented); a rule whose conditions all match; a condition no-match
+(no short-circuit — every evaluated condition is preserved); a condition
+error (mapped to `rule_result: error`, not omitted, not weakened to
+`not_matched`); rule-identity-mismatch rejection
+(`RuleIdentityMismatchError`); every explicit vocabulary mapping (rule
+effect, rule result, condition result); nonlexical rule and condition
+ordering preservation (`rule-z`/`rule-a`/`rule-m`,
+`condition-z`/`condition-a`/`condition-m`) with repeated-assembly and
+round-trip equality; supplied-identifier preservation with no ID
+generation; bounded bundle metadata (`bundle_id`/`bundle_version` only, no
+full bundle content); a failed-trace assembly integration regression
+(required-nullable `outcome`/`bundle_applicability` preserved directly and
+nested); boundedness (no raw request/policy/condition/evidence content in
+serialized output); no input mutation; and that the existing v0.1.0
+`basis_core.audit.trace.DecisionTrace`/`RuleEvaluation` are unchanged. This
+module implements no selector evaluation, no condition evaluation, no
+bundle applicability determination, no candidate selection, no effect
+aggregation, no deny precedence, no default deny, and no final
+authorization outcome — those remain later, separately-scoped Milestone
+9/PR 27 work (the policy-owned evaluation engine).
+
+`tests/test_import_boundaries.py` gains a recursive guard for
+`evaluation/operation_aware/` (`test_evaluation_operation_aware_does_not_import_from_adapters_or_enforcement`)
+and a non-recursive guard for the top-level `evaluation/` package
+(`test_evaluation_does_not_import_from_adapters_or_enforcement`), mirroring
+the existing recursive guard for `audit/operation_aware/`.
+
 ## Anticipated future test files
 
 The files below are **anticipated, not yet implemented**. Each is added by

@@ -59,6 +59,11 @@ _OPERATION_AWARE_MODULE_PATHS = {
     # (see `audit/operation_aware/evaluation_trace.py`'s docstring,
     # "Vocabulary ownership" — same `domain/`-only import boundary as PR 24).
     SRC_ROOT / "audit" / "operation_aware" / "evaluation_trace.py",
+    # PR 26: `assemble_evaluation_trace`'s `reason_code` parameter is typed
+    # `ReasonCode | None`, reused unchanged (see `evaluation/operation_aware/
+    # trace_assembly.py`'s docstring — `evaluation/` may import `domain/`
+    # per `docs/import-boundaries.md`).
+    SRC_ROOT / "evaluation" / "operation_aware" / "trace_assembly.py",
 }
 
 
