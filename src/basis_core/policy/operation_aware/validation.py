@@ -24,20 +24,22 @@ ADR-0002 §14).
 
 Why this module exists, and what it makes true by construction
 ────────────────────────────────────────────────────────────────────────
-No evaluation entry point exists anywhere in this repository yet — there is
-no `OperationAwarePolicyEngine`, no `evaluate()`, and no code path that
-could turn a `PolicyBundle` into an authorization decision. This module's
-entire purpose is to exist *before* one does, so that the invariant
+No `evaluate()` entry point or orchestrating evaluator exists anywhere in
+this repository yet — there is no `OperationAwareEvaluationEngine`, and no
+code path that accepts raw, unvalidated policy data and turns it into an
+authorization decision. This module's entire purpose is to exist *before*
+one does, so that the invariant
 
     invalid policy → validation failure → never reaches evaluation
                                           → can never produce ALLOW
 
-is true by construction from the moment evaluation is added (PR 27
-onward): a future evaluator can only be wired to accept a `PolicyBundle`
-that has already passed through `validate_policy_bundle`, and this module
-guarantees that a bundle failing either the structural or the semantic
-checks below never becomes that accepted `PolicyBundle` value in the first
-place.
+is true by construction from the moment evaluation is added: PR 27's
+policy-owned aggregation logic (`aggregation.py`) and the future
+evaluation-owned orchestrator, `OperationAwareEvaluationEngine` (PR 27B),
+can each only be wired to accept a `PolicyBundle` that has already passed
+through `validate_policy_bundle`, and this module guarantees that a bundle
+failing either the structural or the semantic checks below never becomes
+that accepted `PolicyBundle` value in the first place.
 
 Architectural boundary — validation only, no evaluation
 ────────────────────────────────────────────────────────────────────────
@@ -47,8 +49,10 @@ scope applicability, deny precedence, default-deny, "not applicable"
 determination, trace generation, decision-response assembly, audit
 evidence, or gateway enforcement. It ends with a validated `PolicyBundle`
 returned to its caller — never an authorization result. Scope-to-request
-applicability (PR 17) and the `OperationAwarePolicyEngine` (PR 27) are
-later, separately-scoped roadmap work.
+applicability (PR 17), policy-owned effect aggregation (`aggregation.py`,
+PR 27), and the future evaluation-owned orchestrator,
+`OperationAwareEvaluationEngine` (PR 27B), are later, separately-scoped
+roadmap work relative to this module.
 
 Two failure categories, one root
 ────────────────────────────────────────────────────────────────────────

@@ -64,6 +64,12 @@ _OPERATION_AWARE_MODULE_PATHS = {
     # trace_assembly.py`'s docstring — `evaluation/` may import `domain/`
     # per `docs/import-boundaries.md`).
     SRC_ROOT / "evaluation" / "operation_aware" / "trace_assembly.py",
+    # PR 27: `PolicyAggregationResult.reason_code` is typed
+    # `ReasonCode | None` and the module's four fixed aggregation-level
+    # reason codes are constructed as `ReasonCode` instances (see
+    # `policy/operation_aware/aggregation.py`'s docstring — `policy/` may
+    # import `domain/` per `docs/import-boundaries.md`).
+    SRC_ROOT / "policy" / "operation_aware" / "aggregation.py",
 }
 
 

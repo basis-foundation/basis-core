@@ -166,8 +166,9 @@ Not implemented by this module (deferred to later, separately-scoped
 roadmap PRs): the explicit `PolicyBundleValidationError` structural/
 semantic pipeline and duplicate-`rule_id` rejection (PR 15), canonical
 compatibility-vector bundle conformance (PR 16), the `scope`-to-request
-applicability function (PR 17), and the `OperationAwarePolicyEngine`
-(PR 27).
+applicability function (PR 17), policy-owned effect aggregation and
+final-outcome semantics (`aggregation.py`, PR 27), and the future
+evaluation-owned orchestrator, `OperationAwareEvaluationEngine` (PR 27B).
 
 Public API status: internal to the operation-aware package for now,
 exactly like `condition.py` (PR 12) and `rule.py` (PR 13). Not re-exported

@@ -179,11 +179,13 @@ list of `PolicyRule` objects evaluated imperatively — is **not** reused for
 operation-aware evaluation. Operation-aware policy is a **data model**
 (`PolicyBundle`/`PolicyRule`/`PolicyCondition` as Pydantic-validated data, not
 code implementing a `evaluate()` protocol) per `basis-schemas`
-`policy-rule.md` and ADR-0004. A new `OperationAwarePolicyEngine` implements
-the same *combining semantics* (deny-precedence, default-deny,
-not-applicable) over the new data model — see Section 6 and Milestone 9. The
-v0.1.0 `PolicyEngine`/`PolicyRule` extension point is unaffected and is not
-deprecated by this plan.
+`policy-rule.md` and ADR-0004. A new policy-owned aggregation function
+(`aggregate_policy_outcome`, PR 27) implements the same *combining
+semantics* (deny-precedence, default-deny, not-applicable) over the new
+data model, orchestrated end-to-end by the future evaluation-owned
+`OperationAwareEvaluationEngine` (PR 27B) — see Section 6 and Milestone 9.
+The v0.1.0 `PolicyEngine`/`PolicyRule` extension point is unaffected and is
+not deprecated by this plan.
 
 ### 2.4 EnforcementPoint (`src/basis_core/enforcement/enforcement.py`)
 
@@ -565,7 +567,7 @@ an existing symbol.
 **Naming strategy.** Every operation-aware symbol is prefixed
 `OperationAware*` where it directly parallels an existing v0.1.0 concept
 (`OperationAwareDecisionRequest`, `OperationAwareDecisionResponse`,
-`OperationAwarePolicyEngine`, `OperationAwareEnforcementPoint`), and left
+`OperationAwareEvaluationEngine`, `OperationAwareEnforcementPoint`), and left
 unprefixed where the concept has no v0.1.0 analog and the `basis-schemas`
 contract name is already unambiguous (`PolicyBundle`, `PolicyCondition`,
 `TraceRuleEvidence`, `EvaluationTrace`, `AuditEvidence`,
@@ -633,8 +635,8 @@ those policy-owned operations; it does not reimplement them.
 `trace_assembly.py`, `engine.py`, and `response_assembly.py` under
 `policy/operation_aware/`; these orchestration modules are now planned under
 `evaluation/operation_aware/` (module tree above). Later PR entries in this
-document (PR 26, PR 27, PR 31) reference this note rather than repeating the
-move's rationale at each file listing.
+document (PR 26, PR 27B, PR 31) reference this note rather than repeating
+the move's rationale at each file listing.
 
 This mirrors the existing `domain → {decisions, policy, audit, adapters} →
 enforcement` import graph, extended per ADR-0006: `evaluation/` is a new
@@ -693,7 +695,7 @@ class — not a modified `EnforcementPoint.evaluate()`.** Reasons:
    flags under "Changing the signature of a public function or method in an
    incompatible way."
 2. `EnforcementPoint` composes a v0.1.0 `PolicyEngine`; an operation-aware
-   evaluation composes an `OperationAwarePolicyEngine` operating over a
+   evaluation composes an `OperationAwareEvaluationEngine` operating over a
    `PolicyBundle`, not a `list[PolicyRule]`. These are different
    constructor-time dependencies — a single class cannot cleanly hold both
    without either making both optional (weakening the "always configured"
@@ -704,7 +706,8 @@ class — not a modified `EnforcementPoint.evaluate()`.** Reasons:
    *each* evaluation family independently, rather than requiring one class to
    reason about two unrelated evaluation and audit pipelines.
 4. It is the same pattern this plan already uses for `PolicyEngine` →
-   `OperationAwarePolicyEngine` and is therefore consistent, not a one-off.
+   `OperationAwareEvaluationEngine` and is therefore consistent, not a
+   one-off.
 
 This decision itself is recorded as **Milestone 11, PR 33** (a short design
 note, not code) before PR 34 implements it, so it goes through the same
@@ -971,9 +974,9 @@ Milestones 1-6, 8-11 (Section 12) are explicitly scoped so that they do not
 require condition evaluation to function: bundle/rule/condition *shape*
 validation, applicability, and rule *selection by structural match criteria*
 (the `match` object, not `conditions`) are all independent of the operator
-question and can proceed unblocked. The `OperationAwarePolicyEngine`'s
-Milestone 9-10 aggregation logic (deny-precedence, default-deny) operates
-correctly on `rule_result: matched/not_matched` values that, ahead of
+question and can proceed unblocked. PR 27's policy-owned
+`aggregate_policy_outcome` (Milestone 9) and its Milestone 10 consumers
+operate correctly on `rule_result: matched/not_matched` values that, ahead of
 Milestone 7, are produced entirely by `match`-criteria evaluation (Milestone
 6) with `conditions` treated as present-but-not-yet-evaluated — the plan
 explicitly notes at Milestone 8/PR 26 that `condition_results` will be empty
@@ -1083,9 +1086,9 @@ never make.
 
 | Scenario | First phase it becomes *loadable* (schema validation, domain-model round trip) | First phase it becomes *evaluable* (semantic validation, evaluator behavior) | First phase its *trace* is asserted | First phase its *response* is asserted | First phase its *AuditEvidence* is asserted | Gateway-only assertions this repo makes |
 |---|---|---|---|---|---|---|
-| `allow-basic` | Milestone 3 (PR 10-11): request + bundle load and round-trip against vendored fixtures | Milestone 9 (PR 27-28): unit-level combining logic reaches `allow` | Milestone 12 (PR 37): full canonical-vector wiring | Milestone 12 (PR 37) | Milestone 12 (PR 37) | **none** — `expected-gateway-audit-event.yaml` is reference-only (Milestone 12, PR 38) |
-| `deny-precedence` | Milestone 3 | Milestone 9 (PR 27-28) | Milestone 12 (PR 37) | Milestone 12 (PR 37) | Milestone 12 (PR 37) | none |
-| `default-deny` | Milestone 3 | Milestone 9 (PR 27-28) | Milestone 12 (PR 37) | Milestone 12 (PR 37) | Milestone 12 (PR 37) | none |
+| `allow-basic` | Milestone 3 (PR 10-11): request + bundle load and round-trip against vendored fixtures | Milestone 9 (PR 27: unit-level policy-owned combining logic reaches `allow`; PR 27B-28: canonical-vector-shaped, engine-orchestrated coverage) | Milestone 12 (PR 37): full canonical-vector wiring | Milestone 12 (PR 37) | Milestone 12 (PR 37) | **none** — `expected-gateway-audit-event.yaml` is reference-only (Milestone 12, PR 38) |
+| `deny-precedence` | Milestone 3 | Milestone 9 (PR 27; PR 27B-28) | Milestone 12 (PR 37) | Milestone 12 (PR 37) | Milestone 12 (PR 37) | none |
+| `default-deny` | Milestone 3 | Milestone 9 (PR 27; PR 27B-28) | Milestone 12 (PR 37) | Milestone 12 (PR 37) | Milestone 12 (PR 37) | none |
 | `not-applicable` | Milestone 3 | Milestone 5 (PR 17-18): applicability alone already determines this outcome, ahead of full rule aggregation | Milestone 12 (PR 37) | Milestone 12 (PR 37) | Milestone 12 (PR 37) | none |
 | `invalid-policy-bundle` | Milestone 3 (loads as YAML; fails *validation*, which is the point) | Milestone 4 (PR 15-16): bundle semantic validation rejects the duplicate `rule_id` and produces `evaluation_status: failed` | Milestone 12 (PR 37) | Milestone 12 (PR 37) | Milestone 12 (PR 37) | none |
 
@@ -1119,21 +1122,29 @@ parallel in structure to the existing "Stable public API" section, added at
 Milestone 11 (PR 35) once the shape has stabilized through Milestones 2-10,
 not speculatively at Milestone 2.
 
-**Evaluator entry points.** `OperationAwarePolicyEngine.evaluate(...)` —
-signature to be finalized during Milestone 9 implementation, but expected to
-mirror `PolicyEngine.evaluate()`'s shape (bundle/request in, aggregated
-result out) closely enough that a `basis-core` contributor already familiar
-with `PolicyEngine` recognizes the pattern immediately.
+**Evaluator entry points.** Milestone 9 splits the evaluator into a
+policy-owned pure function, `aggregate_policy_outcome(bundle_applicability,
+evaluated_rules) -> PolicyAggregationResult` (PR 27, `policy/
+operation_aware/aggregation.py`, internal — not part of this section's
+public API surface), and a future evaluation-owned orchestrator,
+`OperationAwareEvaluationEngine` (PR 27B, `evaluation/operation_aware/
+engine.py`) — signature to be finalized during Milestone 9 implementation,
+but expected to mirror `PolicyEngine.evaluate()`'s shape (bundle/request
+in, aggregated result out) closely enough that a `basis-core` contributor
+already familiar with `PolicyEngine` recognizes the pattern immediately.
 
 **`EnforcementPoint` responsibilities.** Unchanged (Section 5). A new,
 separate `OperationAwareEnforcementPoint` gains the equivalent
 responsibilities for the operation-aware family only.
 
-**`PolicyEngine` responsibilities.** Unchanged. `OperationAwarePolicyEngine`
+**`PolicyEngine` responsibilities.** Unchanged. `OperationAwareEvaluationEngine`
 is a new, separate class with its own responsibilities, not a modification
 or subclass of `PolicyEngine` (subclassing would create an implicit
 compatibility coupling between two evaluators this plan treats as
-independent).
+independent). `basis_core.policy.engine.PolicyOutcome` is likewise
+unchanged and unaffected by PR 27's new, distinctly-named
+`OperationAwarePolicyOutcome` (`policy/operation_aware/aggregation.py`) —
+see that PR's compatibility-risk note.
 
 **Result types.** `OperationAwareDecisionResponse` (Section 3, Section 9)
 becomes the operation-aware result type; `DecisionResponse` is unchanged and
@@ -2067,79 +2078,134 @@ unblocked; PR 22/23 unblocked and merged during Milestone 7).
 
 ### Milestone 9 — Decision aggregation
 
-**PR 27 — Effect aggregation and final-outcome semantics (policy-owned) +
-evaluation engine orchestration.**
-Objective: two ownership-separated pieces, per ADR-0006:
+**Scope split (this alignment pass):** the original PR 27 bundled two
+ownership-separated pieces — policy-owned effect aggregation and
+evaluation-owned orchestration — into one PR entry. Per ADR-0006, those are
+two different layers with two different PRs, so this pass splits the
+original entry into **PR 27** (policy-owned aggregation only, below) and a
+new **PR 27B** (the evaluation-owned orchestrator, below), and repoints
+PR 28's dependency accordingly. PR 28 through PR 44 are **not**
+renumbered — "PR 27B" is an inserted label, not a shift of every
+subsequent PR number.
 
-1. **Policy-owned** (`policy/operation_aware/`): implement deny-precedence,
-   default-deny, `NOT_APPLICABLE`, allow determination, and final
-   authorization-outcome semantics as pure, executable rule-effect
-   combination logic over rule evidence — mirroring `PolicyEngine`'s
-   deny-overrides *shape* (Section 2.3) but operating over the new data
-   model. Use the roadmap's existing filenames for this logic; this plan
-   does not rename them.
-2. **Evaluation-owned** (`evaluation/operation_aware/engine.py`): the
-   orchestration engine that invokes policy-owned applicability, candidate
-   selection, selector evaluation, condition evaluation, and effect
-   aggregation, in sequence, carrying each stage's typed result into the
-   next and into trace assembly (PR 26). The evaluation engine invokes the
-   policy-owned effect-combination operation and carries its typed result
-   into subsequent stages — it does not itself combine rule effects.
-
-Files: policy-owned aggregation/precedence/outcome modules under
-`src/basis_core/policy/operation_aware/` (filenames as this plan already
-establishes elsewhere in this section — no new filenames invented here);
-`src/basis_core/evaluation/operation_aware/engine.py` (see Section 5 for this
-module's superseded earlier placement).
-Non-goals: no `EnforcementPoint` integration yet (Milestone 11). The
-evaluation engine must not reimplement selector semantics, condition
-semantics, operator semantics, effect aggregation, deny precedence, default
-deny, or applicability semantics — it invokes the policy-owned operations
-above and carries their typed results forward.
-Dependencies: PR 15 (bundle validation), PR 26 (trace assembly).
-Architecture/schema references: ADR-0002 §4-7,14; `policy-rule-model.md` §9;
-basis-architecture ADR-0006.
-Required tests: deny-precedence beats allow; default-deny when no allow
-matches; not-applicable when no bundle scope covers the request; invalid
-bundle never reaches an `ALLOW`/`DENY` outcome; the evaluation engine's
-recursive import-boundary test (established by PR 26) continues to pass with
-`engine.py` added to `evaluation/operation_aware/`.
-Completion criteria: unit-level correctness for all four logical categories.
-Compatibility risk: **naming/behavioral collision risk with `PolicyEngine` —
-mitigated by keeping the classes fully independent**, per Section 5; this
-PR's tests include an explicit regression check that constructing the new
-evaluation engine has no observable effect on any existing `PolicyEngine`
-instance (no shared mutable state).
+**PR 27 — Effect aggregation and final-outcome semantics (policy-owned).**
+Objective: implement deny precedence, default deny, `NOT_APPLICABLE`,
+allow determination, and final authorization-outcome semantics as a pure,
+executable rule-effect combination function over already-evaluated rule
+facts — mirroring `PolicyEngine`'s deny-overrides *shape* (Section 2.3)
+but operating over the new data model. This PR is policy-owned only: it
+consumes bundle applicability (PR 17) and an ordered set of already-
+evaluated rule facts (PR 19's selector output integrated with PR 22-23's
+condition evaluation, via `condition_eval.RuleConditionResult`) and
+produces one small, typed, internal aggregation result. It does not
+implement the `OperationAwareEvaluationEngine` orchestration sequence
+itself (that is PR 27B, below) and does not consume `EvaluationTrace` or
+`TraceRuleEvidence` — those are audit-owned evidence models `policy/` may
+not import.
+Files: `src/basis_core/policy/operation_aware/aggregation.py` (new); test:
+`tests/operation_aware/test_policy_aggregation.py`; a recursive
+import-boundary guard for `policy/operation_aware/` in
+`tests/test_import_boundaries.py` (this package had no recursive guard
+before this PR — see Section 13, Milestone 13, PR 40, which now confirms
+rather than creates it).
+Non-goals: no `OperationAwareEvaluationEngine` orchestration sequence, no
+applicability determination, no candidate selection, no selector
+evaluation, no condition operator execution, no trace assembly, no
+`EvaluationTrace`/`TraceRuleEvidence` construction, no
+`OperationAwareDecisionResponse`, no `AuditEvidence`, no response
+assembly, no enforcement integration, no policy-bundle validation (PR 15
+already owns that; this PR accepts only post-validation policy facts and
+does not become a second validation pipeline).
+Dependencies: PR 15 (bundle validation), PR 17 (applicability), PR 19
+(selector evaluation), PR 22-23 (condition evaluation).
+Architecture/schema references: ADR-0002 §4-7,14; `policy-rule-model.md`
+§9.
+Required tests: deny precedence beats allow (in both fact orders, and with
+multiple matched allows); allow determination (single and multiple matched
+allows, nonmatching denies do not override); default deny (zero matched
+rules, only-nonmatching rules, a reason code distinct from explicit deny
+precedence); `not_applicable` (distinct from `deny`, and rejected if paired
+with nonempty evaluated-rule facts); evaluation failure (a single errored
+rule produces `failed` with no outcome, never rewritten to `deny`, and
+dominates a simultaneously-matched deny/allow); determinism (equal typed
+inputs produce equal outputs; every permutation of a fixed rule-fact
+multiset produces the same result — order is evidence order, never
+authorization precedence); v0.1.0 compatibility (constructing/invoking
+this module has no observable effect on any existing `PolicyEngine`
+instance; no shared mutable state; no existing public export changes).
+Completion criteria: unit-level correctness for all four logical
+categories (not-applicable, failure, deny precedence, allow, default
+deny), independent of any evaluation-engine orchestration.
+Compatibility risk: **naming collision risk with `basis_core.policy.
+engine.PolicyOutcome`** (a differently-scoped, single-rule evaluation
+outcome) — mitigated the same way Section 5 already resolved the
+`PolicyRule`/`OperationAwarePolicyRule` collision: this PR's new
+aggregate-outcome vocabulary is named `OperationAwarePolicyOutcome`, not
+`PolicyOutcome`.
 Blocked by architecture decision: no.
 
-**Naming note (not resolved by this PR):** the roadmap's Section 5 naming
-strategy names this evaluator `OperationAwarePolicyEngine` and, before this
-alignment pass, planned to implement it at `policy/operation_aware/engine.py`
-— a location where a class named `*PolicyEngine` matched its package. Moving
-`engine.py` to `evaluation/operation_aware/` (this update) creates a naming
-tension: `OperationAwarePolicyEngine` would now be implemented inside the
-`evaluation/` package, which does not match ADR-0006's `evaluation/`-invokes-
-`policy/` ownership split as cleanly as the pre-ADR-0006 name suggests. Every
-occurrence of `OperationAwarePolicyEngine` in this document (Section 5,
-Section 6, Section 11, this milestone) is left unrenamed here — this is a
-documentation/roadmap-alignment PR, not an API-naming decision, and the type
-does not yet exist in code. A future naming decision (analogous to Milestone
-11 PR 33's short design-note treatment of `OperationAwareEnforcementPoint`)
-should resolve whether the orchestration class keeps the `*PolicyEngine`
-name, is renamed to something evaluation-scoped (e.g. an
-`*EvaluationEngine`-shaped name), or is split into a thin evaluation-owned
-orchestrator plus a policy-owned aggregator with two distinct names. That
-decision belongs to whoever implements PR 27, not to this alignment PR.
+**PR 27B — `OperationAwareEvaluationEngine` orchestration (evaluation-owned).**
+Objective: the future evaluation-owned orchestration engine
+(`evaluation/operation_aware/engine.py`) that sequences policy-owned
+applicability determination (PR 17), candidate selection and selector
+evaluation (PR 19), condition evaluation (PR 22-23), and effect
+aggregation (PR 27), carrying each stage's typed result into the next and
+into trace assembly (PR 26). The engine invokes the policy-owned
+`aggregate_policy_outcome` operation and carries its typed result into
+subsequent stages — it does not itself combine rule effects, and it must
+not reimplement selector semantics, condition semantics, operator
+semantics, effect aggregation, deny precedence, default deny, or
+applicability semantics.
+
+Per the roadmap's Section 5 naming strategy and this alignment pass:
+`basis-schemas`/ADR-0004's `policy-rule` contract already forced one
+naming departure (`OperationAwarePolicyRule`, not `PolicyRule`, to avoid
+colliding with the v0.1.0 `PolicyRule` Protocol); ADR-0006 forces a second.
+Section 5, Section 6, Section 11, and this milestone previously named the
+future orchestrator `OperationAwarePolicyEngine`, planned for
+`policy/operation_aware/engine.py` — a location where a `*PolicyEngine`
+name matched its package. ADR-0006 places the orchestrator under
+`evaluation/operation_aware/` instead, where a `*PolicyEngine` name no
+longer matches its owning layer and could be misread as implementing
+policy semantics itself, when it only invokes them. This alignment pass
+therefore renames every prospective reference to this future class from
+`OperationAwarePolicyEngine` to **`OperationAwareEvaluationEngine`**
+throughout this document and this repository's source docstrings. This is
+a naming correction, not a new architecture decision — ADR-0006 already
+settled the orchestrator's package and ownership; only its name is
+corrected here to match.
+Files: `src/basis_core/evaluation/operation_aware/engine.py`.
+Non-goals: no `EnforcementPoint`/`OperationAwareEnforcementPoint`
+integration yet (Milestone 11).
+Dependencies: PR 26 (trace assembly), PR 27 (policy-owned aggregation).
+Architecture/schema references: ADR-0002 §4-7,14; basis-architecture
+ADR-0006.
+Required tests: end-to-end orchestration for all four logical categories
+(not-applicable, failure, deny precedence/default-deny/allow), invoking
+the real policy-owned stages in sequence rather than hand-constructed
+facts; the evaluation engine's recursive import-boundary test
+(established by PR 26) continues to pass with `engine.py` added to
+`evaluation/operation_aware/`; an explicit regression check that
+constructing `OperationAwareEvaluationEngine` has no observable effect on
+any existing `PolicyEngine` instance (no shared mutable state).
+Completion criteria: the four logical categories are reachable end-to-end
+from a real `PolicyBundle` + `OperationAwareDecisionRequest` pair, not
+just from hand-constructed intermediate facts.
+Compatibility risk: none beyond the naming correction above — no v0.1.0
+symbol is touched.
+Blocked by architecture decision: no.
 
 **PR 28 — Combining-algorithm canonical-vector-shaped unit tests.**
 Objective: unit-level (not yet fixture-wired — that is Milestone 12)
 coverage of all five canonical vectors' *logical* shape, using
 hand-constructed `PolicyBundle`/`OperationAwareDecisionRequest` objects that
-mirror each vector's structure.
+mirror each vector's structure, exercised through `OperationAwareEvaluationEngine`
+(PR 27B) end-to-end rather than through `aggregate_policy_outcome` (PR 27)
+in isolation.
 Files: `tests/operation_aware/test_engine_canonical_shapes.py`.
 Non-goals: not yet reading the vendored fixture files directly (Milestone
 12 does that).
-Dependencies: PR 27.
+Dependencies: PR 27B.
 Architecture/schema references: `operation-aware-compatibility-vectors.md`
 §5.
 Required tests: one test per canonical scenario, hand-constructed.
@@ -2244,7 +2310,8 @@ Blocked by architecture decision: no.
 
 **PR 34 — `OperationAwareEnforcementPoint` implementation.**
 Objective: compose the `evaluation/operation_aware/` orchestration engine
-(PR 27, which itself invokes policy-owned bundle validation from PR 15 and
+(`OperationAwareEvaluationEngine`, PR 27B, which itself invokes policy-owned
+bundle validation from PR 15, policy-owned aggregation from PR 27, and
 every other policy-owned semantic stage) into a fail-closed `evaluate()`
 that never raises, returning `OperationAwareDecisionResponse` (+ trace +
 `AuditEvidence`, per PR 33's recorded shape decision). `enforcement/`
@@ -2378,20 +2445,21 @@ per-package boundary state entering this PR, and this PR's job for each:
   added ahead of this milestone. This PR confirms it stays current as later
   audit-owned modules (e.g. `audit_evidence.py`, Milestone 10) are added, but
   does not need to create it.
-- `policy/operation_aware/` — **no recursive guard exists yet.** This PR adds
-  one, asserting every module under `src/basis_core/policy/operation_aware/`
-  (recursively) imports only from `basis_core.domain`, `basis_core.decisions`,
-  and its own `policy/operation_aware/` siblings, and never from
-  `basis_core.audit`, `basis_core.evaluation`, `basis_core.adapters`, or
-  `basis_core.enforcement`. This guard uses the operation-aware ceiling
-  (`domain` + `decisions`), not the stricter legacy rule
-  `tests/test_models.py::test_policy_does_not_import_from_decisions` enforces
-  for `policy/engine.py`/`policy/rules.py` — the two rules are intentionally
-  different in scope and this PR must not collapse them into one.
+- `policy/operation_aware/` — already has a dedicated recursive guard
+  (`tests/test_import_boundaries.py::test_policy_operation_aware_does_not_import_a_forbidden_layer`),
+  added ahead of this milestone by PR 27 (Milestone 9), asserting every
+  module under `src/basis_core/policy/operation_aware/` (recursively)
+  never imports `basis_core.audit`, `basis_core.evaluation`,
+  `basis_core.enforcement`, or `basis_core.adapters`. This PR confirms it
+  stays current as later policy-owned modules are added, but does not need
+  to create it. This guard is distinct in scope from the stricter legacy
+  rule `tests/test_models.py::test_policy_does_not_import_from_decisions`
+  enforces for `policy/engine.py`/`policy/rules.py` — the two rules
+  intentionally remain separate, not collapsed into one.
 - `evaluation/operation_aware/` — already has a dedicated recursive guard,
   required as part of PR 26 (Milestone 8) when that PR first creates
   `src/basis_core/evaluation/`. This PR confirms it stays current as later
-  evaluation-owned modules (`engine.py` at PR 27, `response_assembly.py` at
+  evaluation-owned modules (`engine.py` at PR 27B, `response_assembly.py` at
   PR 31) are added, but does not need to create it.
 
 Files: `tests/test_import_boundaries.py` (extended).
@@ -2518,8 +2586,9 @@ comparatively simple value objects.
 **Deterministic ordering tests.** PR 20 (selector), PR 25 (trace evidence
 ordering) — explicit reordering-input-produces-identical-output tests.
 
-**Evaluator unit tests.** PR 27-28 (`OperationAwarePolicyEngine`),
-PR 34 (`OperationAwareEnforcementPoint`).
+**Evaluator unit tests.** PR 27 (policy-owned `aggregate_policy_outcome`),
+PR 27B-28 (`OperationAwareEvaluationEngine`), PR 34
+(`OperationAwareEnforcementPoint`).
 
 **Canonical vector tests.** Milestone 12 (PR 37-38) — the terminal proof
 that the whole pipeline reaches the architecture-and-schema-defined expected
@@ -2550,9 +2619,9 @@ oversight.
 
 ### Preventing specific failure classes
 
-- **Evaluator nondeterminism** — PR 20/25 ordering tests; PR 27's
-  "same inputs, same outputs" unit tests; the Invariant-5 regression check in
-  PR 40.
+- **Evaluator nondeterminism** — PR 20/25 ordering tests; PR 27's and
+  PR 27B's "same inputs, same outputs" unit tests; the Invariant-5
+  regression check in PR 40.
 - **Unordered trace output** — PR 25/26's deterministic-ordering tests.
 - **Accidental ALLOW on malformed policy** — PR 15's validation-before-
   evaluation architecture makes this structurally impossible, verified by
@@ -2645,9 +2714,10 @@ governance decision.
   kernel-owned (i.e., every contract in Section 3's table except
   `contract-metadata` and `gateway-audit-event`, which are explicitly not
   kernel runtime types) have typed, validated `basis-core` representations.
-- Deterministic operation-aware evaluation is implemented
-  (`OperationAwarePolicyEngine` + `OperationAwareEnforcementPoint`), covering
-  every stage of Section 7's sixteen-stage pipeline.
+- Deterministic operation-aware evaluation is implemented (PR 27's
+  policy-owned `aggregate_policy_outcome`, orchestrated end-to-end by
+  `OperationAwareEvaluationEngine` (PR 27B) + `OperationAwareEnforcementPoint`),
+  covering every stage of Section 7's sixteen-stage pipeline.
 - Condition semantics are architecture-approved (Section 8's clarification,
   PR 21, approved) **before** any condition-evaluation code (PR 22-23) is
   merged — and if, at release time, that approval has not occurred, v0.2.0
@@ -2666,9 +2736,9 @@ governance decision.
   bullet's conditional scope.
 - Invalid policy can never produce ALLOW (PR 15/16/28, verified structurally
   and by test).
-- DENY precedence is enforced (PR 27-28).
-- Default DENY is enforced (PR 27-28).
-- NOT_APPLICABLE remains distinct from DENY (PR 17-18, PR 27-28).
+- DENY precedence is enforced (PR 27, PR 27B-28).
+- Default DENY is enforced (PR 27, PR 27B-28).
+- NOT_APPLICABLE remains distinct from DENY (PR 17-18, PR 27, PR 27B-28).
 - Evaluator failure remains distinct from DENY (Section 7's stage-1-5
   category; PR 29's invariant tests).
 - `EvaluationTrace` is deterministic and bounded (PR 20, PR 25).

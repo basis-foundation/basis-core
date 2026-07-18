@@ -144,8 +144,10 @@ Not implemented by this module (deferred to later, separately-scoped
 roadmap PRs): exhaustive per-dimension and combined-dimension Cartesian
 test coverage (PR 18, extends this module's own test file, not this
 module itself); rule match-criteria evaluation (`selector.py`, PR 19);
-condition evaluation (Milestone 7, gated); the `OperationAwarePolicyEngine`
-and any authorization outcome (PR 27 onward).
+condition evaluation (Milestone 7, gated); policy-owned effect aggregation
+and any final authorization outcome (`aggregation.py`, PR 27); and the
+future evaluation-owned orchestrator, `OperationAwareEvaluationEngine`
+(PR 27B).
 
 Public API status: internal to the operation-aware package for now,
 exactly like `condition.py` (PR 12), `rule.py` (PR 13), `bundle.py`
