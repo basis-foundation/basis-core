@@ -13,6 +13,9 @@ Also asserts intra-package import rules:
   - policy/ does not import from audit/, enforcement/, or adapters/
   - enforcement/ does not import from adapters/
   - audit/ does not import from enforcement/ or adapters/
+  - policy/operation_aware/ (recursively-scanned, most recently extended by
+    PR 27's aggregation.py) does not import from audit/, evaluation/,
+    enforcement/, or adapters/
   - evaluation/ (including the recursively-scanned evaluation/operation_aware/
     subpackage, first created by PR 26) does not import from adapters/ or
     enforcement/
@@ -303,6 +306,41 @@ def test_decisions_does_not_import_from_enforcement() -> None:
     imports = all_imports_in("decisions")
     violations = [(f, m) for f, m in imports if m.startswith("basis_core.enforcement")]
     assert violations == [], f"decisions/ imports from enforcement/: {violations}"
+
+
+def test_policy_operation_aware_does_not_import_a_forbidden_layer() -> None:
+    """
+    The top-level `policy/` scanners above (`test_policy_does_not_import_
+    from_audit`, `_from_enforcement`, `_from_adapters`) are non-recursive
+    (`all_imports_in` uses `pkg_dir.glob("*.py")`) and do not cover the
+    nested `policy/operation_aware/` package — first created by PR 12 and
+    extended most recently by PR 27's `aggregation.py`
+    (`docs/implementation/basis-core-v0.2-operation-aware-plan.md`,
+    Milestone 9). `docs/import-boundaries.md` names this exact gap ("A
+    matching recursive guard for `policy/operation_aware/` does not yet
+    exist"); this test closes it, mirroring
+    `test_audit_operation_aware_does_not_import_from_policy_enforcement_or_adapters`
+    and `test_evaluation_operation_aware_does_not_import_from_adapters_or_enforcement`
+    below. Per `docs/import-boundaries.md`, `policy/operation_aware/` uses
+    the full `policy/` architecture ceiling (`domain/` + `decisions/`) but
+    must never import `basis_core.audit`, `basis_core.evaluation`,
+    `basis_core.enforcement`, or `basis_core.adapters` — all of which sit
+    at or above `policy/` in the dependency graph.
+    """
+    pkg_dir = SRC_ROOT / "policy" / "operation_aware"
+    imports: list[tuple[str, str]] = []
+    for py_file in sorted(pkg_dir.rglob("*.py")):
+        for module in collect_imports(py_file):
+            imports.append((py_file.name, module))
+    violations = [
+        (fname, mod)
+        for fname, mod in imports
+        if mod.startswith("basis_core.audit")
+        or mod.startswith("basis_core.evaluation")
+        or mod.startswith("basis_core.enforcement")
+        or mod.startswith("basis_core.adapters")
+    ]
+    assert violations == [], f"policy/operation_aware/ imports a forbidden layer: {violations}"
 
 
 def test_evaluation_operation_aware_does_not_import_from_adapters_or_enforcement() -> None:

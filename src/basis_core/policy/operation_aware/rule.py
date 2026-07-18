@@ -195,8 +195,10 @@ reflection, or field enumeration of any kind.
 Not implemented by this module (deferred to later, separately-scoped
 roadmap PRs): `PolicyBundle` (PR 14), the explicit
 `PolicyBundleValidationError` structural/semantic pipeline (PR 15), match
-selector evaluation (PR 19), condition evaluation (PR 22-23), and the
-`OperationAwarePolicyEngine` (PR 27).
+selector evaluation (PR 19), condition evaluation (PR 22-23), policy-owned
+effect aggregation and final-outcome semantics (`aggregation.py`, PR 27),
+and the future evaluation-owned orchestrator, `OperationAwareEvaluationEngine`
+(PR 27B).
 
 Public API status: internal to the operation-aware package for now,
 exactly like `condition.py` (PR 12). Not re-exported from
@@ -299,9 +301,10 @@ class RuleEffect(str, Enum):
     bundle"), never something an individual rule inside an applicable
     bundle produces — conflating the two would blur the distinction
     ADR-0002 Section 5 exists to preserve. This enum implements no
-    combining, precedence, or evaluation semantics of its own; a future
-    `OperationAwarePolicyEngine` (PR 27) is the only place deny precedence
-    is implemented.
+    combining, precedence, or evaluation semantics of its own; deny
+    precedence is implemented by this repository's policy-owned effect
+    aggregation logic (`policy.operation_aware.aggregation`, PR 27), not by
+    this enum or by any evaluation-owned orchestrator.
     """
 
     ALLOW = "allow"

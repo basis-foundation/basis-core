@@ -118,8 +118,9 @@ identical `ConditionEvaluation`.
 Not implemented by this module (deferred to later, separately-scoped
 roadmap PRs): rule-level condition iteration/aggregation and
 `condition_eval.py` (PR 23); `TraceRuleEvidence`/`EvaluationTrace` (Milestone
-8); `OperationAwarePolicyEngine`, deny precedence, default deny, and any
-final authorization outcome (Milestone 9 onward). Also explicitly deferred,
+8); policy-owned deny precedence, default deny, and final authorization
+outcome (`aggregation.py`, PR 27); and the future evaluation-owned
+orchestrator, `OperationAwareEvaluationEngine` (PR 27B). Also explicitly deferred,
 per the approved clarification's own §26 "Open Questions Deferred":
 array-typed actual values as operands to any operator beyond
 `exists`/`not_exists` ("any of"/"all of" semantics); timestamp-aware

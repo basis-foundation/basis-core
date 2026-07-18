@@ -22,6 +22,16 @@ contract (ADR-0001 §3; ADR-0005 §4, "PR C"):
                                  `operation_intent` field — the one field on
                                  this contract with a closed enum rather than
                                  an open string label.
+  OperationAwareFailureReason    Closed, six-value governed evaluator
+                                 failure-category vocabulary (ADR-0002 §14),
+                                 added by PR 27A
+                                 (`docs/implementation/basis-core-v0.2-
+                                 operation-aware-plan.md`, Milestone 9) as
+                                 shared operation-aware evaluation-result
+                                 vocabulary — see "Shared evaluation-result
+                                 vocabulary ownership" below for why it
+                                 lives here rather than in `policy/` or
+                                 `audit/`.
 
 Additive sibling, not a replacement
 ────────────────────────────────────
@@ -32,6 +42,70 @@ does not import from `decisions/models.py` except to reuse two already-
 compiled validation patterns (see "Pattern reuse" below). The two request
 types coexist as separate, unrelated Pydantic models with separate field
 sets, separate required/optional shapes, and separate call sites.
+
+Shared evaluation-result vocabulary ownership (`OperationAwareFailureReason`)
+──────────────────────────────────────────────────────────────────────────────
+`decisions` is the lowest common legal dependency shared by every kernel
+subpackage that will eventually need to speak this failure vocabulary:
+
+    policy     → decisions
+    audit      → decisions
+    evaluation → decisions, policy, audit
+
+`OperationAwareFailureReason` classifies why operation-aware evaluation
+could not reach an authorization outcome at all (ADR-0002 §14) — the six
+governed categories `invalid_request`, `unsupported_schema_version`,
+`invalid_policy_bundle`, `policy_validation_failure`,
+`condition_evaluation_error`, and `internal_evaluation_error`. This is
+shared evaluation-*result* vocabulary, not a request-shape concept and not
+this module's own invention: it is consumed by (or will be consumed by,
+per the roadmap plan) policy-owned aggregation (PR 27,
+`policy/operation_aware/aggregation.py`), the future evaluation-owned
+orchestrator (PR 27B), the future `OperationAwareDecisionResponse` (PR 29,
+which this module will also own), trace assembly's vocabulary mapping
+(PR 26), response assembly (PR 31), and audit-evidence assembly
+(Milestone 10). None of those consumers may legally import from each
+other for this purpose — `policy` and `audit` are mutually isolated
+siblings (`docs/import-boundaries.md`), and `decisions` must never be made
+to depend on `policy` (or on `audit`, or on `evaluation`) to close that
+gap. Placing the vocabulary at the one subpackage every future consumer
+already legally imports — `decisions` — is what lets each of them share
+one definition without any of the alternatives: `policy` defining it and
+`audit`/`evaluation` importing `policy` (not permitted); `audit` defining
+it and `policy` importing `audit` (not permitted, and the historical
+mistake this exact vocabulary previously made — see
+`audit/operation_aware/evaluation_trace.py`'s own, distinct
+`TraceFailureReason`, which predates this decision and is deliberately
+left unchanged and unmoved, see "Audit separation" below); or two
+independently-defined, value-parity-tested local copies in both `policy`
+and `audit` (workable, but an unnecessary third definition once one
+legally shared location already exists).
+
+`decisions` does not gain a dependency on `policy` to host this type —
+`OperationAwareFailureReason` is a closed value vocabulary with no
+behavior of its own (like `OperationIntent` above), authored directly in
+this module, not imported from anywhere the "may import" side of the
+dependency graph would forbid.
+
+Audit separation
+─────────────────
+`basis_core.audit.operation_aware.evaluation_trace.TraceFailureReason`
+(PR 25) remains exactly where it is — audit's own bounded evidence
+representation of this same failure vocabulary — and is not moved, removed,
+or redefined by this module. `audit/` continues to define its own local
+copy, value- and member-name-parity-tested against this module's
+`OperationAwareFailureReason`, rather than importing it directly, because
+`audit/` may import only `domain/` and `decisions/` per
+`docs/import-boundaries.md` — importing `OperationAwareFailureReason` from
+`decisions/operation_aware.py` into `audit/operation_aware/
+evaluation_trace.py` would in fact be a legal edge on that graph, but this
+module does not require or assume `audit/` makes that change; `audit/`
+keeping its own local definition (as it already does for
+`TraceBundleApplicability`, `TraceRuleEffect`, and every other
+policy-parity vocabulary it carries) remains equally valid, and changing
+that is explicitly out of scope for this PR. What remains categorically
+forbidden, unchanged by this decision, is `audit/` importing `policy/`, or
+`policy/` importing `audit/` — that boundary is untouched here.
 
 Structural validation only — no evaluation behavior
 ──────────────────────────────────────────────────────
@@ -52,6 +126,10 @@ does not implement, and must never be extended in this PR to implement:
     and `identity_evidence_reference.identity_source` — the contract's own
     `provenance_association` block states the parent request's field is
     authoritative and explicitly implements no automatic reconciliation.
+  - `OperationAwareFailureReason` itself implements no evaluation
+    behavior — it is a closed value vocabulary only, exactly like
+    `OperationIntent`; this module's own aggregation/evaluation-triggering
+    logic remains entirely out of scope, unchanged by this addition.
 
 Pattern reuse — no second action/resource grammar
 ──────────────────────────────────────────────────
@@ -202,6 +280,62 @@ class OperationIntent(str, Enum):
     READ_ONLY = "read_only"
     STATE_CHANGING = "state_changing"
     CONTROL_AFFECTING = "control_affecting"
+
+
+class OperationAwareFailureReason(str, Enum):
+    """
+    Closed, six-value governed evaluator failure-category vocabulary
+    (ADR-0002 §14) — shared operation-aware evaluation-result vocabulary,
+    not a request-shape field. See this module's docstring, "Shared
+    evaluation-result vocabulary ownership", for why this type lives here
+    rather than in `policy/operation_aware/` or
+    `audit/operation_aware/evaluation_trace.py`.
+
+    Classifies why operation-aware evaluation could not reach an
+    authorization outcome at all, distinct from a substantive `allow` /
+    `deny` / `not_applicable` outcome and distinct from the open-format,
+    machine-readable `reason_code` (`basis_core.domain.
+    operation_aware_vocabulary.ReasonCode`) that explains a *completed*
+    outcome. Value- and member-name-parity-tested against
+    `basis_core.audit.operation_aware.evaluation_trace.TraceFailureReason`
+    (that module's own, independently-defined local copy — see "Audit
+    separation" above); this module's copy is authoritative for any future
+    consumer that legally imports `decisions/` but not `audit/`.
+
+    INVALID_REQUEST              Request-level structural or semantic
+                                  validation failed. Not producible by
+                                  policy-owned aggregation
+                                  (`aggregate_policy_outcome`) — request
+                                  validation happens upstream of it.
+    UNSUPPORTED_SCHEMA_VERSION   The request's implicit contract version is
+                                  unsupported. Not producible by
+                                  policy-owned aggregation.
+    INVALID_POLICY_BUNDLE        Policy bundle structural validation
+                                  failed (PR 15's responsibility). Not
+                                  producible by policy-owned aggregation,
+                                  which assumes a bundle already passed
+                                  validation.
+    POLICY_VALIDATION_FAILURE    Policy bundle semantic validation failed
+                                  (PR 15's responsibility). Not producible
+                                  by policy-owned aggregation, for the same
+                                  reason as `INVALID_POLICY_BUNDLE`.
+    CONDITION_EVALUATION_ERROR   A rule's condition evaluation could not be
+                                  completed. The one member policy-owned
+                                  aggregation (PR 27,
+                                  `aggregate_policy_outcome`) actually
+                                  constructs today, whenever any evaluated
+                                  rule's `RuleConditionResult` is `ERROR`.
+    INTERNAL_EVALUATION_ERROR    An unexpected internal evaluator error.
+                                  Not producible by policy-owned
+                                  aggregation.
+    """
+
+    INVALID_REQUEST = "invalid_request"
+    UNSUPPORTED_SCHEMA_VERSION = "unsupported_schema_version"
+    INVALID_POLICY_BUNDLE = "invalid_policy_bundle"
+    POLICY_VALIDATION_FAILURE = "policy_validation_failure"
+    CONDITION_EVALUATION_ERROR = "condition_evaluation_error"
+    INTERNAL_EVALUATION_ERROR = "internal_evaluation_error"
 
 
 class OperationAwareDecisionRequest(BaseModel):
