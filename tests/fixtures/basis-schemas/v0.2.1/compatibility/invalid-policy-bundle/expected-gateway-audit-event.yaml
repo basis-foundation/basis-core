@@ -1,0 +1,18 @@
+# Canonical compatibility fixture — scenario: invalid-policy-bundle.
+#
+# The kernel's failed/null evaluation state is preserved verbatim (never
+# rewritten as a kernel deny); the gateway separately records its own
+# fail-closed enforcement_action: deny for this event (ADR-0002 Section 14;
+# ADR-0003 Section 9).
+
+event_id: gateway-event-compat-invalid-policy-001
+event_type: gateway_authorization
+timestamp: "2026-07-09T09:20:02Z"
+request_id: req-compat-invalid-policy-001
+evaluation_status: failed
+outcome: null
+failure_reason: policy_validation_failure
+trace_id: trace-compat-invalid-policy-001
+audit_evidence_id: audit-compat-invalid-policy-001
+enforcement_action: deny
+explanation: Kernel evaluation failed because the policy bundle declared duplicate rule IDs; gateway fail-closed policy denied the request.

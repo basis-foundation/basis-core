@@ -189,7 +189,7 @@ Extension interface method names (`AuditWriter.write`, `PolicyRule.evaluate`, `A
 
 ---
 
-## Operation-aware `basis-schemas` v0.2.0 fixture snapshot
+## Operation-aware `basis-schemas` fixture snapshot
 
 This is a separate, additive harness from everything above. It does not
 protect a `basis-core` model's serialized shape (there is no operation-aware
@@ -199,12 +199,18 @@ release** from silent drift, so that future operation-aware implementation
 work has a reproducible, offline, immutable target to build and test
 against.
 
-**Location:** `tests/fixtures/basis-schemas/v0.2.0/` — 14 operation-aware
+**Location:** `tests/fixtures/basis-schemas/v0.2.1/` — 14 operation-aware
 contract YAMLs under `schemas/` and 5 canonical compatibility scenarios under
-`compatibility/`, pinned to `basis-schemas` tag `v0.2.0` (commit
-`1d3af3cfd38686173980cfb47f8fa44659a4e1c4`). See that directory's own
-`README.md` for the full ownership, boundary, and refresh documentation —
-this section only orients where it fits alongside the harness above.
+`compatibility/`, pinned to `basis-schemas` tag `v0.2.1` (commit
+`945acd107016bcbcb114f440474df204ead3f8f3`), the currently active snapshot
+per `tests/helpers/basis_schemas_snapshot.py`'s `SNAPSHOT_RELEASE`. `v0.2.1`
+corrects the `invalid-policy-bundle` scenario's `failure_reason` (and drops
+an unrelated `reason_code`) from the prior `v0.2.0` release; no
+`basis-core` evaluator behavior changed as a result. The historical
+`tests/fixtures/basis-schemas/v0.2.0/` snapshot remains on disk, unchanged,
+for reference. See `v0.2.1/README.md` for the full ownership, boundary, and
+refresh documentation — this section only orients where it fits alongside
+the harness above.
 
 **Test coverage:**
 

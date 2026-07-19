@@ -1,0 +1,16 @@
+# Canonical compatibility fixture — scenario: not-applicable.
+#
+# An operator requests a chiller resource, but the only published bundle
+# (policy-bundle.yaml, paired) declares scope.resource_types: [hvac]. No
+# bundle's scope covers this request at all — NOT_APPLICABLE (ADR-0002
+# Section 5), distinct from default deny (no matching allow rule inside an
+# applicable bundle — see the default-deny scenario).
+
+request_id: req-compat-not-applicable-001
+subject_id: svc-compat-operator-003
+subject_roles:
+  - operator
+action: "read:chiller"
+resource: "chiller:unit-1"
+resource_type: chiller
+evaluation_time: "2026-07-09T09:15:00Z"

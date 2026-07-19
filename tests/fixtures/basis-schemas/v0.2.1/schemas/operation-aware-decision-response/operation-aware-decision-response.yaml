@@ -1,0 +1,583 @@
+# BASIS Operation-Aware Decision Response — published contract.
+#
+# This file PUBLISHES the richer, operation-aware kernel-output shape
+# decided in basis-architecture's operation-aware authorization model
+# (ADR-0001, Section 4), evaluation semantics (ADR-0002), and trace/audit
+# evidence model (ADR-0003), sequenced for schema publication by the
+# operation-aware schema readiness plan (ADR-0005,
+# docs/architecture/operation-aware-schema-readiness-plan.md, "PR E —
+# DecisionResponse and EvaluationTrace"). It does not invent new
+# authorization semantics: every field below formalizes a conceptual
+# category ADR-0001/ADR-0002/ADR-0003 already named. Architecture governs;
+# schemas publish; implementations consume.
+#
+# CRITICAL COMPATIBILITY DECISION: THE FIRST-WAVE
+# schemas/decision-response/decision-response.yaml IS UNCHANGED. It is not
+# renamed, replaced, widened, or reinterpreted by this file: its version,
+# required fields, optional fields, failure semantics, examples, and
+# validation behavior are all identical to before this PR. It remains the
+# published v0.1-era response contract. This file is a SEPARATE, ADDITIVE
+# vNext contract surface, published alongside it, not superseding it. See
+# docs/operation-aware-decision-response.md, "Relationship to the existing
+# decision-response", for the full compatibility discussion.
+#
+# AUTHORIZATION OUTCOME AND EVALUATION STATUS/FAILURE ARE STRUCTURALLY
+# SEPARATE FIELDS — NOT COLLAPSED. Per ADR-0002 Section 14: "Evaluation
+# errors are not authorization allows... [the kernel] must not disguise an
+# evaluation failure as a DENY or NOT_APPLICABLE decision." This contract
+# therefore publishes:
+#   outcome            -- allow / deny / not_applicable / null
+#   evaluation_status   -- completed / failed
+#   failure_reason      -- six closed evaluator-failure categories, or null
+# with a REQUIRED INVARIANT enforced by this contract's constraints: outcome
+# is null if and only if evaluation_status is "failed", and failure_reason
+# is non-null if and only if evaluation_status is "failed". A failed
+# evaluation can therefore NEVER serialize outcome: allow (or deny, or
+# not_applicable) — the exact invariant ADR-0002 Section 14 requires. No
+# "error" / "failure" / "invalid" value is added to the outcome enum: the
+# outcome vocabulary stays exactly allow / deny / not_applicable, matching
+# the existing decision-response and evaluation-trace outcome_values, and
+# evaluation failure is represented as its own status/reason pair instead.
+#
+# GATEWAY ENFORCEMENT REMAINS OUT OF SCOPE. This contract does not decide
+# fail-open/fail-closed behavior when evaluation_status is "failed" — that
+# is a basis-gateway/deployment decision per ADR-0002 Section 14 ("Gateways
+# should fail closed when the kernel cannot produce a valid allow decision
+# -- this is a basis-gateway enforcement responsibility"). This contract
+# only guarantees the kernel never asserts allow under failure; it does not
+# publish an enforcement_result, http_status, response_status, or any other
+# gateway-runtime field.
+#
+# The `lifecycle` is `experimental`: this is the first publication of the
+# operation-aware response shape, ahead of any real consumer.
+
+contract:
+  name: operation-aware-decision-response
+  title: BASIS Operation-Aware Decision Response
+  version: 0.1.0
+  lifecycle: experimental
+  governed_by: basis-architecture
+  published_by: basis-schemas
+  source: docs/architecture/operation-aware-schema-readiness-plan.md
+  description: >-
+    The operation-aware authorization response: an additive, richer sibling
+    of the first-wave decision-response contract that a future basis-core
+    v0.2.0 kernel returns for one operation-aware-decision-request. Echoes
+    the request's request_id; carries a closed authorization outcome
+    (allow / deny / not_applicable) kept structurally independent of a
+    closed evaluation_status (completed / failed) and a closed
+    failure_reason, so a failed evaluation can never serialize as an allow
+    (or any other) outcome; carries the evaluated policy bundle's identity
+    and version when one applied; optionally embeds, or references by
+    trace_id, the evaluation-trace that explains the result; and carries an
+    optional reason code (reusing reason-code unchanged) and a safe,
+    non-executable explanation. This contract defines the response shape
+    only — never enforcement behavior, which stays in basis-gateway, and
+    never evaluation behavior, which stays in basis-core.
+  # contract-metadata: this file's own contract: block follows the
+  # formalized pattern. operation-aware-decision-request: request_id is
+  # echoed unchanged from that contract. policy-bundle: bundle_id/
+  # bundle_version echo that contract's identity/version fields unchanged.
+  # evaluation-trace: the optional embedded evaluation_trace field is
+  # evaluation-trace-shaped, referenced not redefined, and its own outcome/
+  # evaluation_status/failure_reason vocabulary is reused unchanged for
+  # this contract's own top-level fields (parity-tested). reason-code: the
+  # optional reason_code field reuses that contract's format unchanged.
+  depends_on:
+    - contract-metadata
+    - operation-aware-decision-request
+    - policy-bundle
+    - evaluation-trace
+    - reason-code
+
+operation_aware_decision_response:
+  # The response is a single object. request_id, evaluation_status, outcome,
+  # and failure_reason are always-present required keys (outcome and
+  # failure_reason may hold an explicit null; see the required invariant
+  # above and the constraints below for exactly when). correlation_id,
+  # bundle_id, bundle_version, trace_id, evaluation_trace, reason_code, and
+  # explanation are independently optional. Unknown fields are rejected.
+  required:
+    - request_id
+    - evaluation_status
+    - outcome
+    - failure_reason
+  optional:
+    - correlation_id
+    - bundle_id
+    - bundle_version
+    - trace_id
+    - evaluation_trace
+    - reason_code
+    - explanation
+  additional_properties: false
+
+  fields:
+    - id: request_id
+      type: string
+      required: true
+      non_empty: true
+      description: >-
+        Echoes the request_id of the operation-aware-decision-request this
+        response answers. Non-empty. Used to correlate the response with
+        its request and, in a future PR F, with its audit record.
+    - id: correlation_id
+      type:
+        - string
+        - "null"
+      required: false
+      default: null
+      description: >-
+        Optional passthrough of the evaluated request's correlation_id.
+        Distinct from request_id; no reconciliation behavior beyond
+        passthrough is implemented here.
+    - id: evaluation_status
+      type: string
+      required: true
+      enum:
+        - completed
+        - failed
+      description: >-
+        Whether the kernel completed evaluation and produced a valid
+        authorization decision ("completed"), or could not ("failed") —
+        ADR-0002 Section 14's distinction between a substantive policy
+        decision and an evaluation failure. Structurally independent of
+        outcome below; see the required invariant in the file header.
+    - id: outcome
+      type:
+        - string
+        - "null"
+      required: true
+      enum:
+        - allow
+        - deny
+        - not_applicable
+        - null
+      description: >-
+        The authorization decision, matching the existing decision-response
+        and evaluation-trace outcome vocabulary exactly (no new outcome
+        values introduced): 'allow' the action is permitted; 'deny' the
+        action is not permitted; 'not_applicable' no policy bundle covered
+        the request. REQUIRED to be null when evaluation_status is "failed"
+        — a failed evaluation never serializes a non-null outcome
+        (ADR-0002 Section 14's central invariant, enforced structurally by
+        this contract's constraints, not left to convention).
+    - id: failure_reason
+      type:
+        - string
+        - "null"
+      required: true
+      enum:
+        - invalid_request
+        - unsupported_schema_version
+        - invalid_policy_bundle
+        - policy_validation_failure
+        - condition_evaluation_error
+        - internal_evaluation_error
+        - null
+      description: >-
+        The evaluation-failure category, REQUIRED to be non-null when
+        evaluation_status is "failed" and REQUIRED to be null when
+        evaluation_status is "completed". Reproduces the same closed
+        six-value evaluator-failure vocabulary published by
+        evaluation-trace.yaml (ADR-0002 Section 14), kept in parity with
+        it by this repository's test suite. Distinct from, and never
+        conflated with: (1) the open reason_code field below, which
+        explains a completed decision's outcome, not why evaluation failed;
+        and (2) the existing first-wave decision-response's own four-value
+        failure_reason (malformed_request / policy_error / audit_error /
+        internal_error), which represents a v0.1-era enforcement-boundary
+        safe-deny concept and is not modified, reinterpreted, or extended
+        by this contract — see "Evaluation failure" in
+        operation-aware-decision-response.md for the full relationship.
+    - id: bundle_id
+      type:
+        - string
+        - "null"
+      required: false
+      default: null
+      non_empty: true
+      governed_by: policy-bundle
+      description: >-
+        The bundle_id of the policy-bundle actually evaluated, when one
+        applied. Null or absent when no bundle applied (outcome:
+        not_applicable) or when evaluation failed before a bundle was
+        identified. Reused unchanged from policy-bundle.
+    - id: bundle_version
+      type:
+        - string
+        - "null"
+      required: false
+      default: null
+      pattern: "^\\d+\\.\\d+\\.\\d+$"
+      governed_by: policy-bundle
+      description: >-
+        The bundle_version of the policy-bundle actually evaluated —
+        distinct from the request's own expected_policy_version (a
+        request-side expectation published by operation-aware-decision-
+        request, never negotiated or resolved by this contract) and from
+        the policy-bundle contract's own schema_version (the bundle-shape
+        version). Reused unchanged from policy-bundle's semver pattern.
+        This contract does not implement policy negotiation or selection;
+        it only publishes what was actually evaluated.
+    - id: trace_id
+      type:
+        - string
+        - "null"
+      required: false
+      default: null
+      non_empty: true
+      governed_by: evaluation-trace
+      description: >-
+        The trace_id of the evaluation-trace that explains this response,
+        when a trace was produced and the producer chooses to reference it
+        by identifier rather than (or in addition to) embedding it. When
+        both trace_id and evaluation_trace are present, evaluation_trace's
+        own trace_id MUST equal this field (see "Trace relationship" below
+        and docs/operation-aware-decision-response.md) — a cross-field
+        equality this static contract documents but cannot itself enforce;
+        this repository's test suite and any future basis-core runtime
+        validation are expected to check it.
+    - id: evaluation_trace
+      type:
+        - object
+        - "null"
+      required: false
+      default: null
+      governed_by: evaluation-trace
+      description: >-
+        The full evaluation-trace-shaped explanation of this response,
+        embedded inline, when the producer chooses to embed rather than (or
+        in addition to) referencing one by trace_id. Referenced, not
+        redefined: validated against evaluation-trace's own published field
+        policy. When present, MUST agree with this response on request_id,
+        correlation_id, evaluation_status, outcome, failure_reason,
+        bundle_id, and bundle_version, and, when both this response and the
+        embedded trace carry a non-null reason_code, the two reason_code
+        values MUST agree (see "Response/trace consistency" below) —
+        cross-field agreement this static contract documents but does not
+        itself enforce.
+    - id: reason_code
+      type:
+        - string
+        - "null"
+      required: false
+      default: null
+      pattern: "^[a-z][a-z0-9]*(_[a-z0-9]+)*$"
+      governed_by: reason-code
+      description: >-
+        Optional stable, machine-readable reason code for the outcome,
+        reusing the reason-code contract's format unchanged. Typically
+        populated for a completed decision to explain the outcome; this
+        contract does not require it to be null when evaluation_status is
+        failed (a producer may still choose to attach a reason code
+        alongside failure_reason), and does not require it to be present
+        for either state.
+    - id: explanation
+      type:
+        - string
+        - "null"
+      required: false
+      default: null
+      non_empty: true
+      description: >-
+        Optional static, non-empty, human-readable summary explanation of
+        the response. Descriptive rendering only — not authoritative; the
+        machine-readable outcome / evaluation_status / failure_reason are
+        authoritative (ADR-0003 Section 11). No template, variable-
+        interpolation, expression-evaluation, or script-execution mechanism
+        is defined. Must not contain secrets or credential material.
+
+  # Reproduced from evaluation-trace.yaml / policy-bundle.yaml /
+  # reason-code.yaml so a consumer can validate without dereferencing them.
+  # Parity with the canonical files is enforced by this repository's test
+  # suite.
+  outcome_values:
+    - allow
+    - deny
+    - not_applicable
+  evaluation_status_values:
+    - completed
+    - failed
+  failure_reason_values:
+    - invalid_request
+    - unsupported_schema_version
+    - invalid_policy_bundle
+    - policy_validation_failure
+    - condition_evaluation_error
+    - internal_evaluation_error
+  bundle_version_pattern: "^\\d+\\.\\d+\\.\\d+$"
+  reason_code_pattern: "^[a-z][a-z0-9]*(_[a-z0-9]+)*$"
+
+  constraints:
+    - request_id, evaluation_status, outcome, and failure_reason are
+      required keys on every response (outcome and failure_reason may hold
+      an explicit null; see below).
+    - request_id must be a non-empty string.
+    - evaluation_status must be one of completed or failed.
+    - >-
+      outcome is REQUIRED to be one of allow, deny, or not_applicable when
+      evaluation_status is completed, and REQUIRED to be null when
+      evaluation_status is failed. A failed evaluation must never serialize
+      a non-null outcome — the required invariant this contract exists to
+      enforce structurally.
+    - >-
+      failure_reason is REQUIRED to be null when evaluation_status is
+      completed, and REQUIRED to be one of the six published
+      failure_reason_values when evaluation_status is failed.
+    - bundle_id, when present and non-null, must be a non-empty string.
+    - bundle_version, when present and non-null, must match
+      bundle_version_pattern (parity with policy-bundle).
+    - trace_id, when present and non-null, must be a non-empty string.
+    - >-
+      evaluation_trace, when present and non-null, must be an object
+      matching evaluation-trace's own published field policy (parity with
+      evaluation-trace.yaml — reused, not redefined).
+    - >-
+      When both trace_id and evaluation_trace are present and non-null,
+      evaluation_trace.trace_id must equal trace_id. This static contract
+      documents this invariant; it is enforced by this repository's test
+      suite and expected to be enforced by a future basis-core runtime,
+      not by YAML-level cross-field validation alone.
+    - >-
+      When evaluation_trace is present and non-null, its request_id,
+      evaluation_status, outcome, and failure_reason must equal this
+      response's own request_id, evaluation_status, outcome, and
+      failure_reason; its correlation_id must equal this response's own
+      correlation_id when both are present; its bundle_id / bundle_version,
+      when both the response and the embedded trace carry them, must agree;
+      and its reason_code, when both the response and the embedded trace
+      carry a non-null reason_code, must agree. Same enforcement posture as
+      the trace_id/evaluation_trace.trace_id invariant above: documented
+      here, checked by tests, expected of a future runtime. Fields not
+      duplicated between the two contracts (for example, per-rule evidence,
+      which exists only on the trace) carry no such equality requirement.
+    - reason_code, when present and non-null, must match reason_code_pattern
+      (parity with the reason-code contract).
+    - explanation, when present and non-null, must be a non-empty string.
+    - >-
+      This contract does not carry a gateway enforcement field
+      (enforcement_result, http_status, response_status, route, or similar),
+      a full request snapshot, a full policy bundle, raw identity or
+      adapter evidence, credentials, tokens, key material, or an
+      audit-event field (event_id, event_type, or similar — those belong to
+      a future PR F AuditEvidence / GatewayAuditEvent contract, not this
+      one). It does not define enforcement_result, http_status,
+      response_status, gateway_enforcement, full_request, request_snapshot,
+      full_policy, policy_document, raw_claims, full_claim_set, raw_payload,
+      raw_protocol_payload, access_token, id_token, refresh_token, jwt,
+      bearer_token, authorization_header, cookie, session_secret,
+      client_secret, password, private_key, api_key, credential, event_id,
+      or event_type fields. Any such field is rejected as unknown.
+    - >-
+      Unknown / additional top-level fields are rejected (additional
+      properties are set to false).
+
+  # Where the response is produced and consumed. Informative; it records
+  # the boundary ownership decided in basis-architecture, it adds no
+  # structure of its own.
+  composition:
+    produced_by: basis-core       # future v0.2.0 kernel evaluates the request and returns this response
+    consumed_by: basis-gateway    # enforces the outcome and decides fail-open/fail-closed runtime policy on evaluation_status: failed; not decided by this contract
+    correlated_by: request_id     # echoes the operation-aware-decision-request's request_id one-to-one
+    visualized_by: basis-console  # may display safe decision explanations; never authoritative
+    published_by: basis-schemas   # publishes the response shape only; implements none of the above
+
+  examples:
+    valid:
+      # 1. Completed ALLOW, with an embedded evaluation trace consistent
+      #    with the response's own top-level fields.
+      - request_id: oadr-0002-0000-0000-000000000002
+        correlation_id: corr-0002-0000-0000-000000000002
+        evaluation_status: completed
+        outcome: allow
+        failure_reason: null
+        bundle_id: baseline-read-only-telemetry
+        bundle_version: "1.0.0"
+        trace_id: trace-0001-0000-0000-000000000001
+        evaluation_trace:
+          trace_id: trace-0001-0000-0000-000000000001
+          request_id: oadr-0002-0000-0000-000000000002
+          evaluation_status: completed
+          outcome: allow
+          bundle_applicability: applicable
+          bundle_id: baseline-read-only-telemetry
+          bundle_version: "1.0.0"
+          rule_evidence:
+            - rule_id: rule-operator-read-ahu-telemetry
+              effect: allow
+              rule_result: matched
+              reason_code: allow_rule_matched
+        reason_code: allow_rule_matched
+        explanation: Operator role matched an allow rule for read:ahu.
+      # 2. Completed DENY, referenced by trace_id only (no embedded trace).
+      - request_id: oadr-0003-0000-0000-000000000003
+        evaluation_status: completed
+        outcome: deny
+        failure_reason: null
+        bundle_id: west-campus-hvac-operations
+        bundle_version: "2.3.1"
+        trace_id: trace-0002-0000-0000-000000000002
+        reason_code: deny_rule_matched
+      # 3. Completed NOT_APPLICABLE: no policy bundle covered the request.
+      - request_id: oadr-0001-0000-0000-000000000001
+        evaluation_status: completed
+        outcome: not_applicable
+        failure_reason: null
+        bundle_id: null
+        bundle_version: null
+        reason_code: no_applicable_bundle
+        explanation: No policy bundle's scope covers this request.
+      # 4. Failed evaluation: outcome is null, failure_reason is set, no
+      #    bundle was identified.
+      - request_id: oadr-1099-0000-0000-000000000099
+        evaluation_status: failed
+        outcome: null
+        failure_reason: unsupported_schema_version
+        explanation: The request declared a schema version this kernel does not support.
+      # 5. Minimal valid completed response: only the four required keys.
+      - request_id: oadr-0004-0000-0000-000000000004
+        evaluation_status: completed
+        outcome: allow
+        failure_reason: null
+    invalid:
+      - reason: missing required request ID
+        value:
+          evaluation_status: completed
+          outcome: allow
+          failure_reason: null
+      - reason: invalid outcome value
+        value:
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: completed
+          outcome: maybe
+          failure_reason: null
+      - reason: malformed evaluation_status value
+        value:
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: partial
+          outcome: allow
+          failure_reason: null
+      - reason: failed evaluation represented as ALLOW (required invariant violation)
+        value:
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: failed
+          outcome: allow
+          failure_reason: internal_evaluation_error
+      - reason: failed evaluation with null failure_reason (invariant violation)
+        value:
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: failed
+          outcome: null
+          failure_reason: null
+      - reason: completed evaluation with non-null failure_reason (invariant violation)
+        value:
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: completed
+          outcome: allow
+          failure_reason: internal_evaluation_error
+      - reason: malformed reason code (uppercase)
+        value:
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: completed
+          outcome: allow
+          failure_reason: null
+          reason_code: ALLOW_RULE_MATCHED
+      - reason: malformed bundle provenance (invalid semver)
+        value:
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: completed
+          outcome: allow
+          failure_reason: null
+          bundle_id: baseline-read-only-telemetry
+          bundle_version: "v1"
+      - reason: malformed embedded trace (missing required trace field)
+        value:
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: completed
+          outcome: allow
+          failure_reason: null
+          evaluation_trace:
+            request_id: oadr-0001-0000-0000-000000000001
+            evaluation_status: completed
+            outcome: allow
+            bundle_applicability: applicable
+            rule_evidence: []
+      - reason: response/trace request-ID mismatch
+        value:
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: completed
+          outcome: allow
+          failure_reason: null
+          evaluation_trace:
+            trace_id: trace-9999-0000-0000-000000009999
+            request_id: oadr-9999-0000-0000-000000009999
+            evaluation_status: completed
+            outcome: allow
+            bundle_applicability: applicable
+            rule_evidence: []
+      - reason: unknown field rejected
+        value:
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: completed
+          outcome: allow
+          failure_reason: null
+          confidence: 0.97
+      - reason: raw evidence field rejected (unknown field)
+        value:
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: completed
+          outcome: allow
+          failure_reason: null
+          access_token: eyJhbGciOiJSUzI1NiJ9.example.signature
+      - reason: gateway enforcement field rejected (unknown field)
+        value:
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: completed
+          outcome: allow
+          failure_reason: null
+          http_status: 200
+      - reason: response/trace correlation_id mismatch
+        value:
+          request_id: oadr-0001-0000-0000-000000000001
+          correlation_id: corr-0001-0000-0000-000000000001
+          evaluation_status: completed
+          outcome: allow
+          failure_reason: null
+          evaluation_trace:
+            trace_id: trace-1
+            request_id: oadr-0001-0000-0000-000000000001
+            correlation_id: corr-DIFFERENT-0000-000000000009
+            evaluation_status: completed
+            outcome: allow
+            bundle_applicability: applicable
+            rule_evidence: []
+      - reason: response/trace failure_reason mismatch
+        value:
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: failed
+          outcome: null
+          failure_reason: internal_evaluation_error
+          evaluation_trace:
+            trace_id: trace-1
+            request_id: oadr-0001-0000-0000-000000000001
+            evaluation_status: failed
+            outcome: null
+            bundle_applicability: null
+            failure_reason: unsupported_schema_version
+            rule_evidence: []
+      - reason: response/trace reason_code mismatch (both non-null but disagree)
+        value:
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: completed
+          outcome: allow
+          failure_reason: null
+          reason_code: allow_rule_matched
+          evaluation_trace:
+            trace_id: trace-1
+            request_id: oadr-0001-0000-0000-000000000001
+            evaluation_status: completed
+            outcome: allow
+            bundle_applicability: applicable
+            rule_evidence: []
+            reason_code: no_applicable_bundle

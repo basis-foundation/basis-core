@@ -1,0 +1,14 @@
+# Canonical compatibility fixture — scenario: not-applicable.
+#
+# bundle_applicability: not_applicable requires rule_evidence to be empty
+# (evaluation-trace.yaml's own constraint): no bundle applied, so no rule was
+# ever a candidate. No bundle_id/bundle_version: no bundle applied.
+
+trace_id: trace-compat-not-applicable-001
+request_id: req-compat-not-applicable-001
+evaluation_status: completed
+outcome: not_applicable
+bundle_applicability: not_applicable
+rule_evidence: []
+reason_code: no_applicable_bundle
+explanation: No policy bundle's scope covers this chiller resource request.

@@ -1,7 +1,11 @@
 """
 tests.helpers.basis_schemas_snapshot — discovery and integrity helpers for the
-vendored `basis-schemas` v0.2.0 operation-aware snapshot at
-``tests/fixtures/basis-schemas/v0.2.0/``.
+vendored `basis-schemas` operation-aware snapshot. ``SNAPSHOT_RELEASE`` below
+is the single active pointer: it currently selects
+``tests/fixtures/basis-schemas/v0.2.1/`` (the corrected snapshot — see that
+directory's ``README.md``). The prior ``v0.2.0/`` snapshot remains on disk,
+immutable, for historical reference; it is simply no longer the release this
+module resolves paths against.
 
 This module is test-only. It is never imported by ``src/basis_core/`` (see
 ``tests/test_basis_schemas_snapshot_boundaries.py``) and is not part of the
@@ -41,7 +45,7 @@ from typing import Any, Final
 
 # ── Location ─────────────────────────────────────────────────────────────
 
-SNAPSHOT_RELEASE: Final[str] = "v0.2.0"
+SNAPSHOT_RELEASE: Final[str] = "v0.2.1"
 
 #: Absolute path to the vendored snapshot root for the pinned release.
 SNAPSHOT_ROOT: Final[Path] = (

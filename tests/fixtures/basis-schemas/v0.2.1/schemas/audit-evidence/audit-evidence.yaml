@@ -1,0 +1,783 @@
+# BASIS Audit Evidence — published contract.
+#
+# This file PUBLISHES the bounded, durable, audit-oriented evidence shape
+# decided in basis-architecture's operation-aware trace and audit evidence
+# model (ADR-0003, docs/architecture/operation-aware-trace-audit-evidence.md,
+# Section 2 "Trace vs Audit" and Section 6 "Request Evidence") and sequenced
+# for schema publication by the operation-aware schema readiness plan
+# (ADR-0005, docs/architecture/operation-aware-schema-readiness-plan.md,
+# "PR F — Audit Evidence and GatewayAuditEvent"). It does not invent new
+# audit semantics: every field below formalizes a conceptual category
+# ADR-0003 already named. Architecture governs; schemas publish;
+# implementations consume.
+#
+# CRITICAL BOUNDARY: AUDIT EVIDENCE IS NOT TRACE, AND IS NOT A GATEWAY EVENT.
+# Per ADR-0003 Section 2: "Trace explains evaluation. Audit records
+# evidence. Gateway enforcement records what happened at runtime." This
+# contract publishes the durable, bounded EVIDENCE record derived from a
+# governed evaluation (the operation-aware-decision-response) and its
+# evidence references — it is broader than trace (it may reference trace,
+# identity evidence, and adapter evidence) but it is NOT itself a second
+# trace: it does not copy trace-rule-evidence objects, condition-level
+# evidence, or a full evaluation-trace. It is also not the gateway
+# enforcement-boundary event: it carries no enforcement action, no
+# enforcement result, and no gateway-runtime fact — those live on the
+# separate gateway-audit-event contract (also published by this PR), which
+# references this record by evidence_id rather than redefining it.
+#
+# CRITICAL COMPATIBILITY DECISION: THE FIRST-WAVE
+# schemas/audit-event/audit-event.yaml IS UNCHANGED. It is not renamed,
+# replaced, widened, or reinterpreted by this file: its version, required
+# fields, optional fields, event types, outcome values, trace representation,
+# schema version, examples, and validation behavior are all identical to
+# before this PR. It remains the published v0.1-era audit contract. This
+# file is a SEPARATE, ADDITIVE operation-aware contract, published alongside
+# it, not superseding it. See docs/audit-evidence.md, "Relationship to
+# first-wave AuditEvent", for the full compatibility discussion.
+#
+# EVALUATION STATE IS REUSED EXACTLY FROM PR E, NOT REDEFINED. evaluation_status
+# / outcome / failure_reason on this contract are the identical closed
+# vocabularies published by operation-aware-decision-response.yaml and
+# evaluation-trace.yaml (parity-tested), with the identical required
+# invariant: outcome is null if and only if evaluation_status is "failed",
+# and failure_reason is non-null if and only if evaluation_status is
+# "failed". This contract never reinterprets an evaluator failure as a
+# policy deny, and never introduces a second outcome vocabulary.
+#
+# RULE EVIDENCE IS A BOUNDED REFERENCE, NOT A SECOND TRACE. Per ADR-0003
+# Section 4 ("Matched rule IDs" is a named evaluation-trace category) and
+# the schema readiness plan's own PR F guidance ("AuditEvidence references
+# stable rule identifiers and bounded result facts; EvaluationTrace remains
+# the detailed explanation artifact"), matched_rule_ids carries only the
+# stable rule_id values (reused unchanged from policy-rule) of rules whose
+# trace-rule-evidence rule_result was "matched" — never the rule's effect,
+# condition results, reason code, or any other trace-rule-evidence field.
+# The full per-rule explanation remains exclusively on evaluation-trace's
+# rule_evidence; this contract does not duplicate it.
+#
+# EVIDENCE REFERENCES ARE REUSED UNCHANGED FROM PR B. identity_evidence_
+# reference and adapter_evidence_reference, when present, are validated
+# against identity-evidence-reference.yaml and adapter-evidence-reference.yaml
+# exactly as published — never redefined, never carrying raw evidence. This
+# mirrors operation-aware-decision-request.yaml's own reuse of the same two
+# contracts.
+#
+# NO TOP-LEVEL redaction_classification FIELD IS PUBLISHED. Every value this
+# contract carries directly is already a safe identifier, a closed
+# vocabulary member, a reason code, or a nested evidence reference that
+# already carries its own redaction_classification (reused from PR B
+# unchanged) — the same reasoning evaluation-trace.yaml and
+# operation-aware-decision-response.yaml already document for themselves.
+#
+# THIS CONTRACT DOES NOT IMPLEMENT PERSISTENCE, RETENTION, STORAGE, SIGNING,
+# OR TAMPER-EVIDENCE. "Durable" describes the evidence record's intended
+# role once a producer persists it — it is not a claim this YAML shape makes
+# true by itself. No signature, signature_algorithm, hash_chain,
+# previous_hash, merkle_root, storage_uri, bucket_name, object_key, or
+# retention_policy field is published. See docs/audit-evidence.md,
+# "Durability responsibility" and "No cryptographic claims".
+#
+# The `lifecycle` is `experimental`: this is the first publication of the
+# audit evidence shape, ahead of any real consumer.
+
+contract:
+  name: audit-evidence
+  title: BASIS Audit Evidence
+  version: 0.1.0
+  lifecycle: experimental
+  governed_by: basis-architecture
+  published_by: basis-schemas
+  source: docs/architecture/operation-aware-schema-readiness-plan.md
+  description: >-
+    The bounded, durable, audit-oriented evidence representation of one
+    operation-aware authorization evaluation: a stable evidence identifier,
+    the evaluated request's identity and optional correlation/trace
+    association, the authoritative kernel evaluation state (evaluation_status
+    / outcome / failure_reason, reused unchanged from
+    operation-aware-decision-response and evaluation-trace), the evaluated
+    policy bundle's bounded identity/version, a bounded list of matched rule
+    identifiers, optional identity/adapter evidence references (reused
+    unchanged from PR B), an optional reason code / safe explanation, a
+    required recorded_at timestamp distinct from any request-supplied
+    evaluation_time, and an optional instance-level schema_version. Publishes
+    the evidence *shape* only: this contract does not implement audit
+    persistence, retention, signing, or tamper-evidence, and it is not
+    itself a gateway enforcement event — see gateway-audit-event, published
+    alongside it by this same PR.
+  # contract-metadata: this file's own contract: block follows the
+  # formalized pattern. operation-aware-decision-response: evaluation_status/
+  # outcome/failure_reason are reused unchanged (parity-tested); request_id/
+  # correlation_id/bundle_id/bundle_version/trace_id echo that contract's
+  # identifiers. evaluation-trace: trace_id references that contract's
+  # trace_id; matched_rule_ids is derived from, but does not copy,
+  # rule_evidence entries with rule_result: matched. policy-bundle:
+  # bundle_id/bundle_version echo that contract's identity/version fields
+  # unchanged. identity-evidence-reference / adapter-evidence-reference: the
+  # optional evidence-reference fields carry values shaped exactly by those
+  # published contracts, referenced not redefined. reason-code: the optional
+  # reason_code field reuses that contract's format unchanged.
+  # redaction-classification is deliberately NOT declared: this contract
+  # carries no field of its own needing a per-field classification (see file
+  # header).
+  depends_on:
+    - contract-metadata
+    - operation-aware-decision-response
+    - evaluation-trace
+    - policy-bundle
+    - identity-evidence-reference
+    - adapter-evidence-reference
+    - reason-code
+
+audit_evidence:
+  # An audit evidence record is a single object. evidence_id, request_id,
+  # evaluation_status, outcome, failure_reason, and recorded_at are
+  # always-present required keys (outcome and failure_reason may hold an
+  # explicit null — see the field-level descriptions and constraints below
+  # for exactly when). correlation_id, trace_id, bundle_id, bundle_version,
+  # matched_rule_ids, identity_evidence_reference, adapter_evidence_reference,
+  # reason_code, explanation, and schema_version are independently optional.
+  # Unknown fields are rejected.
+  required:
+    - evidence_id
+    - request_id
+    - evaluation_status
+    - outcome
+    - failure_reason
+    - recorded_at
+  optional:
+    - correlation_id
+    - trace_id
+    - bundle_id
+    - bundle_version
+    - matched_rule_ids
+    - identity_evidence_reference
+    - adapter_evidence_reference
+    - reason_code
+    - explanation
+    - schema_version
+  additional_properties: false
+
+  fields:
+    - id: evidence_id
+      type: string
+      required: true
+      non_empty: true
+      description: >-
+        Stable identifier for this audit evidence record, unique to this
+        specific evaluation's evidence. Independent of array position,
+        storage location, or file path; safe to reference from a future
+        gateway-audit-event (see that contract's audit_evidence_id field)
+        without being itself a secret. No UUID requirement is imposed by
+        this contract, matching the identifier convention already used by
+        request_id, trace_id, and bundle_id.
+    - id: request_id
+      type: string
+      required: true
+      non_empty: true
+      description: >-
+        The request_id of the operation-aware-decision-request/response this
+        evidence records. Same meaning as operation-aware-decision-response's
+        own request_id; this contract does not copy the full request or
+        response, only this identifier plus the bounded evaluation state
+        below.
+    - id: correlation_id
+      type:
+        - string
+        - "null"
+      required: false
+      default: null
+      description: >-
+        Optional passthrough of the evaluated request's correlation_id, for
+        cross-system correlation with a broader end-to-end operation or
+        workflow. No reconciliation behavior beyond passthrough is
+        implemented here.
+    - id: trace_id
+      type:
+        - string
+        - "null"
+      required: false
+      default: null
+      non_empty: true
+      governed_by: evaluation-trace
+      description: >-
+        The trace_id of the evaluation-trace that explains this evidence's
+        evaluation, when one was produced and the producer chooses to
+        reference it. Reference only: this contract never embeds an
+        evaluation-trace object. Authority: request_id identifies the
+        evaluated request; trace_id identifies the explanatory evaluation
+        trace when one exists; correlation_id associates the record with the
+        broader operation. This contract implements no automatic
+        reconciliation between the three.
+    - id: evaluation_status
+      type: string
+      required: true
+      enum:
+        - completed
+        - failed
+      description: >-
+        Whether the kernel completed evaluation and produced a valid
+        authorization outcome ("completed"), or could not ("failed") —
+        reused unchanged from operation-aware-decision-response and
+        evaluation-trace (ADR-0002 Section 14's distinction between a
+        substantive policy decision and an evaluation failure). A "failed"
+        record never carries a non-null outcome — see the required invariant
+        on outcome below.
+    - id: outcome
+      type:
+        - string
+        - "null"
+      required: true
+      enum:
+        - allow
+        - deny
+        - not_applicable
+        - null
+      description: >-
+        The authorization outcome, reused unchanged from
+        operation-aware-decision-response and evaluation-trace: one of
+        allow / deny / not_applicable when evaluation_status is "completed".
+        REQUIRED to be null when evaluation_status is "failed" — an
+        evaluation failure is never reinterpreted as a policy deny or any
+        other outcome (ADR-0002 Section 14). This is a required key on every
+        record (present, possibly null), not an optional field, matching
+        operation-aware-decision-response's and evaluation-trace's own
+        required-key treatment.
+    - id: failure_reason
+      type:
+        - string
+        - "null"
+      required: true
+      enum:
+        - invalid_request
+        - unsupported_schema_version
+        - invalid_policy_bundle
+        - policy_validation_failure
+        - condition_evaluation_error
+        - internal_evaluation_error
+        - null
+      description: >-
+        The evaluation-failure category, REQUIRED to be non-null when
+        evaluation_status is "failed" and REQUIRED to be null when
+        evaluation_status is "completed". Reproduces the identical
+        six-value evaluator-failure vocabulary published by
+        operation-aware-decision-response.yaml and evaluation-trace.yaml
+        (kept in parity with both by this repository's test suite) —
+        distinct from the open reason_code field below and from the
+        existing first-wave audit-event contract, which has no
+        failure_reason field at all (an enforcement-boundary failure there
+        is recorded as outcome: error with context in detail; see
+        docs/audit-evidence.md, "Relationship to first-wave AuditEvent").
+    - id: bundle_id
+      type:
+        - string
+        - "null"
+      required: false
+      default: null
+      non_empty: true
+      governed_by: policy-bundle
+      description: >-
+        The bundle_id of the policy-bundle actually evaluated, when one
+        applied. Null or absent when no bundle applied (outcome:
+        not_applicable) or when evaluation failed before a bundle was
+        identified. Reused unchanged from policy-bundle; this contract does
+        not redefine bundle identity, and does not embed the bundle's rules,
+        scope, or any other bundle content.
+    - id: bundle_version
+      type:
+        - string
+        - "null"
+      required: false
+      default: null
+      pattern: "^\\d+\\.\\d+\\.\\d+$"
+      governed_by: policy-bundle
+      description: >-
+        The bundle_version of the policy-bundle actually evaluated —
+        distinct from this record's own schema_version (the audit-evidence
+        instance format version, below) and from the basis-schemas package
+        version. Reused unchanged from policy-bundle's semver pattern.
+    - id: matched_rule_ids
+      type: array
+      item_type: string
+      required: false
+      default: []
+      description: >-
+        Bounded list of stable rule_id values (reused unchanged from
+        policy-rule) whose evaluation-trace rule_evidence entry carried
+        rule_result: matched for this evaluation — the rules that
+        contributed to the decision. Never carries a rule's effect,
+        condition results, reason code, or explanation: those remain
+        exclusively on evaluation-trace's own rule_evidence, referenced by
+        this record's optional trace_id, not duplicated here. Items must be
+        non-empty and unique within this array (see constraints below).
+        Empty when no bundle applied, when evaluation failed before rule
+        matching began, or when no candidate rule matched. Array order is
+        NOT authorization precedence: this contract does not define, and a
+        producer's chosen ordering does not imply, any priority or
+        rule-combining precedence among the listed rule IDs — mirroring
+        evaluation-trace.yaml's own trace_ordering.authorization_precedence
+        deferral for rule_evidence.
+    - id: identity_evidence_reference
+      type:
+        - object
+        - "null"
+      required: false
+      default: null
+      governed_by: identity-evidence-reference
+      description: >-
+        Optional reference to the trusted identity evidence that supported
+        this evaluation's subject context, shaped exactly as published by
+        the identity-evidence-reference contract. Never embeds raw identity
+        evidence, tokens, or claims. Reused unchanged from PR B; this
+        contract does not redefine it.
+    - id: adapter_evidence_reference
+      type:
+        - object
+        - "null"
+      required: false
+      default: null
+      governed_by: adapter-evidence-reference
+      description: >-
+        Optional reference to the normalized adapter evidence that produced
+        this evaluation's operation context, shaped exactly as published by
+        the adapter-evidence-reference contract. Never embeds a raw protocol
+        payload. Reused unchanged from PR B; this contract does not redefine
+        it.
+    - id: reason_code
+      type:
+        - string
+        - "null"
+      required: false
+      default: null
+      pattern: "^[a-z][a-z0-9]*(_[a-z0-9]+)*$"
+      governed_by: reason-code
+      description: >-
+        Optional stable, machine-readable reason code summarizing this
+        evidence's evaluation result, reusing the reason-code contract's
+        format unchanged. Typically echoes the response's own reason_code;
+        this contract does not require equality, since audit evidence may be
+        assembled with a more specific or differently-scoped code than the
+        response carried.
+    - id: explanation
+      type:
+        - string
+        - "null"
+      required: false
+      default: null
+      non_empty: true
+      description: >-
+        Optional static, non-empty, human-readable summary explanation of
+        this evidence's evaluation result. Descriptive rendering only — not
+        authoritative over the structured evaluation_status / outcome /
+        failure_reason fields (ADR-0003 Section 11). No template,
+        variable-interpolation, expression-evaluation, or script-execution
+        mechanism is defined. Producers are responsible for emitting only
+        safe, minimized explanation text; the schema constrains shape, not
+        semantic secret detection.
+    - id: recorded_at
+      type: string
+      required: true
+      format: date-time
+      pattern: "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|[+-]\\d{2}:\\d{2})$"
+      description: >-
+        Timezone-aware ISO 8601 timestamp of when this audit evidence record
+        was produced/recorded — distinct from
+        operation-aware-decision-request's evaluation_time (request-supplied
+        context the evaluator reasons about) and from any request-side
+        timestamp. This contract carries a supplied or producer-assigned
+        value only: no runtime clock implementation, and no timezone
+        database behavior, is implemented here.
+    - id: schema_version
+      type: string
+      required: false
+      default: "0.1.0"
+      pattern: "^\\d+\\.\\d+\\.\\d+$"
+      description: >-
+        The audit-evidence INSTANCE format version this record was produced
+        against — distinct from this contract file's own contract.version
+        (the audit-evidence CONTRACT SHAPE version) and from the
+        basis-schemas package version, matching the three-way distinction
+        policy-bundle.yaml already draws between bundle_version,
+        schema_version, and the package version. Mirrors first-wave
+        audit-event's own schema_version precedent (fields are added, never
+        removed or renamed, as this version advances, so older records
+        remain interpretable). This contract implements no version
+        negotiation.
+
+  # Reproduced from operation-aware-decision-response.yaml /
+  # evaluation-trace.yaml / policy-bundle.yaml / reason-code.yaml so a
+  # consumer can validate without dereferencing them. Parity with the
+  # canonical files is enforced by this repository's test suite.
+  outcome_values:
+    - allow
+    - deny
+    - not_applicable
+  evaluation_status_values:
+    - completed
+    - failed
+  failure_reason_values:
+    - invalid_request
+    - unsupported_schema_version
+    - invalid_policy_bundle
+    - policy_validation_failure
+    - condition_evaluation_error
+    - internal_evaluation_error
+  bundle_version_pattern: "^\\d+\\.\\d+\\.\\d+$"
+  reason_code_pattern: "^[a-z][a-z0-9]*(_[a-z0-9]+)*$"
+  recorded_at_pattern: "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|[+-]\\d{2}:\\d{2})$"
+  schema_version_pattern: "^\\d+\\.\\d+\\.\\d+$"
+
+  constraints:
+    - evidence_id, request_id, evaluation_status, outcome, failure_reason,
+      and recorded_at are required keys on every record (outcome and
+      failure_reason may hold an explicit null; see below).
+    - evidence_id and request_id must be non-empty strings.
+    - >-
+      correlation_id, when present, is passed through verbatim with no
+      format constraint beyond being a string or null (parity with
+      identity-evidence-reference's and adapter-evidence-reference's own
+      correlation_id treatment).
+    - evaluation_status must be one of completed or failed.
+    - >-
+      outcome is REQUIRED to be one of allow, deny, or not_applicable when
+      evaluation_status is completed, and REQUIRED to be null when
+      evaluation_status is failed. A failed evaluation must never serialize
+      a non-null outcome (parity with operation-aware-decision-response and
+      evaluation-trace).
+    - >-
+      failure_reason is REQUIRED to be null when evaluation_status is
+      completed, and REQUIRED to be one of the six published
+      failure_reason_values when evaluation_status is failed.
+    - trace_id, when present and non-null, must be a non-empty string.
+    - bundle_id, when present and non-null, must be a non-empty string.
+    - bundle_version, when present and non-null, must match
+      bundle_version_pattern (parity with policy-bundle).
+    - >-
+      matched_rule_ids, when present, must be an array of non-empty strings
+      with no duplicate values (cross-item uniqueness a single item's own
+      type declaration cannot express).
+    - >-
+      identity_evidence_reference, when present and non-null, must be an
+      object matching identity-evidence-reference's own published field
+      policy (parity with identity-evidence-reference.yaml — reused, not
+      redefined).
+    - >-
+      adapter_evidence_reference, when present and non-null, must be an
+      object matching adapter-evidence-reference's own published field
+      policy (parity with adapter-evidence-reference.yaml — reused, not
+      redefined).
+    - reason_code, when present and non-null, must match reason_code_pattern
+      (parity with the reason-code contract).
+    - explanation, when present and non-null, must be a non-empty string.
+    - recorded_at must be a non-empty, timezone-aware ISO 8601 string
+      matching recorded_at_pattern.
+    - schema_version, when present, must match schema_version_pattern.
+    - >-
+      This contract does not carry a full request snapshot, a full policy
+      bundle, raw identity evidence, raw adapter evidence, raw protocol
+      payloads, credentials, tokens, key material, a per-rule trace object,
+      condition-level evidence, gateway enforcement facts, storage
+      configuration, or a cryptographic signature. It does not define
+      full_request, request_snapshot, full_policy, policy_document,
+      policy_source, raw_claims, full_claim_set, raw_payload,
+      raw_protocol_payload, packet, frame, device_secret, access_token,
+      id_token, refresh_token, jwt, bearer_token, authorization_header,
+      cookie, session_secret, client_secret, password, private_key,
+      api_key, credential, debug, debug_data, exception, exception_object,
+      stack, stack_trace, traceback, internal_error_detail,
+      implementation_detail, rule_evidence, condition_results,
+      enforcement_action, enforcement_result, enforcement_status,
+      http_status, response_status, gateway_enforcement, event_id,
+      event_type, signature, signature_algorithm, hash_chain,
+      previous_hash, merkle_root, storage_uri, bucket_name, object_key, or
+      retention_policy fields. Any such field is rejected as unknown.
+    - >-
+      Unknown / additional top-level fields are rejected (additional
+      properties are set to false).
+    - >-
+      This contract does not implement audit persistence, retention,
+      signing, or tamper-evidence, and it is not itself a gateway
+      enforcement event. gateway-audit-event is a later, separate contract
+      (published alongside this one by the same PR) that references this
+      record's evidence_id rather than being defined here.
+
+  # Where this shape is produced, consumed, and governed. Informative; it
+  # records boundary ownership already established in ADR-0003, it adds no
+  # structure of its own.
+  composition:
+    derived_from: operation-aware-decision-response, evaluation-trace  # governed evaluation artifacts and references this record is bounded from
+    produced_by: basis-core   # produces the decision response, evaluation trace, and this kernel-side audit evidence as associated evaluation artifacts of one evaluation; NOT embedded in operation-aware-decision-response.yaml, which has no audit_evidence/audit_evidence_id field — this contract does not define the runtime transport, envelope, return tuple, or delivery mechanism connecting the three; does not persist evidence anywhere durable (ADR-0003 Section 3, Section 14: "basis-core: produces decision response, reason metadata, evaluation trace, kernel-side audit evidence")
+    assembled_by: basis-gateway   # combines this kernel-produced evidence with its own enforcement facts into the gateway-audit-event record — see that contract, not this one (ADR-0003 Section 9, Section 14: "basis-gateway: assembles gateway audit event, combines kernel evidence with enforcement facts, emits audit")
+    referenced_by: gateway-audit-event   # references this record by evidence_id — see that contract's audit_evidence_id field
+    visualized_by: basis-console  # may display redacted evidence; never authoritative
+    published_by: basis-schemas   # publishes the evidence shape only; implements none of the above
+
+  examples:
+    valid:
+      # 1. Completed ALLOW audit evidence: minimal-plus-matched-rule-id shape.
+      - evidence_id: audev-0001-0000-0000-000000000001
+        request_id: oadr-0002-0000-0000-000000000002
+        evaluation_status: completed
+        outcome: allow
+        failure_reason: null
+        bundle_id: baseline-read-only-telemetry
+        bundle_version: "1.0.0"
+        matched_rule_ids:
+          - rule-operator-read-ahu-telemetry
+        reason_code: allow_rule_matched
+        recorded_at: "2026-05-22T14:30:01Z"
+      # 2. Completed DENY audit evidence: deny precedence, referenced trace.
+      - evidence_id: audev-0002-0000-0000-000000000002
+        request_id: oadr-0003-0000-0000-000000000003
+        correlation_id: corr-0003-0000-0000-000000000003
+        trace_id: trace-0002-0000-0000-000000000002
+        evaluation_status: completed
+        outcome: deny
+        failure_reason: null
+        bundle_id: west-campus-hvac-operations
+        bundle_version: "2.3.1"
+        matched_rule_ids:
+          - rule-west-campus-hvac-allow
+          - rule-west-campus-hvac-deny-interlock
+        reason_code: deny_rule_matched
+        explanation: Deny precedence applied; an interlock-scoped deny rule matched.
+        recorded_at: "2026-05-22T14:30:05Z"
+      # 3. Completed NOT_APPLICABLE audit evidence: no bundle applied.
+      - evidence_id: audev-0003-0000-0000-000000000003
+        request_id: oadr-0001-0000-0000-000000000001
+        evaluation_status: completed
+        outcome: not_applicable
+        failure_reason: null
+        matched_rule_ids: []
+        reason_code: no_applicable_bundle
+        recorded_at: "2026-05-22T14:30:02Z"
+      # 4. Failed-evaluation audit evidence: no bundle identified.
+      - evidence_id: audev-0004-0000-0000-000000000004
+        request_id: oadr-1099-0000-0000-000000000099
+        evaluation_status: failed
+        outcome: null
+        failure_reason: unsupported_schema_version
+        explanation: The request declared a schema version this kernel does not support.
+        recorded_at: "2026-05-22T14:30:03Z"
+      # 5. Audit evidence with full policy provenance, trace reference, and
+      #    an explicit schema_version.
+      - evidence_id: audev-0005-0000-0000-000000000005
+        request_id: oadr-0004-0000-0000-000000000004
+        correlation_id: corr-0004-0000-0000-000000000004
+        trace_id: trace-0005-0000-0000-000000000005
+        evaluation_status: failed
+        outcome: null
+        failure_reason: condition_evaluation_error
+        bundle_id: vendor-remote-access-baseline
+        bundle_version: "0.4.0"
+        reason_code: condition_evaluation_error
+        schema_version: "0.1.0"
+        recorded_at: "2026-05-22T14:30:06Z"
+      # 6. Audit evidence with safe identity/adapter evidence references.
+      - evidence_id: audev-0006-0000-0000-000000000006
+        request_id: oadr-0003-0000-0000-000000000003
+        evaluation_status: completed
+        outcome: allow
+        failure_reason: null
+        bundle_id: baseline-read-only-telemetry
+        bundle_version: "1.0.0"
+        matched_rule_ids:
+          - rule-operator-read-ahu-telemetry
+        identity_evidence_reference:
+          reference_id: idev-0002-0000-0000-000000000002
+          evidence_digest:
+            algorithm: sha-256
+            value: 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08
+          identity_source: oidc:https://idp.example.com
+          redaction_classification: reference_only
+        adapter_evidence_reference:
+          reference_id: adev-0003-0000-0000-000000000003
+          evidence_digest:
+            algorithm: sha-256
+            value: 1f825aa2f0020ef7cf91dfa30da4668d791c5d4824fc8e41354b89ec05795ab
+          adapter_source: basis-adapters:bacnet
+          protocol: bacnet
+          redaction_classification: reference_only
+        reason_code: allow_rule_matched
+        recorded_at: "2026-05-22T14:30:07Z"
+    invalid:
+      - reason: missing required evidence ID
+        value:
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: completed
+          outcome: allow
+          failure_reason: null
+          recorded_at: "2026-05-22T14:30:00Z"
+      - reason: empty evidence ID
+        value:
+          evidence_id: ""
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: completed
+          outcome: allow
+          failure_reason: null
+          recorded_at: "2026-05-22T14:30:00Z"
+      - reason: missing required request ID
+        value:
+          evidence_id: audev-1001-0000-0000-000000000001
+          evaluation_status: completed
+          outcome: allow
+          failure_reason: null
+          recorded_at: "2026-05-22T14:30:00Z"
+      - reason: malformed timestamp (timezone-naive, no offset)
+        value:
+          evidence_id: audev-1002-0000-0000-000000000002
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: completed
+          outcome: allow
+          failure_reason: null
+          recorded_at: "2026-05-22T14:30:00"
+      - reason: completed with null outcome (invariant violation)
+        value:
+          evidence_id: audev-1003-0000-0000-000000000003
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: completed
+          outcome: null
+          failure_reason: null
+          recorded_at: "2026-05-22T14:30:00Z"
+      - reason: failed with non-null outcome (invariant violation)
+        value:
+          evidence_id: audev-1004-0000-0000-000000000004
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: failed
+          outcome: allow
+          failure_reason: internal_evaluation_error
+          recorded_at: "2026-05-22T14:30:00Z"
+      - reason: failed without failure reason (invariant violation)
+        value:
+          evidence_id: audev-1005-0000-0000-000000000005
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: failed
+          outcome: null
+          failure_reason: null
+          recorded_at: "2026-05-22T14:30:00Z"
+      - reason: completed with non-null failure reason (invariant violation)
+        value:
+          evidence_id: audev-1006-0000-0000-000000000006
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: completed
+          outcome: allow
+          failure_reason: internal_evaluation_error
+          recorded_at: "2026-05-22T14:30:00Z"
+      - reason: invalid outcome value
+        value:
+          evidence_id: audev-1007-0000-0000-000000000007
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: completed
+          outcome: maybe
+          failure_reason: null
+          recorded_at: "2026-05-22T14:30:00Z"
+      - reason: malformed policy provenance (invalid bundle_version semver)
+        value:
+          evidence_id: audev-1008-0000-0000-000000000008
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: completed
+          outcome: allow
+          failure_reason: null
+          bundle_id: baseline-read-only-telemetry
+          bundle_version: "v1"
+          recorded_at: "2026-05-22T14:30:00Z"
+      - reason: malformed trace reference (empty trace_id)
+        value:
+          evidence_id: audev-1009-0000-0000-000000000009
+          request_id: oadr-0001-0000-0000-000000000001
+          trace_id: ""
+          evaluation_status: completed
+          outcome: allow
+          failure_reason: null
+          recorded_at: "2026-05-22T14:30:00Z"
+      - reason: duplicate rule IDs in matched_rule_ids (uniqueness violation)
+        value:
+          evidence_id: audev-1010-0000-0000-000000000010
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: completed
+          outcome: allow
+          failure_reason: null
+          matched_rule_ids:
+            - rule-duplicate
+            - rule-duplicate
+          recorded_at: "2026-05-22T14:30:00Z"
+      - reason: unsupported redaction classification in nested identity evidence reference
+        value:
+          evidence_id: audev-1011-0000-0000-000000000011
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: completed
+          outcome: allow
+          failure_reason: null
+          identity_evidence_reference:
+            reference_id: idev-1011-0000-0000-000000000011
+            evidence_digest:
+              algorithm: sha-256
+              value: 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08
+            identity_source: oidc:https://idp.example.com
+            redaction_classification: public
+          recorded_at: "2026-05-22T14:30:00Z"
+      - reason: raw access token field rejected (unknown field)
+        value:
+          evidence_id: audev-1012-0000-0000-000000000012
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: completed
+          outcome: allow
+          failure_reason: null
+          access_token: eyJhbGciOiJSUzI1NiJ9.example.signature
+          recorded_at: "2026-05-22T14:30:00Z"
+      - reason: raw claims field rejected (unknown field)
+        value:
+          evidence_id: audev-1013-0000-0000-000000000013
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: completed
+          outcome: allow
+          failure_reason: null
+          raw_claims:
+            sub: alice
+          recorded_at: "2026-05-22T14:30:00Z"
+      - reason: raw protocol payload field rejected (unknown field)
+        value:
+          evidence_id: audev-1014-0000-0000-000000000014
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: completed
+          outcome: allow
+          failure_reason: null
+          raw_protocol_payload: "0x0300000A"
+          recorded_at: "2026-05-22T14:30:00Z"
+      - reason: request snapshot field rejected (unknown field)
+        value:
+          evidence_id: audev-1015-0000-0000-000000000015
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: completed
+          outcome: allow
+          failure_reason: null
+          request_snapshot:
+            subject_id: alice
+          recorded_at: "2026-05-22T14:30:00Z"
+      - reason: full policy field rejected (unknown field)
+        value:
+          evidence_id: audev-1016-0000-0000-000000000016
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: completed
+          outcome: allow
+          failure_reason: null
+          full_policy:
+            rules: []
+          recorded_at: "2026-05-22T14:30:00Z"
+      - reason: stack trace field rejected (unknown field)
+        value:
+          evidence_id: audev-1017-0000-0000-000000000017
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: failed
+          outcome: null
+          failure_reason: internal_evaluation_error
+          stack_trace: "Traceback (most recent call last): ..."
+          recorded_at: "2026-05-22T14:30:00Z"
+      - reason: unknown field rejected
+        value:
+          evidence_id: audev-1018-0000-0000-000000000018
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: completed
+          outcome: allow
+          failure_reason: null
+          confidence: 0.97
+          recorded_at: "2026-05-22T14:30:00Z"

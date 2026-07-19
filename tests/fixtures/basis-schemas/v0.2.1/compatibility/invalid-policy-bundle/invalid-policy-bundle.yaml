@@ -1,0 +1,39 @@
+# Canonical compatibility fixture — scenario: invalid-policy-bundle.
+#
+# INTENTIONALLY INVALID. This fixture parses as YAML but FAILS
+# policy-bundle's own published field policy
+# (schemas/policy-bundle/policy-bundle.yaml): rule_id values across a
+# bundle's rules array must be unique (see that contract's own "duplicate
+# rule IDs within one bundle" invalid example, which this fixture mirrors).
+# Duplicate rule_id is a cross-rule, BUNDLE-level consistency defect — a
+# concern no single rule object's own schema can express or enforce (see
+# policy-bundle.yaml's own "rules" field description and constraints) — not
+# a missing field, malformed type, or malformed shape on any one object.
+# Every individual rule and the bundle's own top-level fields are otherwise
+# shaped correctly. Per ADR-0002 Section 14, the corresponding kernel
+# failure category is therefore `policy_validation_failure` ("shaped
+# correctly but fails internal consistency validation"), not
+# `invalid_policy_bundle` ("does not conform to the required shape"). See
+# examples/operation-aware/compatibility/README.md, "Invalid-policy
+# scenario," for the full reasoning.
+#
+# No consumer may treat this file as a valid policy bundle.
+
+bundle_id: bundle-compat-invalid-policy
+bundle_version: "1.0.0"
+schema_version: "0.1.0"
+policy_owner: compat-vectors-team
+description: >-
+  Canonical compatibility fixture demonstrating a deterministic PR D
+  validation failure: duplicate rule_id values within one bundle.
+rules:
+  - rule_id: allow-duplicate-rule
+    effect: allow
+    match:
+      actions:
+        - "read:ahu"
+  - rule_id: allow-duplicate-rule
+    effect: deny
+    match:
+      actions:
+        - "write:ahu"

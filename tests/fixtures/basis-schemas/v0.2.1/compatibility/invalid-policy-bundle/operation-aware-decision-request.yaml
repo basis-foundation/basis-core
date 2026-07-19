@@ -1,0 +1,14 @@
+# Canonical compatibility fixture — scenario: invalid-policy-bundle.
+#
+# An otherwise well-formed request. The failure in this scenario originates
+# entirely from the paired invalid-policy-bundle.yaml, not from this
+# request.
+
+request_id: req-compat-invalid-policy-001
+subject_id: svc-compat-operator-004
+subject_roles:
+  - operator
+action: "read:ahu"
+resource: "ahu:rooftop-3"
+resource_type: ahu
+evaluation_time: "2026-07-09T09:20:00Z"

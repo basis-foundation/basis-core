@@ -1,0 +1,53 @@
+# Canonical compatibility fixture — scenario: allow-basic.
+#
+# A minimal but realistic operation-aware request: an operator reads AHU
+# telemetry. Demonstrates PR B integration via an embedded
+# identity_evidence_reference / adapter_evidence_reference pair. All
+# identifiers, digests, and timestamps are synthetic and deterministic — see
+# examples/operation-aware/compatibility/README.md, "Security and synthetic-
+# data policy."
+#
+# This fixture is a plain instance of operation-aware-decision-request
+# (schemas/operation-aware-decision-request/operation-aware-decision-request.yaml),
+# not a copy of that contract's own schema file.
+
+request_id: req-compat-allow-001
+correlation_id: corr-compat-allow-001
+subject_id: svc-compat-operator-001
+subject_roles:
+  - operator
+subject_attrs:
+  clearance: level-2
+identity_source: "oidc:https://idp.example.com"
+authority_mode: federated
+identity_evidence_reference:
+  reference_id: idev-compat-allow-001
+  evidence_digest:
+    algorithm: sha-256
+    value: 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08
+  identity_source: "oidc:https://idp.example.com"
+  redaction_classification: reference_only
+action: "read:ahu"
+resource: "ahu:rooftop-1"
+resource_type: ahu
+location:
+  site_id: west-campus
+  building_id: bldg-3
+  zone_id: zone-a
+device:
+  device_id: ahu-14
+  device_class: controller
+protocol_context:
+  protocol: bacnet
+  operation: ReadProperty
+adapter_evidence_reference:
+  reference_id: adev-compat-allow-001
+  evidence_digest:
+    algorithm: sha-256
+    value: 1f825aa2f0020ef7cf91dfa30da4668d791c5d4824fc8e41354b89ec05795ab
+  adapter_source: "basis-adapters:bacnet"
+  protocol: bacnet
+  redaction_classification: reference_only
+operation_intent: read_only
+evaluation_time: "2026-07-09T09:00:00Z"
+expected_policy_version: "1.0.0"

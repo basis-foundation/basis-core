@@ -1,15 +1,25 @@
 """
 tests/test_basis_schemas_snapshot_provenance.py — release provenance tests
-for the vendored `basis-schemas` v0.2.0 snapshot.
+for the vendored `basis-schemas` snapshot currently active via
+`tests/helpers/basis_schemas_snapshot.py`'s `SNAPSHOT_RELEASE`.
 
 Asserts the *real* recorded provenance values, not merely that the fields
-are present and non-empty. These values were independently confirmed at
+are present and non-empty. `v0.2.0`'s values were independently confirmed at
 plan-authoring time against the actual `basis-schemas` `v0.2.0` git tag (see
 `docs/implementation/basis-core-v0.2-operation-aware-plan.md`, Section 4,
 which records the same commit SHA) and cross-checked directly against the
-`v0.2.0` tag in the `basis-schemas` repository during this PR.
+`v0.2.0` tag in the `basis-schemas` repository during that PR.
 
-If this test ever needs to change, it means the snapshot is being
+This test now asserts the `v0.2.1` values instead: `v0.2.1` is a deliberate,
+reviewed re-vendoring PR (see `tests/fixtures/basis-schemas/v0.2.1/README.md`
+and `v0.2.0/README.md`'s "Refreshing this snapshot" section) that corrects
+the `invalid-policy-bundle` scenario's `failure_reason`/`reason_code` from
+upstream `basis-schemas` `v0.2.1`. The `v0.2.1` commit was independently
+confirmed both against a local sibling `basis-schemas` clone's `v0.2.1` tag
+and via `git ls-remote` against the upstream GitHub repository during this
+PR; both resolved to the same commit.
+
+If this test ever needs to change again, it means the snapshot is being
 re-vendored against a new release — which must be a deliberate, reviewed PR
 (see the snapshot README's "Refreshing this snapshot" section), not an
 incidental edit.
@@ -22,8 +32,8 @@ import re
 from tests.helpers.basis_schemas_snapshot import load_snapshot_manifest
 
 EXPECTED_SOURCE_REPOSITORY = "basis-foundation/basis-schemas"
-EXPECTED_SOURCE_RELEASE = "v0.2.0"
-EXPECTED_SOURCE_COMMIT = "1d3af3cfd38686173980cfb47f8fa44659a4e1c4"
+EXPECTED_SOURCE_RELEASE = "v0.2.1"
+EXPECTED_SOURCE_COMMIT = "945acd107016bcbcb114f440474df204ead3f8f3"
 
 _ISO8601_UTC_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
 

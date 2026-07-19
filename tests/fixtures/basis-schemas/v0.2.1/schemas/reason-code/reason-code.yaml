@@ -1,0 +1,118 @@
+# BASIS Reason Code — published contract.
+#
+# This file PUBLISHES the structural format of a BASIS reason code decided in
+# basis-architecture (docs/architecture/operation-aware-trace-audit-evidence.md,
+# ADR-0003, Section 12 "Reason Codes"; and
+# docs/architecture/operation-aware-policy-rule-model.md, Section 13 "Reason
+# Codes in Policy"). It publishes the *shape* every reason code must satisfy —
+# a stable, machine-readable, lowercase snake_case token — not the final
+# vocabulary of codes. ADR-0003's illustrative examples (ALLOW_RULE_MATCHED,
+# DENY_RULE_MATCHED, and similar) are explicitly named there as "examples
+# only, not a final vocabulary"; this contract preserves that openness. The
+# examples below use this contract's lowercase serialization instead, for
+# consistency with every other enumerated value already published in this
+# repository (the vocabulary contract's verbs, decision-response's outcome and
+# failure_reason, and audit-event's outcome) — a casing choice made here in
+# basis-schemas, not a vocabulary decision made in basis-architecture.
+#
+# The `lifecycle` is `experimental` because this published contract is new in
+# basis-schemas, not because the reason-code concept is unsettled.
+
+contract:
+  name: reason-code
+  title: BASIS Reason Code
+  version: 0.1.0
+  lifecycle: experimental
+  governed_by: basis-architecture
+  published_by: basis-schemas
+  source: docs/architecture/operation-aware-trace-audit-evidence.md
+  description: >-
+    The structural format of a stable, machine-readable reason code: a single
+    lowercase snake_case token, distinct from the free-form human-readable
+    explanation text carried alongside it. Publishes the format decided in
+    basis-architecture (ADR-0003, Section 12; and the policy/rule model,
+    Section 13) so future decision, trace, audit, and policy contracts can
+    reference a reason_code field with a shared, testable shape. This contract
+    is deliberately not a closed enum: it defines the format every reason code
+    must satisfy, not the final list of codes. The final vocabulary is
+    deferred to the operation-aware contracts that carry reason codes in
+    practice (decision response, evaluation trace, policy rule outcomes).
+  depends_on:
+    - contract-metadata
+
+reason_code:
+  # Human-readable structure. A single token: no colons, no hyphens, no
+  # namespacing separator. Namespacing (if ever needed) is a future,
+  # additive extension of this format, not a change to it.
+  structure: "{token}"
+
+  # Regular expression that validates a reason code. Anchored; a string is a
+  # well-formed reason code if and only if it matches: a lowercase letter,
+  # followed by lowercase letters or digits, optionally repeated groups of a
+  # single underscore followed by one or more lowercase letters or digits. No
+  # leading digit, no uppercase, no hyphen, no colon, no leading, trailing, or
+  # doubled underscore.
+  pattern: "^[a-z][a-z0-9]*(_[a-z0-9]+)*$"
+
+  constraints:
+    - A reason code must be a non-empty string.
+    - >-
+      A reason code must match the published pattern — lowercase ASCII
+      letters and digits, with single underscores separating words; it must
+      start with a letter.
+    - A reason code must not contain a colon or hyphen (that would make it an
+      action-string or resource-identifier-shaped value instead).
+    - A reason code must not have a leading, trailing, or doubled underscore.
+    - >-
+      This contract does not enumerate a closed set of valid codes. A string
+      that matches the pattern is a structurally valid reason code even if it
+      is not one of the illustrative examples below; rejecting an unrecognized
+      but structurally valid code is the responsibility of whichever future
+      contract chooses to constrain its own reason_code field to a specific
+      vocabulary, not this contract.
+    - A reason code is machine-readable and stable; it is a separate concept
+      from a human-readable explanation string (for example, decision-response's
+      free-text `reason` field) and never a substitute for one.
+    - >-
+      Once a reason code is published by a contract that uses this format,
+      changing or removing it is a compatibility-sensitive, breaking change
+      under docs/contract-governance.md — the same treatment as any other
+      enumerated value in this repository.
+
+  # Illustrative examples only, echoing the categories named in ADR-0003
+  # Section 12 and the policy/rule model Section 13 (substantive denial vs.
+  # missing context vs. evaluation failure) — not an exhaustive or final
+  # vocabulary. A future contract that publishes a reason_code field may adopt
+  # some, all, or none of these; this contract does not require any of them.
+  illustrative_examples:
+    - allow_rule_matched
+    - deny_rule_matched
+    - no_allow_rule_matched
+    - missing_required_context
+    - unknown_resource_type
+    - unsupported_schema_version
+    - policy_bundle_invalid
+    - evaluation_error
+
+  examples:
+    valid:
+      - allow_rule_matched
+      - deny_rule_matched
+      - no_allow_rule_matched
+      - missing_required_context
+      - unknown_resource_type
+      - unsupported_schema_version
+      - policy_bundle_invalid
+      - evaluation_error
+      # A structurally valid code that is not in the illustrative list above:
+      # demonstrates the format is open, not a closed enum.
+      - future_unrecognized_reason_code
+    invalid:
+      - ""                         # empty
+      - "ALLOW_RULE_MATCHED"       # uppercase; not this contract's serialization
+      - "1_invalid_start"          # leading digit
+      - "read:ahu"                 # contains a colon (action-string shaped, not a reason code)
+      - "deny-rule-matched"        # contains hyphens instead of underscores
+      - "_leading_underscore"      # leading underscore
+      - "trailing_underscore_"     # trailing underscore
+      - "double__underscore"      # doubled underscore
