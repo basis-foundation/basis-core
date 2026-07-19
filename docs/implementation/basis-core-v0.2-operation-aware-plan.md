@@ -2145,6 +2145,55 @@ aggregate-outcome vocabulary is named `OperationAwarePolicyOutcome`, not
 Blocked by architecture decision: no.
 
 **PR 27B — `OperationAwareEvaluationEngine` orchestration (evaluation-owned).**
+**Status: implemented** (`src/basis_core/evaluation/operation_aware/engine.py`;
+tests: `tests/operation_aware/test_evaluation_engine.py`; uncommitted on
+`feature/operation-aware-evaluation-engine`, pending architectural review).
+`OperationAwareEvaluationEngine.evaluate(*, request: OperationAwareDecisionRequest,
+bundle: PolicyBundle, trace_id: str) -> EvaluationTrace` is stateless (no
+constructor arguments, no instance attributes) and returns the assembled
+`EvaluationTrace` directly — no intermediate engine-result wrapper was
+introduced; `OperationAwareDecisionResponse`/response assembly/`AuditEvidence`
+remain out of scope, per PR 29/30/31 below.
+
+The engine follows the typed structural-versus-semantic policy-validation
+boundary this repository's own exception hierarchy already establishes:
+`StructuralPolicyValidationError` is unreachable through this engine's typed
+`bundle: PolicyBundle` entry point (a raw mapping never reaches this call),
+so the engine catches `SemanticPolicyValidationError` specifically — not the
+`PolicyBundleValidationError` root — and maps every reachable semantic
+failure (`DuplicateRuleIdError`, `DuplicateConditionIdError`) to
+`OperationAwareFailureReason.POLICY_VALIDATION_FAILURE`:
+
+```text
+raw structural bundle invalidity
+    → invalid_policy_bundle   (unreachable here; a future raw-mapping/
+                                parsing boundary's concern)
+
+typed bundle semantic invalidity
+    → policy_validation_failure   (this engine's typed-bundle boundary)
+```
+
+**Known upstream conflict, not resolved here.** The current `basis-schemas`
+`invalid-policy-bundle` canonical vector (a duplicate-`rule_id` scenario)
+classifies duplicate rule IDs as `invalid_policy_bundle`, while the
+`basis-core` staged evaluation pipeline — the typed structural-versus-
+semantic validation-error hierarchy this engine follows — classifies
+typed-bundle duplicate-ID failures as `policy_validation_failure`. The
+engine follows the typed structural-versus-semantic validation boundary, not
+the vendored fixture's classification. The upstream canonical vector must be
+reconciled in `basis-schemas` before PR 28 canonical-vector-shaped engine
+conformance testing can assert full agreement with it. The vendored fixture
+itself is not modified by this PR, and this PR does not claim full
+canonical-vector conformance — see `engine.py`'s own docstring, "Policy-
+validation failure mapping," for the full boundary rationale.
+
+PR 28 ("Combining-algorithm canonical-vector-shaped unit tests," below)
+remains canonical-vector-shaped engine testing and is not implemented by
+this PR, and is now additionally blocked on the upstream `basis-schemas`
+reconciliation named above before it can assert conformance against the
+`invalid-policy-bundle` vector specifically. PRs 28 through 44 remain
+unrenumbered.
+
 Objective: the future evaluation-owned orchestration engine
 (`evaluation/operation_aware/engine.py`) that sequences policy-owned
 applicability determination (PR 17), candidate selection and selector
