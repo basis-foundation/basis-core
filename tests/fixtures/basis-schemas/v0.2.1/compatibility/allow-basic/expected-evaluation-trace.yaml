@@ -1,0 +1,22 @@
+# Canonical compatibility fixture — scenario: allow-basic.
+#
+# The expected evaluation-trace (schemas/evaluation-trace/evaluation-trace.yaml)
+# for req-compat-allow-001 evaluated against bundle-compat-allow: one
+# candidate rule, matched, ALLOW.
+
+trace_id: trace-compat-allow-001
+request_id: req-compat-allow-001
+correlation_id: corr-compat-allow-001
+evaluation_status: completed
+outcome: allow
+bundle_applicability: applicable
+bundle_id: bundle-compat-allow
+bundle_version: "1.0.0"
+rule_evidence:
+  - rule_id: allow-operator-read-ahu
+    effect: allow
+    rule_result: matched
+    reason_code: allow_rule_matched
+    explanation: Operator role matched an allow rule for read:ahu.
+reason_code: allow_rule_matched
+explanation: Operator role matched an allow rule for read:ahu.

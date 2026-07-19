@@ -1,0 +1,26 @@
+# Canonical compatibility fixture — scenario: deny-precedence.
+#
+# Both the ALLOW and DENY rule are recorded as matched; the containing
+# trace's outcome is deny (deny precedence). Rule_evidence array order is
+# not authorization precedence (evaluation-trace.yaml's trace_ordering) —
+# see examples/operation-aware/compatibility/README.md.
+
+trace_id: trace-compat-deny-precedence-001
+request_id: req-compat-deny-precedence-001
+evaluation_status: completed
+outcome: deny
+bundle_applicability: applicable
+bundle_id: bundle-compat-deny-precedence
+bundle_version: "1.0.0"
+rule_evidence:
+  - rule_id: allow-operator-write-hvac-setpoint
+    effect: allow
+    rule_result: matched
+    reason_code: allow_rule_matched
+  - rule_id: deny-control-during-interlock
+    effect: deny
+    rule_result: matched
+    reason_code: deny_rule_matched
+    explanation: Control-affecting operation denied while an interlock is engaged.
+reason_code: deny_rule_matched
+explanation: Deny precedence applied; an interlock-scoped deny rule matched.

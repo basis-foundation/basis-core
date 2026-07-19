@@ -1,0 +1,17 @@
+# Canonical compatibility fixture — scenario: default-deny.
+#
+# A vendor subject requests read:ahu against a bundle that only grants that
+# action to the operator role. The bundle is applicable (globally scoped);
+# no allow rule matches; no deny rule exists either. ADR-0002 Section 4:
+# default deny is distinct from NOT_APPLICABLE (see the not-applicable
+# scenario) and from evaluation failure (see the invalid-policy-bundle
+# scenario).
+
+request_id: req-compat-default-deny-001
+subject_id: svc-compat-vendor-001
+subject_roles:
+  - vendor
+action: "read:ahu"
+resource: "ahu:rooftop-2"
+resource_type: ahu
+evaluation_time: "2026-07-09T09:10:00Z"

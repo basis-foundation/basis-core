@@ -1,6 +1,7 @@
 """
 tests/test_basis_schemas_snapshot.py — inventory tests for the vendored
-`basis-schemas` v0.2.0 operation-aware snapshot.
+`basis-schemas` operation-aware snapshot (currently `v0.2.1`, per
+`tests/helpers/basis_schemas_snapshot.py`'s `SNAPSHOT_RELEASE`).
 
 These tests protect the *shape* of the vendored snapshot: exactly which
 contracts and scenarios are present, and which artifacts each scenario
@@ -9,7 +10,7 @@ evaluator yet) and they do not parse or validate YAML contract content.
 
 Cross-references
 ─────────────────
-tests/fixtures/basis-schemas/v0.2.0/README.md — ownership and boundary docs.
+tests/fixtures/basis-schemas/v0.2.1/README.md — ownership and boundary docs.
 tests/helpers/basis_schemas_snapshot.py       — discovery helpers under test.
 tests/test_basis_schemas_snapshot_integrity.py — manifest/hash integrity.
 tests/test_basis_schemas_snapshot_provenance.py — source provenance values.

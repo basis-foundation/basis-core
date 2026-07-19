@@ -1,0 +1,732 @@
+# BASIS Policy Rule — published contract.
+#
+# This file PUBLISHES the deterministic unit-of-evaluation shape decided in
+# basis-architecture's operation-aware policy bundle and rule model (ADR-0004,
+# docs/architecture/operation-aware-policy-rule-model.md, Sections 4-7 and 10)
+# and sequenced for schema publication by the operation-aware schema
+# readiness plan (ADR-0005,
+# docs/architecture/operation-aware-schema-readiness-plan.md, "PR D — Policy
+# Bundle and Rule Contracts"). It does not invent new policy semantics: every
+# field below formalizes a conceptual category ADR-0004 already named.
+# Architecture governs; schemas publish; implementations consume.
+#
+# CRITICAL DESIGN BOUNDARY: this publishes a structured policy DATA model,
+# not a policy language, and not an evaluation engine. It does not select
+# Rego, Cedar, CEL, Python, JavaScript, SQL, WASM, a custom DSL, or a
+# templated expression language, and it carries no script/code/executable
+# field. This contract does not implement rule matching, condition
+# evaluation, deny precedence, default deny, or any other evaluation
+# semantics — those are basis-core v0.2.0 responsibilities (ADR-0004
+# Section 16). It publishes the rule *shape* future basis-core validates and
+# evaluates against.
+#
+# RULE EFFECTS ARE CLOSED TO EXACTLY allow / deny (ADR-0004 Section 5:
+# "Recommended rule effects, conceptually: ALLOW / DENY ... Future effects
+# such as advisory, warn, or log-only are out of scope unless separately
+# governed"). NOT_APPLICABLE is deliberately excluded as a rule effect: per
+# the operation-aware evaluation semantics document (Section 5),
+# NOT_APPLICABLE is a *bundle-applicability* outcome ("no applicable policy
+# bundle"), never something an individual rule inside an applicable bundle
+# produces. Conflating the two would blur exactly the distinction ADR-0002
+# Section 5 exists to preserve.
+#
+# UNCONDITIONAL RULES ARE NOT PERMITTED. ADR-0004 does not explicitly permit
+# a rule with no match criteria and no conditions (an implicit "matches
+# everything" rule), and permitting one silently would be a significant,
+# undocumented policy-authoring risk in an OT authorization context — a
+# single unconditional ALLOW or DENY rule would apply to every request in
+# its bundle's scope regardless of subject, action, or resource. This
+# contract therefore requires at least one of `match` or `conditions` to be
+# present (and non-empty) on every rule. This is a basis-schemas publication
+# decision, made because ADR-0004 left the question open rather than settled
+# it explicitly — see docs/policy-rule.md, "Why NOT_APPLICABLE is not a rule
+# effect" and the unconditional-rule discussion, for the full reasoning.
+#
+# RULE ORDERING / PRIORITY IS DELIBERATELY NOT PUBLISHED. ADR-0004 Section 10
+# and the operation-aware evaluation semantics document (Section 8) both
+# require that evaluation never depend on incidental file, map, or runtime
+# iteration order, and state that "if priority is supported later, priority
+# semantics must be explicit" — a requirement neither document actually
+# satisfies yet (no priority field, tie-break direction, or interaction with
+# deny precedence is defined). Publishing a priority field now would invent
+# ordering semantics ADR-0004 explicitly left open. Instead, rule_id is
+# published purely as a stable identifier for trace, audit, compatibility,
+# and deterministic reporting; this contract does not define evaluation
+# priority and does not make declaration/array order in a bundle's rules list
+# authoritative (it NEVER is). ADR-0004 Section 10 notes that stable rule
+# identifiers may serve as a deterministic tie-breaking fallback where no
+# other ordering signal resolves a tie, but any ordering or tie-breaking
+# semantics must be defined by future architecture/core work before
+# implementation — this contract neither defines nor depends on them. Stable
+# sorting for display/tests/trace output is not authorization evaluation
+# precedence. See docs/policy-rule.md, "Rule ordering decision".
+#
+# The `lifecycle` is `experimental`: this is the first publication of the
+# policy rule shape, ahead of any real consumer.
+
+contract:
+  name: policy-rule
+  title: BASIS Policy Rule
+  version: 0.1.0
+  lifecycle: experimental
+  governed_by: basis-architecture
+  published_by: basis-schemas
+  source: docs/architecture/operation-aware-schema-readiness-plan.md
+  description: >-
+    A deterministic unit of authorization evaluation: a stable rule
+    identifier, a closed allow/deny effect, explicit operation-aware match
+    criteria mirroring operation-aware-decision-request's categories,
+    optional deterministic conditions (policy-condition-shaped), an optional
+    reason code (reusing the reason-code contract unchanged), and an optional
+    static, non-executable explanation. Every rule must declare at least one
+    of match or conditions — this contract does not permit an unconditional
+    rule that implicitly matches every request. Publishes the rule *shape*
+    only: this contract does not implement rule matching, condition
+    evaluation, deny precedence, ordering, or any other evaluation semantics
+    — all of that is deferred to a future basis-core v0.2.0 policy validator
+    and evaluator.
+  # policy-condition: a rule's optional conditions are policy-condition-
+  # shaped values, referenced not redefined. operation-aware-decision-
+  # request: match criteria mirror that contract's categories, and this
+  # contract reproduces (and parity-tests against) its action/resource/
+  # resource-type/operation-intent/authority-mode/device-class/protocol
+  # patterns. reason-code: the optional reason_code field reuses that
+  # contract's format unchanged, introducing no new closed vocabulary.
+  # action-string / resource-identifier: match.actions and match.resources
+  # validate directly against those contracts' own canonical patterns
+  # (reproduced and parity-tested here), not only against
+  # operation-aware-decision-request's copies of them.
+  depends_on:
+    - contract-metadata
+    - policy-condition
+    - operation-aware-decision-request
+    - reason-code
+    - action-string
+    - resource-identifier
+
+policy_rule:
+  # A rule is a single object. rule_id and effect are always required.
+  # match and conditions are individually optional, but at least one of them
+  # must be present and non-empty (required_at_least_one below) — see the
+  # file header for why an unconditional rule is not permitted. reason_code
+  # and explanation are independently optional. No priority/ordering field is
+  # published (see file header). No provenance/lifecycle metadata field is
+  # published in this PR: none is yet justified by a real consumer, and
+  # adding one speculatively would be exactly the kind of ungoverned
+  # extension this contract's additional_properties: false policy exists to
+  # prevent. Unknown fields are rejected.
+  required:
+    - rule_id
+    - effect
+  optional:
+    - match
+    - conditions
+    - reason_code
+    - explanation
+  additional_properties: false
+
+  # At least one of these fields must be present and non-empty on every
+  # rule. This is a single-object (this rule's own) field-combination
+  # policy, not a cross-rule bundle-validation concern, so it is expressed
+  # here rather than deferred to policy-bundle.
+  required_at_least_one:
+    - match
+    - conditions
+
+  fields:
+    - id: rule_id
+      type: string
+      required: true
+      non_empty: true
+      description: >-
+        Stable identifier for this rule, unique within its containing bundle
+        (BUNDLE-level validation — see policy-bundle.yaml's duplicate-rule-id
+        validation — not something a single rule's own type declaration can
+        enforce). Never derived from the rule's position in a bundle's rules
+        array: array position is not rule identity. No UUID requirement: a
+        short, stable, human-readable token (e.g. rule-operator-read-ahu) is
+        preferred, because rule_id must remain suitable for trace, audit,
+        compatibility tests, and operator explanations (ADR-0004 Section 4).
+        Must not carry a timestamp or other mutable information.
+    - id: effect
+      type: string
+      required: true
+      enum:
+        - allow
+        - deny
+      description: >-
+        The outcome this rule produces when it matches. Closed to exactly
+        these two lowercase values (ADR-0004 Section 5). NOT_APPLICABLE is
+        deliberately excluded: it is a bundle-applicability outcome, never a
+        rule effect — see the file header. This contract does not implement
+        deny precedence or any other combining semantics; it only publishes
+        the effect vocabulary a future basis-core evaluator combines
+        according to ADR-0002's evaluation semantics.
+    - id: match
+      type:
+        - object
+        - "null"
+      required: false
+      default: null
+      description: >-
+        Explicit, structured match criteria selecting which operation-aware
+        requests this rule is a candidate for — see match_shape below. Every
+        populated selector category is an independent, optional field;
+        `match` itself is optional, but when present it must contain at
+        least one populated selector (an empty match object is invalid — see
+        constraints). Distinct from a policy bundle's own `scope` (published
+        by policy-bundle.yaml), which determines whether a bundle applies at
+        all; `match` determines which rules inside an applicable bundle are
+        candidates for a specific request. See match_semantics below for the
+        documented (not implemented) selector-combination contract a future
+        basis-core evaluator must honor.
+    - id: conditions
+      type:
+        - array
+        - "null"
+      required: false
+      default: []
+      description: >-
+        Zero or more policy-condition-shaped values providing deterministic,
+        data-only tests beyond what `match`'s structured selectors can
+        express. Referenced from, not a redefinition of, the policy-condition
+        contract — see policy-condition.md. When present, must be non-empty
+        (an empty conditions array conveys nothing and is invalid — see
+        constraints). condition_id values must be unique within this rule's
+        conditions array (RULE-level validation — a cross-condition
+        uniqueness concern this single field-type declaration cannot express
+        on its own; see constraints and the companion test suite). This
+        contract does not itself define how conditions combine with `match`
+        or with each other — that is future basis-core evaluation semantics.
+    - id: reason_code
+      type:
+        - string
+        - "null"
+      required: false
+      default: null
+      pattern: "^[a-z][a-z0-9]*(_[a-z0-9]+)*$"
+      governed_by: reason-code
+      description: >-
+        Optional stable, machine-readable reason code this rule emits when
+        it matches, reusing the reason-code contract's format unchanged (no
+        new pattern, no new closed policy vocabulary, no new official codes
+        introduced by this PR — see illustrative_reason_codes below for
+        synthetic, non-final examples only). Distinct from `explanation`: a
+        reason code is machine-readable and stable; an explanation is
+        free-form human-readable text. Neither is a substitute for the
+        other.
+    - id: explanation
+      type:
+        - string
+        - "null"
+      required: false
+      default: null
+      non_empty: true
+      description: >-
+        Optional static, non-empty, human-readable explanation text for why
+        this rule matching produces its effect. Descriptive metadata only —
+        not authoritative (the machine-readable decision and trace are
+        authoritative; this is a rendering, not a second source of truth,
+        per ADR-0004 Section 14). This contract defines no template field,
+        no variable-interpolation syntax, no expression-evaluation
+        mechanism, and no HTML/script execution mechanism: `explanation` is
+        a single opaque string field with no companion templating
+        machinery, so there is no structural mechanism by which it could
+        execute anything. Must not contain secrets or credential material.
+
+  # --- Match criteria shape -------------------------------------------
+
+  # Structured selectors mirroring operation-aware-decision-request's
+  # categories (ADR-0004 Section 6: "This list mirrors the DecisionRequest
+  # categories ... deliberately: a rule can only match what a request can
+  # carry"). Every selector is an array of alternatives: within one
+  # populated selector, values are alternatives (any-of) — see
+  # match_semantics below. No metadata/extensions/custom/arbitrary_context
+  # bag: only selectors grounded in an operation-aware-decision-request
+  # category are published.
+  match_shape:
+    optional:
+      - subject_ids
+      - subject_roles
+      - identity_sources
+      - authority_modes
+      - actions
+      - resources
+      - resource_types
+      - site_ids
+      - building_ids
+      - zone_ids
+      - area_ids
+      - device_ids
+      - device_classes
+      - protocols
+      - protocol_operations
+      - operation_intents
+      - safety_modes
+      - safety_classifications
+      - environment_modes
+      - risk_classifications
+    additional_properties: false
+    fields:
+      - id: subject_ids
+        type: array
+        item_type: string
+        required: false
+        default: []
+        description: >-
+          Alternative subject_id values (operation-aware-decision-request's
+          subject_id). Non-empty array of non-empty strings when present.
+      - id: subject_roles
+        type: array
+        item_type: string
+        required: false
+        default: []
+        description: >-
+          Alternative role names (operation-aware-decision-request's
+          subject_roles). Non-empty array of non-empty strings when present.
+      - id: identity_sources
+        type: array
+        item_type: string
+        required: false
+        default: []
+        description: >-
+          Alternative identity_source labels (operation-aware-decision-
+          request's identity_source). Non-empty array of non-empty strings
+          when present.
+      - id: authority_modes
+        type: array
+        item_type: string
+        required: false
+        default: []
+        pattern: "^[a-z][a-z0-9_-]*$"
+        description: >-
+          Alternative authority_mode labels (operation-aware-decision-
+          request's authority_mode), validated against the same open
+          identifier pattern that contract publishes. Non-empty array when
+          present.
+      - id: actions
+        type: array
+        item_type: string
+        required: false
+        default: []
+        pattern: "^[a-z][a-z0-9_-]*:[a-z][a-z0-9_-]*(:[a-z][a-z0-9_-]*)?$"
+        description: >-
+          Alternative composite actions, validated against the canonical
+          action-string pattern. Non-empty array when present.
+      - id: resources
+        type: array
+        item_type: string
+        required: false
+        default: []
+        pattern: "^[a-z][a-z0-9_-]*:[a-z0-9][a-z0-9_-]*$"
+        description: >-
+          Alternative canonical resource identifiers, validated against the
+          canonical resource-identifier pattern. Non-empty array when
+          present.
+      - id: resource_types
+        type: array
+        item_type: string
+        required: false
+        default: []
+        pattern: "^[a-z][a-z0-9_-]*$"
+        description: >-
+          Alternative resource_type values, validated against the
+          resource-identifier contract's resource_type segment pattern.
+          Non-empty array when present.
+      - id: site_ids
+        type: array
+        item_type: string
+        required: false
+        default: []
+        description: >-
+          Alternative location.site_id values. Non-empty array of non-empty
+          strings when present.
+      - id: building_ids
+        type: array
+        item_type: string
+        required: false
+        default: []
+        description: >-
+          Alternative location.building_id values. Non-empty array of
+          non-empty strings when present.
+      - id: zone_ids
+        type: array
+        item_type: string
+        required: false
+        default: []
+        description: >-
+          Alternative location.zone_id values. Non-empty array of non-empty
+          strings when present.
+      - id: area_ids
+        type: array
+        item_type: string
+        required: false
+        default: []
+        description: >-
+          Alternative location.area_id values. Non-empty array of non-empty
+          strings when present.
+      - id: device_ids
+        type: array
+        item_type: string
+        required: false
+        default: []
+        description: >-
+          Alternative device.device_id values. Non-empty array of non-empty
+          strings when present.
+      - id: device_classes
+        type: array
+        item_type: string
+        required: false
+        default: []
+        pattern: "^[a-z][a-z0-9_-]*$"
+        description: >-
+          Alternative device.device_class values, validated against the
+          same open identifier pattern operation-aware-decision-request
+          publishes for device_class. Non-empty array when present.
+      - id: protocols
+        type: array
+        item_type: string
+        required: false
+        default: []
+        pattern: "^[a-z][a-z0-9_-]*$"
+        description: >-
+          Alternative protocol_context.protocol labels, validated against
+          the same open identifier pattern operation-aware-decision-request
+          publishes for protocol. Non-empty array when present.
+      - id: protocol_operations
+        type: array
+        item_type: string
+        required: false
+        default: []
+        description: >-
+          Alternative protocol_context.operation values (free-form,
+          non-empty; protocol-native operation names do not share one
+          charset, matching operation-aware-decision-request's own
+          treatment of this field). Non-empty array of non-empty strings
+          when present.
+      - id: operation_intents
+        type: array
+        item_type: string
+        required: false
+        default: []
+        description: >-
+          Alternative operation_intent values. Each item must be one of
+          operation-aware-decision-request's closed operation_intent_values
+          (read_only / state_changing / control_affecting) — see
+          operation_intent_values below. Non-empty array when present.
+      - id: safety_modes
+        type: array
+        item_type: string
+        required: false
+        default: []
+        pattern: "^[a-z][a-z0-9_-]*$"
+        description: >-
+          Alternative safety_context.mode labels, validated against the
+          same open identifier pattern operation-aware-decision-request
+          publishes for safety mode. Non-empty array when present.
+      - id: safety_classifications
+        type: array
+        item_type: string
+        required: false
+        default: []
+        pattern: "^[a-z][a-z0-9_-]*$"
+        description: >-
+          Alternative safety_context.classification labels, validated
+          against the same open identifier pattern operation-aware-
+          decision-request publishes for safety classification. Non-empty
+          array when present.
+      - id: environment_modes
+        type: array
+        item_type: string
+        required: false
+        default: []
+        pattern: "^[a-z][a-z0-9_-]*$"
+        description: >-
+          Alternative environment_context.mode labels, validated against
+          the same open identifier pattern operation-aware-decision-request
+          publishes for environment mode. Non-empty array when present.
+      - id: risk_classifications
+        type: array
+        item_type: string
+        required: false
+        default: []
+        pattern: "^[a-z][a-z0-9_-]*$"
+        description: >-
+          Alternative risk_context.classification labels, validated against
+          the same open identifier pattern operation-aware-decision-request
+          publishes for risk classification. Non-empty array when present.
+
+  # Documented (not implemented) selector-combination contract a future
+  # basis-core evaluator must honor. This is a basis-schemas publication
+  # choice, made because ADR-0004 Section 6 names match categories but does
+  # not itself settle intra-selector or inter-selector combination
+  # semantics beyond restating deny precedence at the bundle-combining level
+  # (Section 9); this schema does not implement or enforce any of the
+  # following at evaluation time — there is no evaluation implemented here.
+  match_semantics:
+    within_selector: any_of          # e.g. actions: [a, b] matches a request whose action is a OR b
+    across_selectors: all_of         # every POPULATED selector category must match (AND)
+    absent_selector: no_restriction  # an omitted selector imposes no restriction
+    empty_selector_list: invalid     # a present-but-empty selector array is a validation error, not "match nothing"
+
+  # --- Reproduced patterns / value sets ---------------------------------
+  #
+  # Reproduced verbatim from the dependency contracts (action-string,
+  # resource-identifier, operation-aware-decision-request, reason-code) so a
+  # consumer can validate a rule without dereferencing them, matching
+  # operation-aware-decision-request's own convention. Parity with the
+  # canonical files is enforced by this repository's test suite.
+  action_pattern: "^[a-z][a-z0-9_-]*:[a-z][a-z0-9_-]*(:[a-z][a-z0-9_-]*)?$"
+  resource_pattern: "^[a-z][a-z0-9_-]*:[a-z0-9][a-z0-9_-]*$"
+  resource_type_pattern: "^[a-z][a-z0-9_-]*$"
+  open_identifier_pattern: "^[a-z][a-z0-9_-]*$"
+  reason_code_pattern: "^[a-z][a-z0-9]*(_[a-z0-9]+)*$"
+  operation_intent_values:
+    - read_only
+    - state_changing
+    - control_affecting
+
+  # Illustrative examples ONLY — not a final or closed policy reason-code
+  # vocabulary. No official codes are introduced by this PR.
+  illustrative_reason_codes:
+    - allow_rule_matched
+    - deny_rule_matched
+    - no_allow_rule_matched
+
+  constraints:
+    - rule_id and effect are required.
+    - rule_id must be a non-empty string.
+    - >-
+      rule_id must be unique within its containing bundle. Uniqueness across
+      a bundle's rules is BUNDLE-level validation (see policy-bundle.yaml),
+      not something a single rule's own schema can express or enforce.
+    - effect must be exactly "allow" or "deny" (lowercase). Any other
+      value, including "not_applicable", is rejected.
+    - At least one of match or conditions must be present and non-empty. A
+      rule with neither is invalid (no unconditional rules — see the file
+      header).
+    - >-
+      match, when present, must be an object matching match_shape, must
+      reject unknown selector keys, and must contain at least one populated
+      selector (an entirely empty match object, `{}`, is invalid — use
+      omission of the match field instead to signal "no match-based
+      restriction," relying on conditions alone, or vice versa).
+    - Every populated selector array inside match must be non-empty (an
+      empty selector array, e.g. actions [], is invalid).
+    - match.actions items must match action_pattern (parity with
+      action-string).
+    - match.resources items must match resource_pattern (parity with
+      resource-identifier).
+    - match.resource_types items must match resource_type_pattern (parity
+      with resource-identifier's resource_type segment pattern).
+    - match.authority_modes, match.device_classes, match.protocols,
+      match.safety_modes, match.safety_classifications, and
+      match.environment_modes, and match.risk_classifications items must
+      match open_identifier_pattern (parity with
+      operation-aware-decision-request's equivalent field patterns).
+    - match.operation_intents items must each be one of
+      operation_intent_values (parity with
+      operation-aware-decision-request's closed operation_intent
+      vocabulary).
+    - >-
+      conditions, when present, must be a non-empty array of
+      policy-condition-shaped objects (parity with policy-condition.yaml's
+      own published field policy — reused, not redefined).
+    - >-
+      condition_id values within a single rule's conditions array must be
+      unique. This is RULE-level validation: a cross-condition uniqueness
+      concern a single condition object's own schema cannot express.
+    - reason_code, when present and non-null, must match reason_code_pattern
+      (parity with the reason-code contract). This contract introduces no
+      new closed reason-code vocabulary.
+    - explanation, when present and non-null, must be a non-empty string.
+      This contract defines no template, variable-interpolation, expression-
+      evaluation, or script-execution mechanism for explanation text.
+    - This contract defines no script, code, executable, command, shell,
+      python, javascript, rego, cedar, cel, wasm, sql, template, priority,
+      or expression field. Any such field is rejected as unknown.
+    - >-
+      Unknown / additional top-level fields are rejected (additional
+      properties are set to false), and unknown fields within match_shape
+      are rejected the same way.
+    - >-
+      This contract does not publish a rule-ordering or priority field (see
+      the file header). Declaration/array order in a containing bundle's
+      rules list is never authoritative. rule_id is a stable identifier for
+      trace, audit, compatibility, and deterministic reporting; this contract
+      does not define evaluation priority or any tie-breaking semantics.
+      ADR-0004 Section 10 notes stable rule identifiers may serve as a
+      deterministic tie-breaking fallback, but future architecture/core work
+      must define any ordering or tie-breaking semantics before
+      implementation.
+
+  # Where this shape is produced, consumed, and governed. Informative; it
+  # records boundary ownership already established in ADR-0004 Section 16,
+  # it adds no structure of its own.
+  composition:
+    authored_as_part_of: policy-bundle  # rules are carried inside a policy-bundle's rules array
+    validated_by: basis-core            # future v0.2.0 policy validator checks shape, uniqueness, support
+    evaluated_by: basis-core            # future v0.2.0 kernel evaluates match/conditions deterministically
+    published_by: basis-schemas         # publishes the rule shape only; implements none of the above
+
+  examples:
+    valid:
+      # 1. Role-based allow rule (subject_roles + actions match criteria).
+      - rule_id: rule-operator-read-ahu-telemetry
+        effect: allow
+        match:
+          subject_roles:
+            - operator
+          actions:
+            - read:ahu
+        reason_code: allow_rule_matched
+        explanation: Operators may read AHU telemetry.
+      # 2. Resource/site-scoped allow rule.
+      - rule_id: rule-west-campus-hvac-state-change
+        effect: allow
+        match:
+          site_ids:
+            - west-campus
+          resource_types:
+            - hvac
+          operation_intents:
+            - state_changing
+        reason_code: allow_rule_matched
+      # 3. Safety-context deny rule.
+      - rule_id: rule-deny-control-during-interlock
+        effect: deny
+        match:
+          safety_modes:
+            - interlock-engaged
+          operation_intents:
+            - control_affecting
+        reason_code: deny_rule_matched
+        explanation: >-
+          Control-affecting operations are denied while an interlock is
+          engaged.
+      # 4. Rule using one or more policy-condition values.
+      - rule_id: rule-deny-elevated-risk
+        effect: deny
+        conditions:
+          - condition_id: cond-risk-score-high
+            field_path: risk_context.score
+            operator: greater_than
+            expected_value: 0.8
+        reason_code: deny_rule_matched
+        explanation: Denies operations when the request's risk score is elevated.
+    invalid:
+      - reason: missing required rule ID
+        value:
+          effect: allow
+          match:
+            actions:
+              - read:ahu
+      - reason: empty rule ID
+        value:
+          rule_id: ""
+          effect: allow
+          match:
+            actions:
+              - read:ahu
+      - reason: invalid effect (not allow/deny)
+        value:
+          rule_id: rule-invalid-effect
+          effect: permit
+          match:
+            actions:
+              - read:ahu
+      - reason: not_applicable effect rejected (bundle-applicability outcome, not a rule effect)
+        value:
+          rule_id: rule-not-applicable-effect
+          effect: not_applicable
+          match:
+            actions:
+              - read:ahu
+      - reason: malformed selector (uppercase protocol, not open-identifier shaped)
+        value:
+          rule_id: rule-malformed-protocol
+          effect: allow
+          match:
+            protocols:
+              - BACnet
+      - reason: invalid action in match selector
+        value:
+          rule_id: rule-invalid-action
+          effect: allow
+          match:
+            actions:
+              - read
+      - reason: invalid resource in match selector
+        value:
+          rule_id: rule-invalid-resource
+          effect: allow
+          match:
+            resources:
+              - rooftop-1
+      - reason: unsupported operation intent in match selector
+        value:
+          rule_id: rule-unsupported-operation-intent
+          effect: allow
+          match:
+            operation_intents:
+              - destructive
+      - reason: malformed reason code (uppercase)
+        value:
+          rule_id: rule-malformed-reason-code
+          effect: allow
+          match:
+            actions:
+              - read:ahu
+          reason_code: ALLOW_RULE_MATCHED
+      - reason: malformed condition (missing required operator)
+        value:
+          rule_id: rule-malformed-condition
+          effect: deny
+          conditions:
+            - condition_id: cond-missing-operator
+              field_path: risk_context.score
+              expected_value: 0.8
+      - reason: duplicate condition IDs within one rule
+        value:
+          rule_id: rule-duplicate-condition-ids
+          effect: deny
+          conditions:
+            - condition_id: cond-duplicate
+              field_path: risk_context.score
+              operator: greater_than
+              expected_value: 0.8
+            - condition_id: cond-duplicate
+              field_path: risk_context.classification
+              operator: equals
+              expected_value: elevated
+      - reason: unknown field rejected
+        value:
+          rule_id: rule-unknown-field
+          effect: allow
+          match:
+            actions:
+              - read:ahu
+          priority: 1
+      - reason: script/expression field rejected (unknown field)
+        value:
+          rule_id: rule-script-field
+          effect: allow
+          match:
+            actions:
+              - read:ahu
+          script: "return True"
+      - reason: unconditional rule rejected (neither match nor conditions present)
+        value:
+          rule_id: rule-unconditional
+          effect: allow
+      - reason: empty match object rejected (no populated selector)
+        value:
+          rule_id: rule-empty-match
+          effect: allow
+          match: {}
+      - reason: empty selector array rejected
+        value:
+          rule_id: rule-empty-selector-array
+          effect: allow
+          match:
+            actions: []

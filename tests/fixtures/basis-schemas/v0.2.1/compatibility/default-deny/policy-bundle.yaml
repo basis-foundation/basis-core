@@ -1,0 +1,24 @@
+# Canonical compatibility fixture — scenario: default-deny.
+#
+# A globally-applicable bundle with exactly one ALLOW rule, scoped to the
+# operator role, and no DENY rule at all. The paired request's vendor
+# subject does not match it, so the bundle is applicable but grants nothing:
+# default deny (ADR-0002 Section 4).
+
+bundle_id: bundle-compat-default-deny
+bundle_version: "1.0.0"
+schema_version: "0.1.0"
+policy_owner: compat-vectors-team
+description: >-
+  Canonical compatibility fixture demonstrating default DENY: an applicable
+  bundle with no matching ALLOW rule and no DENY rule at all.
+rules:
+  - rule_id: allow-operator-read-ahu-telemetry
+    effect: allow
+    match:
+      subject_roles:
+        - operator
+      actions:
+        - "read:ahu"
+    reason_code: allow_rule_matched
+    explanation: Operators may read AHU telemetry.

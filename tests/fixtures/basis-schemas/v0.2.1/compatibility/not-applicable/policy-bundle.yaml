@@ -1,0 +1,28 @@
+# Canonical compatibility fixture — scenario: not-applicable.
+#
+# scope.resource_types restricts this bundle to hvac resources only. The
+# paired request's resource_type is chiller, so this bundle's scope does not
+# cover it at all (ADR-0004 Section 3: "A bundle outside its declared scope
+# should not pretend to deny or allow a request. It should be semantically
+# not applicable.").
+
+bundle_id: bundle-compat-hvac-scope
+bundle_version: "1.0.0"
+schema_version: "0.1.0"
+policy_owner: compat-vectors-team
+description: >-
+  Canonical compatibility fixture demonstrating NOT_APPLICABLE: a bundle
+  scoped to hvac resources, which does not cover a chiller-scoped request.
+scope:
+  resource_types:
+    - hvac
+rules:
+  - rule_id: allow-operator-hvac-write
+    effect: allow
+    match:
+      subject_roles:
+        - operator
+      resource_types:
+        - hvac
+    reason_code: allow_rule_matched
+    explanation: Operators may act on HVAC resources within this bundle's scope.

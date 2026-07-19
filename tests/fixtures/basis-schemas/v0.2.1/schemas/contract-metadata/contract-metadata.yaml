@@ -1,0 +1,302 @@
+# BASIS Contract Metadata — published contract.
+#
+# This file PUBLISHES, as a reusable contract in its own right, the metadata
+# shape every contract in this repository already carries: the `contract:`
+# block documented informally in schemas/README.md ("Metadata pattern") and
+# used identically by all six first-wave contracts (vocabulary, action-string,
+# resource-identifier, decision-request, decision-response, audit-event). It
+# does not invent a new identifier or version convention — it formalizes the
+# one this repository already established and reused six times.
+#
+# basis-architecture's operation-aware schema readiness plan (ADR-0005,
+# docs/architecture/operation-aware-schema-readiness-plan.md, "PR A — Shared
+# Metadata and Vocabulary") calls for schema version metadata and contract
+# identifiers to be published as their own reusable building blocks before
+# later operation-aware contracts (request, policy, response, trace, audit,
+# evidence) depend on them. This contract is that publication. It composes
+# identifier and version together, rather than as two separate contracts,
+# because that is exactly how the existing `contract:` block already composes
+# them — splitting a proven, six-times-repeated composition into pieces no
+# consumer has ever needed separately would not simplify anything.
+#
+# The `lifecycle` is `experimental` because formalizing this pattern as its own
+# citable contract is new, not because the underlying `contract:` block shape
+# is unsettled — it has been stable and reused without change since the
+# vocabulary contract first established it.
+
+contract:
+  name: contract-metadata
+  title: BASIS Contract Metadata
+  version: 0.1.0
+  lifecycle: experimental
+  governed_by: basis-architecture
+  published_by: basis-schemas
+  source: docs/architecture/operation-aware-schema-readiness-plan.md
+  description: >-
+    The metadata shape every published BASIS contract carries in its own
+    `contract:` block: a stable machine-readable identifier, an explicit
+    contract/schema version distinct from the basis-schemas package version, a
+    lifecycle state, governance and publication attribution, an optional
+    human-readable title and description, an optional source reference into
+    basis-architecture, and an optional list of other contracts this one
+    depends on. This contract formalizes the pattern already established and
+    reused identically by all six first-wave contracts; it does not change that
+    pattern or require existing contracts to adopt anything new.
+
+contract_metadata:
+  required:
+    - name
+    - title
+    - version
+    - lifecycle
+    - governed_by
+    - published_by
+    - source
+    - description
+  optional:
+    - depends_on
+  additional_properties: false
+
+  fields:
+    - id: name
+      type: string
+      required: true
+      non_empty: true
+      pattern: "^[a-z][a-z0-9]*(-[a-z0-9]+)*$"
+      description: >-
+        The contract identifier. Stable, deterministic, machine-readable, and
+        independent of Python import path, source filename, generated schema
+        filename, or package installation location. By convention it matches
+        the contract's directory name under schemas/ (e.g. vocabulary,
+        decision-response). Lowercase kebab-case; a lowercase letter followed
+        by lowercase letters, digits, or single hyphens. Carries no mutable
+        information such as a timestamp or filesystem path.
+    - id: title
+      type: string
+      required: true
+      non_empty: true
+      description: >-
+        Human-readable title of the contract (e.g. "BASIS Decision Response").
+        Informative only; never used for correlation or compatibility — that is
+        what `name` and `version` are for.
+    - id: version
+      type: string
+      required: true
+      non_empty: true
+      pattern: "^\\d+\\.\\d+\\.\\d+$"
+      description: >-
+        The version of this specific machine-readable contract surface —
+        distinct from the basis-schemas package release version. Two contracts
+        published in the same basis-schemas release may carry different
+        contract versions, and a contract's version advances independently of
+        a package version bump. Semantic-version form (MAJOR.MINOR.PATCH);
+        every first-wave contract currently publishes "0.1.0". This field
+        defines version metadata only: it does not implement version
+        negotiation or compatibility resolution.
+    - id: lifecycle
+      type: string
+      required: true
+      enum:
+        - experimental
+        - candidate
+        - stable
+      description: >-
+        The contract's lifecycle state, as defined in
+        docs/contract-governance.md. States move forward only
+        (experimental -> candidate -> stable) and only on a decision recorded
+        in basis-architecture; this field publishes the current state, it does
+        not decide transitions.
+    - id: governed_by
+      type: string
+      required: true
+      non_empty: true
+      description: >-
+        Where the contract's shape is decided. Every currently published
+        contract sets this to "basis-architecture".
+    - id: published_by
+      type: string
+      required: true
+      non_empty: true
+      description: >-
+        Where the contract's machine-readable definition is published. Every
+        currently published contract sets this to "basis-schemas".
+    - id: source
+      type: string
+      required: true
+      non_empty: true
+      description: >-
+        Path, relative to the governing repository, to the document that
+        decided this contract's shape (e.g.
+        docs/architecture/action-vocabulary.md). Informative provenance, not a
+        resolvable dependency.
+    - id: description
+      type: string
+      required: true
+      non_empty: true
+      description: >-
+        One-paragraph, human-readable summary of what the contract publishes
+        and why. Not a substitute for the contract's own field-level
+        documentation.
+    - id: depends_on
+      type: array
+      required: false
+      default: []
+      items:
+        type: string
+        pattern: "^[a-z][a-z0-9]*(-[a-z0-9]+)*$"
+      description: >-
+        Names of other published contracts this one builds on (e.g.
+        action-string depends on vocabulary). Each entry must itself be a valid
+        contract identifier per the `name` pattern above. Absent or empty means
+        the contract depends on no other published contract.
+
+  constraints:
+    - name, title, version, lifecycle, governed_by, published_by, source, and
+      description are required.
+    - name, title, governed_by, published_by, source, and description must be
+      non-empty strings.
+    - name must match the identifier pattern (lowercase kebab-case).
+    - version must match the semantic-version pattern (MAJOR.MINOR.PATCH).
+    - lifecycle must be one of experimental, candidate, or stable.
+    - depends_on, when present, must be a list; each entry must match the
+      identifier pattern.
+    - Unknown / additional fields are rejected.
+
+  # Where this pattern is produced, consumed, and governed. Informative; it
+  # records boundary ownership already established elsewhere, it adds no
+  # structure of its own.
+  composition:
+    decided_by: basis-architecture      # a contract's shape and version bump are decided there
+    published_by: basis-schemas         # every contract file's own `contract:` block follows this shape
+    consumed_by: basis-core, basis-gateway, basis-adapters, basis-identity, basis-console  # read a contract's identity/version/lifecycle before depending on it
+
+  examples:
+    valid:
+      # The vocabulary contract's own `contract:` block, reproduced verbatim.
+      # This is a real, already-published block — not a hypothetical example —
+      # demonstrating that this schema faithfully describes existing usage.
+      - name: vocabulary
+        title: BASIS Action Vocabulary
+        version: "0.1.0"
+        lifecycle: experimental
+        governed_by: basis-architecture
+        published_by: basis-schemas
+        source: docs/architecture/action-vocabulary.md
+        description: >-
+          Canonical action verbs shared across BASIS components.
+      # The decision-response contract's own `contract:` block, including
+      # depends_on, reproduced verbatim.
+      - name: decision-response
+        title: BASIS Decision Response
+        version: "0.1.0"
+        lifecycle: experimental
+        governed_by: basis-architecture
+        published_by: basis-schemas
+        source: docs/architecture/ecosystem-contract-inventory.md
+        description: >-
+          The result of an authorization evaluation returned by the policy engine.
+        depends_on:
+          - decision-request
+      # A hypothetical future contract at candidate lifecycle with no
+      # dependencies, showing depends_on may be validly absent.
+      - name: policy-bundle
+        title: BASIS Policy Bundle
+        version: "0.2.0"
+        lifecycle: candidate
+        governed_by: basis-architecture
+        published_by: basis-schemas
+        source: docs/architecture/operation-aware-policy-rule-model.md
+        description: >-
+          The unit of policy distribution, versioning, and validation.
+    invalid:
+      - reason: missing required name
+        value:
+          title: BASIS Example
+          version: "0.1.0"
+          lifecycle: experimental
+          governed_by: basis-architecture
+          published_by: basis-schemas
+          source: docs/architecture/example.md
+          description: example
+      - reason: empty name
+        value:
+          name: ""
+          title: BASIS Example
+          version: "0.1.0"
+          lifecycle: experimental
+          governed_by: basis-architecture
+          published_by: basis-schemas
+          source: docs/architecture/example.md
+          description: example
+      - reason: malformed name (uppercase, not kebab-case)
+        value:
+          name: Example_Contract
+          title: BASIS Example
+          version: "0.1.0"
+          lifecycle: experimental
+          governed_by: basis-architecture
+          published_by: basis-schemas
+          source: docs/architecture/example.md
+          description: example
+      - reason: missing required version
+        value:
+          name: example-contract
+          title: BASIS Example
+          lifecycle: experimental
+          governed_by: basis-architecture
+          published_by: basis-schemas
+          source: docs/architecture/example.md
+          description: example
+      - reason: empty version
+        value:
+          name: example-contract
+          title: BASIS Example
+          version: ""
+          lifecycle: experimental
+          governed_by: basis-architecture
+          published_by: basis-schemas
+          source: docs/architecture/example.md
+          description: example
+      - reason: malformed version (not semver)
+        value:
+          name: example-contract
+          title: BASIS Example
+          version: "v1"
+          lifecycle: experimental
+          governed_by: basis-architecture
+          published_by: basis-schemas
+          source: docs/architecture/example.md
+          description: example
+      - reason: invalid lifecycle value
+        value:
+          name: example-contract
+          title: BASIS Example
+          version: "0.1.0"
+          lifecycle: beta
+          governed_by: basis-architecture
+          published_by: basis-schemas
+          source: docs/architecture/example.md
+          description: example
+      - reason: malformed depends_on entry
+        value:
+          name: example-contract
+          title: BASIS Example
+          version: "0.1.0"
+          lifecycle: experimental
+          governed_by: basis-architecture
+          published_by: basis-schemas
+          source: docs/architecture/example.md
+          description: example
+          depends_on:
+            - Not_A_Valid_Name
+      - reason: unknown / additional field rejected
+        value:
+          name: example-contract
+          title: BASIS Example
+          version: "0.1.0"
+          lifecycle: experimental
+          governed_by: basis-architecture
+          published_by: basis-schemas
+          source: docs/architecture/example.md
+          description: example
+          confidence: 0.97

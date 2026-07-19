@@ -1,0 +1,23 @@
+# Canonical compatibility fixture — scenario: allow-basic.
+#
+# The expected gateway-audit-event
+# (schemas/gateway-audit-event/gateway-audit-event.yaml) for req-compat-allow-001:
+# the ordinary path, gateway enforces the kernel allow.
+
+event_id: gateway-event-compat-allow-001
+event_type: gateway_authorization
+timestamp: "2026-07-09T09:00:02Z"
+request_id: req-compat-allow-001
+correlation_id: corr-compat-allow-001
+evaluation_status: completed
+outcome: allow
+failure_reason: null
+bundle_id: bundle-compat-allow
+bundle_version: "1.0.0"
+trace_id: trace-compat-allow-001
+audit_evidence_id: audit-compat-allow-001
+gateway_id: gateway-compat-vectors-01
+enforcement_action: allow
+reason_code: allow_rule_matched
+explanation: Gateway enforced the kernel allow decision.
+schema_version: "0.1.0"

@@ -1,0 +1,11 @@
+# Canonical compatibility fixture — scenario: deny-precedence.
+
+request_id: req-compat-deny-precedence-001
+evaluation_status: completed
+outcome: deny
+failure_reason: null
+bundle_id: bundle-compat-deny-precedence
+bundle_version: "1.0.0"
+trace_id: trace-compat-deny-precedence-001
+reason_code: deny_rule_matched
+explanation: Deny precedence applied; an interlock-scoped deny rule matched.

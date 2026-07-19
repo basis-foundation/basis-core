@@ -2173,26 +2173,34 @@ typed bundle semantic invalidity
     → policy_validation_failure   (this engine's typed-bundle boundary)
 ```
 
-**Known upstream conflict, not resolved here.** The current `basis-schemas`
-`invalid-policy-bundle` canonical vector (a duplicate-`rule_id` scenario)
-classifies duplicate rule IDs as `invalid_policy_bundle`, while the
+**Upstream conflict — reconciled in `basis-schemas` v0.2.1, vendored
+snapshot refreshed.** The `basis-schemas` `invalid-policy-bundle` canonical
+vector (a duplicate-`rule_id` scenario) previously classified duplicate rule
+IDs as `invalid_policy_bundle` in the `v0.2.0` release, while the
 `basis-core` staged evaluation pipeline — the typed structural-versus-
 semantic validation-error hierarchy this engine follows — classifies
 typed-bundle duplicate-ID failures as `policy_validation_failure`. The
-engine follows the typed structural-versus-semantic validation boundary, not
-the vendored fixture's classification. The upstream canonical vector must be
-reconciled in `basis-schemas` before PR 28 canonical-vector-shaped engine
-conformance testing can assert full agreement with it. The vendored fixture
-itself is not modified by this PR, and this PR does not claim full
-canonical-vector conformance — see `engine.py`'s own docstring, "Policy-
-validation failure mapping," for the full boundary rationale.
+engine has always followed the typed structural-versus-semantic validation
+boundary, not the vendored fixture's then-classification. `basis-schemas`
+`v0.2.1` corrects the canonical vector's four result artifacts to
+`failure_reason: policy_validation_failure` (removing the unrelated
+`reason_code: policy_bundle_invalid` outright rather than substituting a
+replacement) — see `tests/fixtures/basis-schemas/v0.2.1/README.md`. The
+vendoring PR that pulled `v0.2.1` in vendors the corrected fixtures
+verbatim and updates the active snapshot pointer
+(`tests/helpers/basis_schemas_snapshot.py`'s `SNAPSHOT_RELEASE`); it does
+not modify `basis-core` evaluator behavior. The historical `v0.2.0`
+snapshot remains on disk, unchanged, for reference. See `engine.py`'s own
+docstring, "Policy-validation failure mapping," for the full boundary
+rationale (that docstring still narrates the boundary against the `v0.2.0`
+fixture path and has not itself been revisited by the vendoring PR).
 
 PR 28 ("Combining-algorithm canonical-vector-shaped unit tests," below)
 remains canonical-vector-shaped engine testing and is not implemented by
-this PR, and is now additionally blocked on the upstream `basis-schemas`
-reconciliation named above before it can assert conformance against the
-`invalid-policy-bundle` vector specifically. PRs 28 through 44 remain
-unrenumbered.
+this PR. The upstream `basis-schemas` reconciliation that previously
+blocked it is now complete in `v0.2.1`, and the local vendored snapshot has
+been refreshed accordingly — PR 28 may begin after this vendoring PR
+merges. PRs 28 through 44 remain unrenumbered.
 
 Objective: the future evaluation-owned orchestration engine
 (`evaluation/operation_aware/engine.py`) that sequences policy-owned
