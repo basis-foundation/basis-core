@@ -554,15 +554,29 @@ def test_decision_and_trace_failure_vocabularies_have_exact_name_and_value_parit
     assert TraceFailureReason.__module__ == "basis_core.audit.operation_aware.evaluation_trace"
 
 
-def test_no_operation_aware_orchestration_engine_was_introduced() -> None:
-    """Required test 8: this PR does not add
-    `src/basis_core/evaluation/operation_aware/engine.py` (the future
-    `OperationAwareEvaluationEngine`, PR 27B, separately-scoped roadmap
-    work) — moving the failure vocabulary to `decisions/` does not, by
-    itself, imply or require any orchestration code."""
-    import importlib.util
+def test_this_module_still_does_not_define_the_orchestration_engine_itself() -> None:
+    """Required test 8, updated for PR 27B: this module (PR 27A's policy-owned
+    aggregation) never defined, and still does not define,
+    `OperationAwareEvaluationEngine` — that orchestration class now legitimately
+    exists (`src/basis_core/evaluation/operation_aware/engine.py`, PR 27B), but
+    it lives in `evaluation/`, not here, and this module was never its owner.
+    This test originally asserted the engine module did not exist at all,
+    back when PR 27A's own scope was "moving the failure vocabulary to
+    `decisions/` does not, by itself, imply or require any orchestration
+    code" — that assertion is now obsolete by design, since PR 27B's entire
+    purpose is to add that orchestration code. What remains true, and what
+    this test now checks instead, is that `aggregation.py` itself was never
+    the engine's home and does not define it."""
+    import ast
+    import inspect
 
-    assert importlib.util.find_spec("basis_core.evaluation.operation_aware.engine") is None
+    from basis_core.policy.operation_aware import aggregation as aggregation_module
+
+    source = inspect.getsource(aggregation_module)
+    tree = ast.parse(source)
+    class_defs = [node.name for node in ast.walk(tree) if isinstance(node, ast.ClassDef)]
+    assert "OperationAwareEvaluationEngine" not in class_defs
+    assert "OperationAwarePolicyEngine" not in class_defs
 
 
 # ══════════════════════════════════════════════════════════════════════════
