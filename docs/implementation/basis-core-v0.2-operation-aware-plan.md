@@ -2253,6 +2253,21 @@ symbol is touched.
 Blocked by architecture decision: no.
 
 **PR 28 — Combining-algorithm canonical-vector-shaped unit tests.**
+**Status: implemented** (`tests/operation_aware/test_engine_canonical_shapes.py`;
+uncommitted, pending architectural review). Five hand-constructed
+canonical-shaped tests — `test_allow_basic_canonical_shape`,
+`test_deny_precedence_canonical_shape`, `test_default_deny_canonical_shape`,
+`test_not_applicable_canonical_shape`, `test_invalid_policy_bundle_canonical_shape`
+— each build an `OperationAwareDecisionRequest` and a `PolicyBundle` directly
+through the real typed Pydantic models (never a raw dict, never
+`model_construct()`) and evaluate them through the real, unmocked
+`OperationAwareEvaluationEngine` (PR 27B). The `invalid-policy-bundle` shape
+reaches its duplicate-`rule_id` failure through ordinary `PolicyBundle`
+construction (bundle-level `rule_id` uniqueness is deferred to
+`validate_policy_bundle`, per `bundle.py`'s own docstring) and asserts
+`failure_reason: policy_validation_failure` — consistent with the `v0.2.1`
+reconciliation recorded in PR 27B's own status note above, so no
+architectural discrepancy was found.
 Objective: unit-level (not yet fixture-wired — that is Milestone 12)
 coverage of all five canonical vectors' *logical* shape, using
 hand-constructed `PolicyBundle`/`OperationAwareDecisionRequest` objects that
@@ -2261,7 +2276,10 @@ mirror each vector's structure, exercised through `OperationAwareEvaluationEngin
 in isolation.
 Files: `tests/operation_aware/test_engine_canonical_shapes.py`.
 Non-goals: not yet reading the vendored fixture files directly (Milestone
-12 does that).
+12 does that) — no expected-evaluation-trace/response/audit-evidence/
+gateway-event YAML is loaded or asserted against by this PR; no response,
+audit-evidence, or enforcement behavior was added; `src/` is unmodified by
+this PR.
 Dependencies: PR 27B.
 Architecture/schema references: `operation-aware-compatibility-vectors.md`
 §5.
