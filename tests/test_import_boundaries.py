@@ -285,6 +285,17 @@ def test_audit_operation_aware_does_not_import_from_policy_enforcement_or_adapte
     the nested `audit/operation_aware/` package. This test protects that
     nested package specifically, scanning recursively so it also covers any
     future descendant modules added under it.
+
+    Also asserts no `basis_core.evaluation` import (per `docs/import-
+    boundaries.md`: `audit/` must not import `evaluation/` — the two are
+    mutually isolated siblings under `evaluation/`; only `evaluation/` is
+    permitted to sit above both). This was not previously checked here
+    because, until PR 30 (`audit_evidence.py`,
+    `docs/implementation/basis-core-v0.2-operation-aware-plan.md`, Milestone
+    10), no module in this package needed to state the distinction
+    explicitly — `audit_evidence.py`'s own docstring ("Import boundary")
+    relies on this test to keep that guarantee mechanically checked rather
+    than merely asserted in prose.
     """
     pkg_dir = SRC_ROOT / "audit" / "operation_aware"
     imports: list[tuple[str, str]] = []
@@ -297,6 +308,7 @@ def test_audit_operation_aware_does_not_import_from_policy_enforcement_or_adapte
         if mod.startswith("basis_core.policy")
         or mod.startswith("basis_core.enforcement")
         or mod.startswith("basis_core.adapters")
+        or mod.startswith("basis_core.evaluation")
     ]
     assert violations == [], f"audit/operation_aware/ imports a forbidden layer: {violations}"
 
