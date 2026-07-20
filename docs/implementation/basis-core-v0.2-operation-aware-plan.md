@@ -396,7 +396,7 @@ compatibility concern · unresolved question.
 | `PolicyBundle` | ADR-0004 §2-3 | `policy-bundle` (PR D) | `PolicyBundle` — new, `src/basis_core/policy/operation_aware/bundle.py` | none (v0.1.0 has no bundle concept — rules are just a Python list) | Milestone 4 (PR 14-15) | none | Scope-matching semantics beyond exact-match equality are not fully specified by ADR-0004 — implement the conservative exact-match reading first (Section 6, Milestone 5) and flag richer matching as a later, separately-reviewed capability |
 | `TraceRuleEvidence` | ADR-0003 §5 | `trace-rule-evidence` (PR E) | `TraceRuleEvidence` — new, `src/basis_core/audit/operation_aware/trace_rule_evidence.py` | `RuleEvaluation` (v0.1.0, structurally simpler — no `rule_result` 4-value vocabulary, no `condition_results`) | Milestone 8 (PR 24) | Does not extend or alter `RuleEvaluation` | None |
 | `EvaluationTrace` | ADR-0003 §4 | `evaluation-trace` (PR E) | `EvaluationTrace` — new, `src/basis_core/audit/operation_aware/evaluation_trace.py` | `DecisionTrace` (v0.1.0, structurally simpler) | Milestone 8 (PR 25) | Does not extend or alter `DecisionTrace` | None |
-| `OperationAwareDecisionResponse` | ADR-0001 §4; ADR-0002 §4-5,14 | `operation-aware-decision-response` (PR E) | `OperationAwareDecisionResponse` — new, `src/basis_core/decisions/operation_aware.py` | `DecisionResponse` (v0.1.0, coexists unchanged) | Milestone 10 (PR 29) | Additive sibling only | None — the `evaluation_status`/`outcome`/`failure_reason` invariants are fully specified and directly testable |
+| `OperationAwareDecisionResponse` | ADR-0001 §4; ADR-0002 §4-5,14 | `operation-aware-decision-response` (PR E) | `OperationAwareDecisionResponse` — new, `src/basis_core/evaluation/operation_aware/response.py` (corrected by PR 29 from this table's original `decisions/operation_aware.py` placement — see PR 29's status note, Section 12, for why ADR-0006 requires the evaluation-owned location) | `DecisionResponse` (v0.1.0, coexists unchanged) | Milestone 10 (PR 29) | Additive sibling only | None — the `evaluation_status`/`outcome`/`failure_reason` invariants are fully specified and directly testable |
 | `AuditEvidence` | ADR-0003 §2,14 | `audit-evidence` (PR F) | `AuditEvidence` — new, `src/basis_core/audit/operation_aware/audit_evidence.py` | `AuditEvent` (v0.1.0, coexists unchanged, structurally distinct family) | Milestone 10 (PR 30) | `basis-core` **produces** this as part of its response; it must not persist it (no writer, no storage) | None on the shape; persistence ownership is explicitly the gateway's per ADR-0003 §14 |
 | reason codes | ADR-0003 §12; ADR-0004 §13 | `reason-code` (PR A) — format only, open vocabulary | `ReasonCode` validated string type (regex, not enum) | none | Milestone 2 (PR 5) | none — contract is explicitly not a closed enum | Final reason-code *vocabulary* (which specific codes `basis-core` emits) is this repository's own decision to make incrementally as evaluation stages are implemented, not something to invent wholesale up front |
 | redaction classification | ADR-0003 §10 | `redaction-classification` (PR A) — closed 5-value enum | `RedactionClassification` enum, `src/basis_core/domain/operation_aware_vocabulary.py` | none | Milestone 2 (PR 5) | Must be applied consistently wherever evidence-reference models are constructed | None — vocabulary is closed and stable |
@@ -2291,19 +2291,73 @@ Blocked by architecture decision: no.
 ### Milestone 10 — Response and AuditEvidence
 
 **PR 29 — `OperationAwareDecisionResponse` model.**
+**Status: implemented** (`src/basis_core/evaluation/operation_aware/response.py`;
+tests: `tests/operation_aware/test_operation_aware_decision_response.py`;
+uncommitted on `feature/operation-aware-decision-response`, pending
+architectural review).
+
+**Stale placement corrected — Files below no longer matches this entry's
+original text.** This entry originally read "extends
+`src/basis_core/decisions/operation_aware.py` (from PR 8)" — a placement
+from before `basis-architecture` ADR-0006 ("Introduce a Pure Evaluation
+Orchestration Layer"). Section 5's "Supersession note" already moved
+`trace_assembly.py`, `engine.py`, and `response_assembly.py` from a
+`policy/operation_aware/` sketch to `evaluation/operation_aware/` for the
+same reason, but never revisited this entry's own `decisions/
+operation_aware.py` placement. `OperationAwareDecisionResponse` embeds
+`EvaluationTrace` (audit-owned); `docs/import-boundaries.md` permits
+`audit/` to import only `domain/` and `decisions/`, and no permitted edge
+lets `decisions/` import `audit/` — so the complete response model cannot
+be typed correctly at `decisions/operation_aware.py` without an illegal
+`decisions → audit` import. Per `docs/kernel-constitution.md`'s own
+description of the evaluation layer — it "invokes policy-owned semantic
+operations and composes their typed results into bounded decision, trace,
+response, and kernel audit-evidence artifacts" — the model instead lives at
+`src/basis_core/evaluation/operation_aware/response.py`, following
+`trace_assembly.py`/`engine.py`'s precedent. `decisions/operation_aware.py`
+(from PR 8) is extended only narrowly, with two small shared vocabulary
+enums the response needs (`OperationAwareEvaluationStatus`,
+`OperationAwareDecisionOutcome`) — not with the response model itself.
+
 Objective: implement the model exactly as specified in Section 3/Section 9,
 including the `evaluation_status`/`outcome`/`failure_reason` mutual-exclusion
-invariants (Section 3's mapping-table row).
-Files: extends `src/basis_core/decisions/operation_aware.py` (from PR 8).
-Non-goals: none.
-Dependencies: PR 8, PR 25.
-Architecture/schema references: `operation-aware-decision-response.md` (PR
-E) in full; ADR-0002 §4-5,14.
+invariants (Section 3's mapping-table row — itself corrected by this PR to
+point at the new module location instead of the stale `decisions/
+operation_aware.py` row).
+Files: `src/basis_core/evaluation/operation_aware/response.py` (new); two
+new shared enums added to `src/basis_core/decisions/operation_aware.py`
+(from PR 8) — `OperationAwareEvaluationStatus`, `OperationAwareDecisionOutcome`
+— value- and member-name-parity-tested against the audit-owned
+`EvaluationStatus`/`TraceOutcome` (PR 25); `OperationAwareFailureReason`
+(already decisions-owned, from PR 27A) is reused directly, not redefined.
+Test: `tests/operation_aware/test_operation_aware_decision_response.py`.
+Also touched: `tests/operation_aware/test_vocabulary_boundaries.py`'s
+`_OPERATION_AWARE_MODULE_PATHS` allowlist, adding `response.py` as an
+anticipated `ReasonCode` consumer (that test file's own docstring names
+this as the expected update mechanism for new operation-aware modules).
+Non-goals: response assembly from an `EvaluationTrace`/engine result (PR
+31); `AuditEvidence` (PR 30); full response/trace/audit-evidence agreement
+(PR 32) — this PR enforces only the narrow subset of response/trace
+agreement (`request_id`, `correlation_id` when both present,
+`failure_reason`, `reason_code` when both non-null) that the vendored
+contract's own invalid examples actually exercise as rejection cases;
+`evaluation_status`/`outcome`/`bundle_id`/`bundle_version`/`trace_id`-vs-
+`evaluation_trace.trace_id` agreement remain deliberately deferred to PR
+32, not silently absorbed here. Public export remains PR 35.
+Dependencies: PR 8 (request model, pattern reuse), PR 25 (`EvaluationTrace`),
+PR 27A (`OperationAwareFailureReason`).
+Architecture/schema references: `operation-aware-decision-response.yaml`
+(vendored `basis-schemas` v0.2.1) in full; ADR-0002 §4-5,14; ADR-0006.
 Required tests: the four required outcome/status/failure-reason invariant
 combinations (`completed+allow/deny/not_applicable` valid;
 `failed+null-outcome` valid and required; every other combination invalid),
-tested directly as Pydantic validator cases.
-Completion criteria: model passes every vendored PR E valid/invalid example.
+tested directly as Pydantic validator cases; every vendored valid (5) and
+invalid (16) fixture example; required-nullable serialization across direct
+dump, direct JSON dump, nested-in-a-wrapper dump, nested-in-a-wrapper JSON
+dump, `exclude_none`, explicit `include`, and explicit `exclude`; v0.1
+`DecisionResponse` regression.
+Completion criteria: model passes every vendored valid/invalid example (5
+valid, 16 invalid — met, 155 focused tests passing, full suite green).
 Compatibility risk: none — new file addition, does not touch
 `decisions/models.py`.
 Blocked by architecture decision: no.
