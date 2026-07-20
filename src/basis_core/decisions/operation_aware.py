@@ -338,6 +338,61 @@ class OperationAwareFailureReason(str, Enum):
     INTERNAL_EVALUATION_ERROR = "internal_evaluation_error"
 
 
+class OperationAwareEvaluationStatus(str, Enum):
+    """
+    Closed, two-value vocabulary for whether operation-aware evaluation
+    completed and produced a valid authorization decision (`completed`) or
+    could not (`failed`) — ADR-0002 §14. Shared operation-aware
+    evaluation-result vocabulary, added by PR 29
+    (`docs/implementation/basis-core-v0.2-operation-aware-plan.md`,
+    Milestone 10) for `OperationAwareDecisionResponse`
+    (`evaluation/operation_aware/response.py`), following the same
+    "Shared evaluation-result vocabulary ownership" reasoning this module's
+    docstring already gives for `OperationAwareFailureReason` above:
+    `decisions/` is the lowest common legal dependency every future consumer
+    (`policy/`, `audit/`, `evaluation/`) already shares.
+
+    Value- and member-name-parity-tested against
+    `basis_core.audit.operation_aware.evaluation_trace.EvaluationStatus`
+    (that module's own, independently-defined local copy, required because
+    `audit/` may not import `decisions/` — see this module's docstring,
+    "Audit separation" — for symmetry `evaluation/` reuses this
+    decisions-owned copy directly rather than the audit-owned one, since
+    `evaluation/` legally imports `decisions/`).
+
+    COMPLETED  The kernel completed evaluation and produced a valid
+               authorization decision.
+    FAILED     The kernel could not produce a valid authorization decision.
+               Distinct from a substantive `deny` outcome — see
+               `OperationAwareDecisionOutcome` below.
+    """
+
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+class OperationAwareDecisionOutcome(str, Enum):
+    """
+    Closed, three-value authorization-outcome vocabulary for
+    `OperationAwareDecisionResponse.outcome`, matching the existing
+    `decision-response`/`evaluation-trace`/`policy-rule` outcome vocabulary
+    exactly (no new outcome values introduced). Added by PR 29 alongside
+    `OperationAwareEvaluationStatus` above — see that type's docstring for
+    the shared ownership reasoning.
+
+    Value- and member-name-parity-tested against
+    `basis_core.audit.operation_aware.evaluation_trace.TraceOutcome`.
+
+    ALLOW           The action is permitted.
+    DENY            The action is not permitted.
+    NOT_APPLICABLE  No policy bundle covered the request.
+    """
+
+    ALLOW = "allow"
+    DENY = "deny"
+    NOT_APPLICABLE = "not_applicable"
+
+
 class OperationAwareDecisionRequest(BaseModel):
     """
     The operation-aware authorization request — an additive, richer sibling

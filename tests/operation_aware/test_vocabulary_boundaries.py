@@ -70,6 +70,13 @@ _OPERATION_AWARE_MODULE_PATHS = {
     # `policy/operation_aware/aggregation.py`'s docstring — `policy/` may
     # import `domain/` per `docs/import-boundaries.md`).
     SRC_ROOT / "policy" / "operation_aware" / "aggregation.py",
+    # PR 29: `OperationAwareDecisionResponse.reason_code` is typed
+    # `ReasonCode | None`, reused unchanged via the same small
+    # `PlainValidator`/`PlainSerializer` wrapper this package's sibling
+    # modules already use (see `evaluation/operation_aware/response.py`'s
+    # docstring — `evaluation/` may import `domain/` per
+    # `docs/import-boundaries.md`).
+    SRC_ROOT / "evaluation" / "operation_aware" / "response.py",
 }
 
 
