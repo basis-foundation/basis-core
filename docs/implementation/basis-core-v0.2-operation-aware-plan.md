@@ -2363,17 +2363,125 @@ Compatibility risk: none — new file addition, does not touch
 Blocked by architecture decision: no.
 
 **PR 30 — `AuditEvidence` model.**
-Objective: implement the model exactly as specified in Section 3/Section 9.
-Files: `src/basis_core/audit/operation_aware/audit_evidence.py`; test:
-`tests/operation_aware/test_audit_evidence.py`.
-Non-goals: **no persistence mechanism, no `AuditWriter`-shaped protocol for
-this type** — explicitly out of scope per Section 9.
-Dependencies: PR 25, PR 29.
-Architecture/schema references: `audit-evidence.md` (PR F); ADR-0003 §2,14.
-Required tests: fixture conformance against vendored PR F examples.
-Completion criteria: model passes every vendored valid/invalid example.
-Compatibility risk: none — does not touch `audit/events.py`'s `AuditEvent`.
-Blocked by architecture decision: no.
+**Status: implemented** (`src/basis_core/audit/operation_aware/
+audit_evidence.py`; tests: `tests/operation_aware/test_audit_evidence.py`;
+uncommitted on `feature/operation-aware-audit-evidence`, pending
+architectural review).
+
+Objective: implement the model exactly as specified in Section 3/Section 9,
+against the vendored `basis-schemas` v0.2.1 `audit-evidence` contract
+(`tests/fixtures/basis-schemas/v0.2.1/schemas/audit-evidence/
+audit-evidence.yaml`).
+Files: `src/basis_core/audit/operation_aware/audit_evidence.py` (new,
+`AuditEvidence` plus the `AUDIT_EVIDENCE_SCHEMA_VERSION` constant); test:
+`tests/operation_aware/test_audit_evidence.py` (new, 221 focused tests).
+Also touched, narrowly: `tests/operation_aware/test_vocabulary_boundaries.py`
+(added `audit_evidence.py` to the `_OPERATION_AWARE_MODULE_PATHS` allowlist
+of legitimate `ReasonCode` consumers, per that test file's own documented
+update mechanism); `tests/test_import_boundaries.py`
+(`test_audit_operation_aware_does_not_import_from_policy_enforcement_or_adapters`
+extended to additionally assert no `basis_core.evaluation` import — a gap
+that predated this PR and is not itself weakened by it; every prior
+assertion in that test is unchanged and still enforced).
+Exact field inventory (16 fields): `evidence_id` (str, required, non-empty),
+`request_id` (str, required, non-empty), `correlation_id` (str | None,
+optional), `trace_id` (str | None, optional, non-empty if present),
+`evaluation_status` (`OperationAwareEvaluationStatus`, required),
+`outcome` (`OperationAwareDecisionOutcome | None`, required-nullable),
+`failure_reason` (`OperationAwareFailureReason | None`, required-nullable),
+`bundle_id` (str | None, optional, non-empty if present), `bundle_version`
+(str | None, optional, semver pattern if present), `matched_rule_ids`
+(list[str], optional, defaults to `[]`, items non-empty and unique, order
+preserved), `identity_evidence_reference` (`IdentityEvidenceReference |
+None`, optional, reused unchanged from `domain/evidence.py`),
+`adapter_evidence_reference` (`AdapterEvidenceReference | None`, optional,
+reused unchanged), `reason_code` (`ReasonCode | None`, optional, reused
+unchanged), `explanation` (str | None, optional, non-empty if present),
+`recorded_at` (`datetime`, required, timezone-aware, caller-supplied — no
+default factory, no clock), `schema_version` (str, optional, defaults to
+`AUDIT_EVIDENCE_SCHEMA_VERSION` = `"0.1.0"`, semver pattern).
+Shared vocabulary: `evaluation_status`/`outcome`/`failure_reason` reuse the
+decisions-owned `OperationAwareEvaluationStatus`/`OperationAwareDecisionOutcome`/
+`OperationAwareFailureReason` (`decisions/operation_aware.py`, PR 27A/29)
+directly — this module defines no fourth, audit-local duplicate of any of
+the three, unlike `evaluation_trace.py` (PR 25), which independently defined
+its own local copies at a time no `audit/` module yet exercised the
+already-permitted `audit/` → `decisions/` import edge
+(`docs/import-boundaries.md`). This PR is the first `audit/` module to
+exercise that edge; `evaluation_trace.py`'s own local vocabulary is
+unchanged and unmigrated. `reason_code` reuses `domain.
+operation_aware_vocabulary.ReasonCode` via the same locally-reproduced
+`PlainValidator`/`PlainSerializer` wrapper this package's sibling modules
+already use.
+Evaluation-state invariant: implemented directly on this model (not imported
+from `OperationAwareDecisionResponse` or `EvaluationTrace`) — `outcome` null
+iff `evaluation_status` is `failed`; `failure_reason` non-null iff `failed`.
+All eight combinations (four valid: completed+allow/deny/not_applicable,
+failed+null+governed-reason; four invalid: completed+null-outcome,
+completed+non-null-failure_reason, failed+non-null-outcome (×3 outcome
+values), failed+null-failure_reason) are directly tested, in addition to
+every vendored fixture example that exercises the same invariant.
+Recorded-time strategy: `recorded_at` is a required, non-nullable,
+timezone-aware `datetime` — caller-supplied only, no default factory, no
+`datetime.now()` call, no derivation from any other field (there is no
+`evaluation_time` field on this model to derive from). A timezone-naive
+value is rejected, mirroring `OperationAwareDecisionRequest.evaluation_time`'s
+existing tz-aware check.
+Matched-rule validation: `matched_rule_ids` is validated (non-empty items,
+uniqueness, caller-supplied order preserved) but never derived, calculated,
+sorted, or deduplicated by this model — derivation from `EvaluationTrace`/
+policy rules/engine internals remains PR 31's responsibility.
+Evidence-reference reuse: `identity_evidence_reference`/
+`adapter_evidence_reference` are typed as the real `IdentityEvidenceReference`/
+`AdapterEvidenceReference` models (PR 6), never `dict[str, Any]`; both
+reject raw evidence fields and unsupported `redaction_classification`
+values through their own existing closed validation.
+Serialization: follows the `@model_serializer(mode="wrap")` pattern proven
+by `EvaluationTrace` (PR 25) and `OperationAwareDecisionResponse` (PR 29) —
+`outcome`/`failure_reason` are restored as explicit `null` under
+`exclude_none=True` unless the caller's own `include`/`exclude` excluded
+them; verified across direct `model_dump`, direct `model_dump_json`, nested
+wrapper `model_dump`/`model_dump_json`, `exclude_none`, explicit `include`,
+and explicit `exclude`.
+No persistence, no writer: confirmed by direct test
+(`TestV01Compatibility::test_no_persistence_or_writer_method_exists_on_audit_evidence`)
+that no `write`/`save`/`store`/`append`/`publish`/`emit`/`persist` method
+exists on `AuditEvidence`; `audit/events.py` and `audit/writer.py` are
+untouched (see the "Compatibility risk" line below).
+Non-goals confirmed: **no persistence mechanism, no `AuditWriter`-shaped
+protocol for this type** (Section 9); no audit/response assembly (remains
+PR 31); no response/trace/audit-evidence agreement enforcement (remains
+PR 32); no public export (remains PR 35, Milestone 11).
+Dependencies: PR 25 (`EvaluationTrace`, referenced by `trace_id` only, never
+embedded), PR 27A/29 (`OperationAwareFailureReason`/
+`OperationAwareEvaluationStatus`/`OperationAwareDecisionOutcome`).
+Architecture/schema references: `audit-evidence.yaml` (vendored
+`basis-schemas` v0.2.1, PR F) in full; ADR-0003 §2, §14.
+Required tests: every vendored valid (6) and invalid (20) fixture example;
+all five vendored canonical `expected-audit-evidence.yaml` compatibility
+artifacts (independent model-shape conformance only — no comparison against
+engine, policy, response, or trace output); the eight evaluation-state
+matrix combinations; required-nullable serialization across direct dump,
+direct JSON dump, nested-wrapper dump, nested-wrapper JSON dump,
+`exclude_none`, explicit `include`, explicit `exclude`; `matched_rule_ids`
+non-empty/uniqueness/ordering; typed evidence-reference construction and
+rejection; `recorded_at` tz-aware rejection; v0.1 `AuditEvent`/`AuditWriter`
+regression.
+Completion criteria: model passes every vendored valid/invalid example (6
+valid, 20 invalid — met); all five canonical compatibility artifacts
+construct, including `invalid-policy-bundle`'s corrected v0.2.1
+`failure_reason: policy_validation_failure` value (met, no invented
+replacement code needed); 221 focused tests passing; full suite green (3540
+passed, 86 skipped); `ruff check`/`ruff format --check`/`mypy`/`git diff
+--check` all clean.
+Compatibility risk: none — new file addition, does not touch
+`audit/events.py`'s `AuditEvent` or `audit/writer.py`'s `AuditWriter`
+(mechanically confirmed by `TestV01Compatibility`).
+Blocked by architecture decision: no. No architectural conflict was
+encountered — the previously-documented-but-unexercised `audit/` →
+`decisions/` import edge (`docs/import-boundaries.md`) was exercised exactly
+as that document already permitted, with no change to the permission matrix
+itself required.
 
 **PR 31 — Response + AuditEvidence assembly.**
 Objective: pure functions, owned by the `evaluation/` orchestration layer
