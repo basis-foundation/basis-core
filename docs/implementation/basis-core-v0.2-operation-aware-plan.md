@@ -2484,30 +2484,110 @@ as that document already permitted, with no change to the permission matrix
 itself required.
 
 **PR 31 — Response + AuditEvidence assembly.**
+**Status: implemented** (`src/basis_core/evaluation/operation_aware/
+response_assembly.py`; tests: `tests/operation_aware/
+test_response_assembly.py`, 66 focused tests; uncommitted on
+`feature/operation-aware-response-assembly`, pending architectural review).
+
 Objective: pure functions, owned by the `evaluation/` orchestration layer
-(ADR-0006), wiring the policy-owned aggregation result (PR 27) and
-`EvaluationTrace` (PR 26) into a `(OperationAwareDecisionResponse,
-AuditEvidence)` pair — no I/O, no persistence. Response assembly consumes
-already-determined evaluation results and an already-assembled
-`EvaluationTrace`; it constructs the operation-aware response contract,
-preserves response/trace agreement, and may construct bounded kernel audit
-evidence now that `AuditEvidence` (PR 30) exists. It performs no audit
-persistence, records no gateway-only enforcement facts (`GatewayAuditEvent`
-remains the gateway's, per ADR-0003 and Section 9), and performs no runtime
-enforcement.
-Files: `src/basis_core/evaluation/operation_aware/response_assembly.py` (see
-Section 5 for this module's superseded earlier placement).
-Non-goals: none.
-Dependencies: PR 27, PR 29, PR 30.
-Architecture/schema references: ADR-0002 §14-15; ADR-0003 §2,14; basis-architecture
-ADR-0006.
+(ADR-0006), converting an already-produced `EvaluationTrace` (PR 26/27B) —
+and, for `AuditEvidence`, the `OperationAwareDecisionRequest` that trace
+answers — into a `(OperationAwareDecisionResponse, AuditEvidence)` pair — no
+I/O, no persistence. This engine's return value is treated as the single
+source of every already-determined evaluation fact; no duplicate,
+independently-supplied value for `evaluation_status`/`outcome`/
+`failure_reason`/bundle identity/`reason_code`/`explanation`/`request_id`/
+`correlation_id`/`trace_id` is accepted.
+
+Exact functions implemented (final names/signatures):
+
+```python
+def assemble_operation_aware_decision_response(
+    *, trace: EvaluationTrace, embed_evaluation_trace: bool,
+) -> OperationAwareDecisionResponse: ...
+
+def assemble_audit_evidence(
+    *, request: OperationAwareDecisionRequest, trace: EvaluationTrace,
+    evidence_id: str, recorded_at: datetime,
+) -> AuditEvidence: ...
+```
+
+Response trace-reference/embedding design: `trace_id` is always set from
+`trace.trace_id`; the caller-supplied, required `embed_evaluation_trace: bool`
+controls whether the full trace is also embedded (`True`) or left `None`
+(reference-only, `False`) — no inference from environment, configuration, or
+trace content. This matches every vendored `basis-schemas` v0.2.1
+`expected-operation-aware-decision-response.yaml` canonical fixture (all five
+scenarios carry `trace_id` and omit `evaluation_trace`).
+
+Explicit vocabulary mappings (three tables, exhaustiveness-tested against
+both source and target enum membership): `EvaluationStatus` →
+`OperationAwareEvaluationStatus`; `TraceOutcome` →
+`OperationAwareDecisionOutcome`; `TraceFailureReason` →
+`OperationAwareFailureReason`. No `TargetEnum(source.value)` coercion is
+used anywhere.
+
+Request/trace identity safety: `assemble_audit_evidence` checks
+`request.request_id == trace.request_id` and `request.correlation_id ==
+trace.correlation_id` (exact equality, including `None`) before combining
+request-owned evidence references with trace-owned facts, raising
+`EvaluationArtifactIdentityMismatchError` (message names only the
+mismatched field and the two identifier values under comparison — no raw
+evidence-reference content) on disagreement.
+
+Matched-rule projection: `AuditEvidence.matched_rule_ids` is derived from
+`trace.rule_evidence`, in its own established order, including exactly the
+`rule_id` of every entry whose `rule_result` is `RuleResult.MATCHED`
+(`not_matched`/`skipped`/`error` excluded); an empty list (never `None`,
+never omitted) when no entry matched, matching the model's own
+`Field(default_factory=list)` contract and every vendored `default-deny`/
+`not-applicable` canonical `expected-audit-evidence.yaml` fixture.
+
+No `policy/` import: `EvaluationTrace` already carries every final
+evaluation fact this module needs, so `response_assembly.py` imports only
+`domain`/`decisions`/`audit`/its own `evaluation` sibling — never
+`basis_core.policy`, `basis_core.adapters`, or `basis_core.enforcement`
+(confirmed by this PR's own purity-guard tests and the pre-existing
+recursive `evaluation/operation_aware/` import-boundary guard from PR 26,
+which required no modification).
+
+Purity/determinism confirmed: no clock (`datetime.now`/`.utcnow` never
+called — `recorded_at` is caller-supplied only), no UUID/random generation,
+no I/O, no persistence/writer method defined, no mutation of `request` or
+`trace` (verified via `model_dump(mode="json")` before/after comparison),
+deterministic repeat assembly.
+
+Files: `src/basis_core/evaluation/operation_aware/response_assembly.py`
+(new); `tests/operation_aware/test_response_assembly.py` (new). No other
+file was modified — `tests/operation_aware/test_vocabulary_boundaries.py`'s
+allowlist did not require an update (this module never imports
+`ReasonCode`/`operation_aware_vocabulary` directly; it only forwards
+already-constructed `ReasonCode` values already present on `trace`), and
+`tests/test_import_boundaries.py`'s existing recursive
+`evaluation/operation_aware/` guard already covers this new module without
+change.
+Non-goals confirmed: no policy evaluation, no engine invocation, no
+authorization-outcome reinterpretation, no audit persistence, no
+enforcement, no `GatewayAuditEvent`, no full response/trace/audit-evidence
+agreement matrix (remains PR 32, unimplemented), no full canonical fixture
+equality (remains the later canonical-vector milestone), no public export
+(remains PR 35), no reusable general-purpose agreement/validator helper.
+Dependencies: PR 26/27B (`EvaluationTrace`), PR 29
+(`OperationAwareDecisionResponse`), PR 30 (`AuditEvidence`).
+Architecture/schema references: ADR-0002 §14-15; ADR-0003 §2,14;
+basis-architecture ADR-0006.
 Required tests: assembly correctness for all four combining categories
-(allow/deny/not-applicable/failed); the `evaluation/operation_aware/`
+(allow/deny/not-applicable/failed) — met; the `evaluation/operation_aware/`
 recursive import-boundary test (established by PR 26) continues to pass with
-`response_assembly.py` added.
-Completion criteria: green.
-Compatibility risk: none.
-Blocked by architecture decision: no.
+`response_assembly.py` added — confirmed, no test modification needed.
+Completion criteria: green — 66 focused assembly tests; full
+`tests/operation_aware/` suite (2,889 passed, 86 skipped); full repository
+suite (3,606 passed, 86 skipped); `ruff check`/`ruff format --check`/`mypy`/
+`git diff --check` all clean.
+Compatibility risk: none — new file addition; protected v0.1/PR 29/PR 30
+files mechanically confirmed untouched.
+Blocked by architecture decision: no. No architectural conflict was
+encountered.
 
 **PR 32 — Response/trace/AuditEvidence agreement invariant tests.**
 Objective: implement and test the "Response/trace authority" cross-field
