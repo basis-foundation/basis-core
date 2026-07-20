@@ -2590,20 +2590,71 @@ Blocked by architecture decision: no. No architectural conflict was
 encountered.
 
 **PR 32 — Response/trace/AuditEvidence agreement invariant tests.**
-Objective: implement and test the "Response/trace authority" cross-field
-rules from `operation-aware-decision-response.md` §21 (Section 9 of this
-plan) — request_id/evaluation_status/outcome/failure_reason equality between
-response and embedded trace; bundle_id/version agreement; one-sided
-correlation_id/reason_code is not a mismatch.
-Files: `tests/operation_aware/test_response_trace_audit_agreement.py`.
-Non-goals: none.
-Dependencies: PR 31.
-Architecture/schema references: `operation-aware-decision-response.md` §21.
-Required tests: every stated invariant, both positive (agreement holds) and
-negative (deliberately constructed disagreement is caught).
-Completion criteria: green.
-Compatibility risk: none.
-Blocked by architecture decision: no.
+**Status: implemented** (`tests/operation_aware/test_artifact_agreement.py`,
+109 focused tests; uncommitted on `test/operation-aware-artifact-agreement`,
+pending architectural review). No production source file changed.
+
+Objective: independently prove, via unit-level cross-artifact tests calling
+the real, merged PR 31 assemblers (`assemble_operation_aware_decision_response`,
+`assemble_audit_evidence`), that `OperationAwareDecisionResponse`,
+`EvaluationTrace`, and `AuditEvidence` agree on every shared field —
+request_id/correlation_id identity; evaluation_status/outcome/failure_reason
+(via independent, test-owned enum mappings, exhaustiveness-tested, never
+`.value` string coercion); bundle_id/bundle_version; trace_id; reason_code;
+explanation — across both the reference-only and embedded response forms,
+across every valid evaluation state (completed allow, completed explicit
+deny, completed default deny, completed not-applicable, failed — including
+all six governed failure reasons, with the duplicate-rule scenario correctly
+using `policy_validation_failure`, not the superseded `invalid_policy_bundle`
+classification), for `AuditEvidence.matched_rule_ids` projection (including
+order-as-contract and empty-list-not-`None` behavior), and for request-owned
+evidence-reference provenance (`identity_evidence_reference`/
+`adapter_evidence_reference`, all four presence combinations). Also proves,
+via a 24-case negative-mutation matrix built with `model_copy(update=...)`,
+that these agreement checks actually detect disagreement, and that every
+mutation is caught and identifies the mismatched field by name. Covers
+serialization agreement (`model_dump(mode="json")`,
+`exclude_none=True`, `model_dump_json()`, and a nested response/trace
+envelope serialization test), determinism, and input/artifact immutability.
+
+Files: `tests/operation_aware/test_artifact_agreement.py` (new, matching the
+brief's required filename — supersedes this entry's earlier placeholder
+filename, `test_response_trace_audit_agreement.py`, which was never
+implemented).
+Non-goals: no production agreement framework or validator function (test-local
+assertion helpers only — `_assert_response_trace_agree`,
+`_assert_audit_trace_agree`, `_assert_response_audit_agree`,
+`_assert_complete_artifact_agreement`, and related helpers, all defined
+inside the test module and not exported); no `OperationAwareEvaluationEngine`,
+policy, or enforcement invocation (mechanically confirmed by a static AST
+guard); no `GatewayAuditEvent` or gateway-owned enforcement fact (also
+guarded); no runtime fixture loading (`yaml`/`tests.helpers.
+basis_schemas_snapshot`/`tests.helpers.operation_aware_contracts` imports are
+mechanically forbidden by a static guard, matching
+`test_engine_canonical_shapes.py`'s existing pattern) — complete canonical
+YAML fixture equality remains PR 37; no public API change (remains PR 35).
+Dependencies: PR 31 (confirmed merged at `d493e1a`, this branch's starting
+commit).
+Architecture/schema references: `operation-aware-decision-response.md` §21;
+ADR-0002 §14; ADR-0003 §2,5,14; Section 9 of this plan.
+Required tests: every stated shared-field invariant, both positive (agreement
+holds, including after serialization and repeat assembly) and negative
+(24 deliberately constructed disagreements, each caught with a field-naming
+assertion message) — met.
+Completion criteria: green — 109 focused agreement tests; full
+`tests/operation_aware/` suite (2,998 passed, 86 skipped, up from PR 31's
+2,889 passed/86 skipped baseline by exactly this PR's 109 new tests); full
+repository suite (3,715 passed, 86 skipped, up from PR 31's 3,606
+passed/86 skipped baseline by the same 109); `ruff check`/`ruff format
+--check`/`mypy --cache-dir=/dev/null src`/`git diff --check` all clean;
+`git diff --name-only -- src` empty.
+Compatibility risk: none — new test-only file addition; protected
+`src/`, `tests/fixtures/basis-schemas/`, `src/basis_core/__init__.py`, and
+`docs/public-api.md` paths mechanically confirmed untouched.
+Blocked by architecture decision: no. No architectural conflict, model
+defect, or ambiguous optional-presence semantic was encountered; every
+assembled artifact from the real PR 31 functions agreed on every shared
+field for every scenario tested.
 
 ### Milestone 11 — EnforcementPoint/public API integration
 
