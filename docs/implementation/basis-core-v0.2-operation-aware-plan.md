@@ -2659,20 +2659,29 @@ field for every scenario tested.
 ### Milestone 11 — EnforcementPoint/public API integration
 
 **PR 33 — `OperationAwareEnforcementPoint` design decision record.**
-Objective: a short, docs-only note in `basis-core` (not a `basis-architecture`
-ADR — this is an additive, non-breaking design choice within `basis-core`'s
-own discretion, per Section 5's analysis) recording the "new class, not a
-modified `evaluate()` signature" decision and its four supporting reasons
-from Section 5, so the implementation PR that follows has a settled target.
-Files: `docs/implementation/operation-aware-enforcement-point-decision.md`
-(or folded into this plan's own text if a future session judges a separate
-file unnecessary — see Section 15 for this as an open repository-convention
-question).
+Status: **Complete.** Recorded as a repository-local ADR (not a
+`basis-architecture` ADR — this is an additive, non-breaking design choice
+within `basis-core`'s own discretion, per Section 5's analysis), following
+this repository's existing `docs/adr/` numbering convention rather than a
+plain implementation note, so the decision carries the same status/context/
+decision/consequences discipline as ADR-0001 through ADR-0005.
+Objective: record the "new class, not a modified `evaluate()` signature"
+decision and its four supporting reasons from Section 5, plus the full
+configuration model, accepted-input, caller-supplied-facts, result-carrier,
+disposition-mapping, expected-vs-unexpected-failure, trace-presentation,
+audit-boundary, gateway-boundary, and purity decisions PR 34 needs, so the
+implementation PR that follows has a settled target and does not invent
+architecture.
+Files: `docs/adr/ADR-0006-operation-aware-enforcement-point.md`.
 Non-goals: no code.
-Dependencies: PR 27, PR 31.
-Architecture/schema references: Section 5 of this plan.
+Dependencies: PR 27, PR 31, PR 32.
+Architecture/schema references: Section 5 of this plan;
+`basis-architecture/docs/kernel-boundary-rules.md`;
+`basis-architecture/docs/architecture/operation-aware-evaluation-orchestration.md`;
+`basis-architecture/docs/architecture/operation-aware-trace-audit-evidence.md`;
+`basis-architecture/docs/architecture/operation-aware-evaluation-semantics.md`.
 Required tests: none (docs-only).
-Completion criteria: decision recorded.
+Completion criteria: decision recorded — met.
 Compatibility risk: none.
 Blocked by architecture decision: no.
 
@@ -2681,18 +2690,24 @@ Objective: compose the `evaluation/operation_aware/` orchestration engine
 (`OperationAwareEvaluationEngine`, PR 27B, which itself invokes policy-owned
 bundle validation from PR 15, policy-owned aggregation from PR 27, and
 every other policy-owned semantic stage) into a fail-closed `evaluate()`
-that never raises, returning `OperationAwareDecisionResponse` (+ trace +
-`AuditEvidence`, per PR 33's recorded shape decision). `enforcement/`
-imports `evaluation/` directly for this composition — it does not reach past
-`evaluation/` into `policy/`'s semantic modules itself.
+that never raises, returning an `OperationAwareEnforcementResult`
+(`response: OperationAwareDecisionResponse`,
+`audit_evidence: AuditEvidence | None`, `disposition: EnforcementDisposition`
+— per ADR-0006's Decisions 5–9). `enforcement/` imports `evaluation/`
+directly for this composition — it does not reach past `evaluation/` into
+`policy/`'s semantic modules itself.
 Files: `src/basis_core/enforcement/operation_aware.py`.
 Non-goals: no audit *persistence* (Section 9 — `basis-core` does not write
-`AuditEvidence` anywhere); no shared state with `EnforcementPoint`.
-Dependencies: PR 33.
-Architecture/schema references: Section 5, Section 7 (all 16 pipeline
+`AuditEvidence` anywhere); no shared state with `EnforcementPoint`; no
+public export (`__all__`/`docs/public-api.md` remain PR 35, per
+ADR-0006 Decision 14).
+Dependencies: PR 33 (`docs/adr/ADR-0006-operation-aware-enforcement-point.md`).
+Architecture/schema references: ADR-0006 in full (all 14 decisions and the
+required PR 34 test contract); Section 5, Section 7 (all 16 pipeline
 stages), ADR-0002, ADR-0003.
-Required tests: fail-closed behavior for every Section 7 stage-1-5 failure
-category; never-raises guarantee (exception-injection tests analogous to
+Required tests: ADR-0006's full PR 34 test contract (22 items), including
+fail-closed behavior for every Section 7 stage-1-5 failure category and a
+never-raises guarantee (exception-injection tests analogous to
 `test_enforcement_point.py`'s existing coverage of `EnforcementPoint`).
 Completion criteria: green; `EnforcementPoint`'s own existing test suite
 still passes unmodified (proving no shared-state regression).
@@ -3070,7 +3085,7 @@ governance decision.
 | Performance expectations | Implementation choice within `basis-core`, currently undefined | No upstream document states a latency/throughput target for operation-aware evaluation; this plan does not invent one. Named as an open question rather than silently assumed. |
 | Extension contract compatibility | Resolved — no impact | Section 11's conclusion: no new extension point is introduced, so no existing extension contract (`PolicyRule`, `AuditWriter`, `AdapterBase`) is affected by anything in this roadmap. |
 | `tests/operation_aware/` as a new top-level test-organization convention | Implementation choice within `basis-core`, flagged for confirmation | Section 2.12 notes this departs from the existing flat `tests/*.py` convention; recommended because of the sheer number of new modules, but a future session/reviewer may prefer flattening it back into `tests/test_operation_aware_*.py` to match the existing convention exactly — either is compatible with this plan's roadmap, and the choice does not affect any dependency or architecture question. |
-| Whether PR 33's design-decision note is a standalone doc or folded into this plan | Implementation choice within `basis-core` | Named explicitly in PR 33's own entry (Section 12) as still open at plan-authoring time. |
+| Whether PR 33's design-decision note is a standalone doc or folded into this plan | Resolved by PR 33 | Recorded as `docs/adr/ADR-0006-operation-aware-enforcement-point.md`, a standalone repository-local ADR, not folded into this plan's own text — see PR 33's entry (Section 12). |
 | Richer bundle-scope matching (beyond exact-match) | **`basis-architecture` decision required**, if/when needed | Section 3 and PR 17 flag this as a conservative first implementation, not a permanent ceiling; broadening it (prefix matching, zone hierarchy awareness) should get its own review rather than being added informally to Milestone 5's PRs after the fact. |
 | CHANGELOG.md introduction | Release-governance decision | No `CHANGELOG.md` exists in `basis-core` today (Section 2.13); PR 43/44 (Milestone 14) is where this plan recommends deciding whether to introduce one, not earlier. |
 
