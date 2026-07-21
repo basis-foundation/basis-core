@@ -16,12 +16,31 @@ Contents
 
 Public API
 ──────────
-``EnforcementPoint`` is the sole public export of this package.
+``EnforcementPoint`` is the sole public export of this package for v0.1.
 See ``docs/public-api.md`` for the full inventory and stability tiers.
+
+Operation-aware public API (v0.2.0)
+────────────────────────────────────
+Additive sibling surface: ``OperationAwareEnforcementPoint`` (composes
+operation-aware evaluation into a fail-closed ``evaluate()`` that never
+raises), its immutable result carrier ``OperationAwareEnforcementResult``,
+and the enforcement-only ``EnforcementDisposition`` vocabulary. Neither
+modifies, subclasses, or shares implementation with ``EnforcementPoint``
+above; both coexist. See ``docs/public-api.md``'s "Operation-aware public
+API (v0.2.0)" section.
 """
 
 from basis_core.enforcement.enforcement import EnforcementPoint
+from basis_core.enforcement.operation_aware import (
+    EnforcementDisposition,
+    OperationAwareEnforcementPoint,
+    OperationAwareEnforcementResult,
+)
 
 __all__ = [
     "EnforcementPoint",
+    # operation-aware (v0.2.0)
+    "EnforcementDisposition",
+    "OperationAwareEnforcementPoint",
+    "OperationAwareEnforcementResult",
 ]

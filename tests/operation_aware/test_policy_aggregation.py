@@ -643,22 +643,22 @@ def test_no_new_symbols_are_exported_from_basis_core_policy_package() -> None:
     assert not hasattr(policy_package, "PolicyAggregationResult")
 
 
-def test_decisions_package_does_not_export_the_failure_reason_as_stable_public_api() -> None:
-    """Required test 9 (extended for PR 27A): moving
-    `OperationAwareFailureReason` into `decisions/operation_aware.py` does
-    not, by itself, stabilize it as part of `basis_core.decisions`'s
-    public API surface — it stays an internal symbol, reachable only via
-    the explicit submodule import used throughout this file
-    (`from basis_core.decisions.operation_aware import
-    OperationAwareFailureReason`), following the same "add internally now,
-    stabilize later" convention already applied to `ReasonCode` (see
-    `tests/operation_aware/test_vocabulary_boundaries.py`)."""
+def test_decisions_package_graduated_the_failure_reason_by_pr35() -> None:
+    """Required test 9 (extended for PR 27A) asserted `OperationAwareFailureReason`
+    stayed internal until stabilized. PR 35 (Milestone 11) is that
+    stabilization: `basis_core.decisions.__all__` now includes it, per
+    `docs/public-api.md`'s "Operation-aware public API (v0.2.0)" section
+    and the same "add internally now, stabilize later" convention already
+    applied to `ReasonCode` (see `tests/operation_aware/
+    test_vocabulary_boundaries.py::TestPublicApiSurfaceGraduatedByPR35`)."""
     import basis_core.decisions as decisions_package
+    from basis_core.decisions import operation_aware as concrete
 
-    assert not hasattr(decisions_package, "OperationAwareFailureReason")
+    assert "OperationAwareFailureReason" in decisions_package.__all__
+    assert decisions_package.OperationAwareFailureReason is concrete.OperationAwareFailureReason
 
     init_path = (
         Path(__file__).parent.parent.parent / "src" / "basis_core" / "decisions" / "__init__.py"
     )
     text = init_path.read_text(encoding="utf-8")
-    assert "OperationAwareFailureReason" not in text
+    assert "OperationAwareFailureReason" in text

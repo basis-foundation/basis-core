@@ -83,6 +83,13 @@ _OPERATION_AWARE_MODULE_PATHS = {
     # `audit/operation_aware/audit_evidence.py`'s docstring — `audit/` may
     # import `domain/` per `docs/import-boundaries.md`).
     SRC_ROOT / "audit" / "operation_aware" / "audit_evidence.py",
+    # PR 35: `basis_core.domain`'s package initializer imports
+    # `RedactionClassification`/`ReasonCode` directly to graduate them into
+    # the stable package-level public API (docs/public-api.md's
+    # "Operation-aware public API (v0.2.0)" section) — the anticipated,
+    # roadmap-scheduled export this module's own docstring names as
+    # Milestone 11, PR 35.
+    SRC_ROOT / "domain" / "__init__.py",
 }
 
 
@@ -167,25 +174,32 @@ class TestModuleImportBoundaries:
         )
 
 
-class TestPublicApiSurfaceUnchanged:
-    def test_domain_init_does_not_export_the_new_types(self) -> None:
+class TestPublicApiSurfaceGraduatedByPR35:
+    """As of PR 35 (`docs/implementation/basis-core-v0.2-operation-aware-
+    plan.md`, Milestone 11), `RedactionClassification`/`ReasonCode` are
+    stabilized as part of `basis_core.domain`'s package-level public API —
+    this module's own docstring named this as the expected outcome
+    ("Public API status: internal ... for now ... Milestone 11, PR 35").
+    Superseded the prior `TestPublicApiSurfaceUnchanged` guard, which
+    asserted the pre-PR-35 state."""
+
+    def test_domain_init_exports_the_new_types(self) -> None:
         init_path = SRC_ROOT / "domain" / "__init__.py"
         text = init_path.read_text(encoding="utf-8")
-        assert "operation_aware_vocabulary" not in text
-        assert "RedactionClassification" not in text
-        assert "ReasonCode" not in text
+        assert "operation_aware_vocabulary" in text
+        assert "RedactionClassification" in text
+        assert "ReasonCode" in text
 
-    def test_no_basis_core_package_init_exports_the_new_types(self) -> None:
-        for init_file in sorted(SRC_ROOT.rglob("__init__.py")):
-            text = init_file.read_text(encoding="utf-8")
-            assert "RedactionClassification" not in text
-            assert "ReasonCode" not in text
+    def test_domain_package_exports_the_new_types(self) -> None:
+        import basis_core.domain as domain_package
 
-    def test_public_api_doc_does_not_yet_list_the_new_types_as_stable(self) -> None:
+        assert "RedactionClassification" in domain_package.__all__
+        assert "ReasonCode" in domain_package.__all__
+        assert hasattr(domain_package, "RedactionClassification")
+        assert hasattr(domain_package, "ReasonCode")
+
+    def test_public_api_doc_lists_the_new_types_as_stable(self) -> None:
         public_api_doc = Path(__file__).parent.parent.parent / "docs" / "public-api.md"
         text = public_api_doc.read_text(encoding="utf-8")
-        # The roadmap plan itself may name these types in prose; the public
-        # API inventory document must not yet list them under a stable
-        # import-path table row (i.e. as part of "Stable public API").
-        assert "| `RedactionClassification` |" not in text
-        assert "| `ReasonCode` |" not in text
+        assert "| `RedactionClassification` |" in text
+        assert "| `ReasonCode` |" in text

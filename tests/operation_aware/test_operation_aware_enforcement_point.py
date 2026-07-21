@@ -1122,6 +1122,13 @@ class TestImportBoundaries:
 
 
 class TestPublicExportRestraint:
+    """PR 34 itself added no public export (ADR-0006 Decision 14): the
+    top-level `basis_core` namespace gained nothing, per that package's own
+    deliberate no-top-level-namespace policy (`docs/public-api.md`, "Open
+    API questions"). PR 35 (Milestone 11) is the PR that decides the
+    `basis_core.enforcement` export path — see `TestPublicExportGraduatedByPR35`
+    below for the now-exported state."""
+
     def test_not_exported_from_basis_core(self) -> None:
         for name in (
             "OperationAwareEnforcementPoint",
@@ -1131,23 +1138,40 @@ class TestPublicExportRestraint:
             assert not hasattr(basis_core, name)
             assert name not in getattr(basis_core, "__all__", [])
 
-    def test_not_exported_from_enforcement_package(self) -> None:
-        for name in (
-            "OperationAwareEnforcementPoint",
-            "OperationAwareEnforcementResult",
-            "EnforcementDisposition",
-        ):
-            assert not hasattr(enforcement_package, name)
-            assert name not in enforcement_package.__all__
-
-    def test_enforcement_all_is_unchanged(self) -> None:
-        assert enforcement_package.__all__ == ["EnforcementPoint"]
-
     def test_importable_only_from_concrete_internal_module(self) -> None:
         # This import succeeding is the point: the concrete module path
-        # remains available even though the package-level export does not.
+        # remains available whether or not a package-level export also exists.
         from basis_core.enforcement.operation_aware import (  # noqa: F401
             EnforcementDisposition,
             OperationAwareEnforcementPoint,
             OperationAwareEnforcementResult,
         )
+
+
+class TestPublicExportGraduatedByPR35:
+    """As of PR 35 (Milestone 11), `OperationAwareEnforcementPoint`,
+    `OperationAwareEnforcementResult`, and `EnforcementDisposition` are
+    stabilized as part of `basis_core.enforcement`'s package-level public
+    API (ADR-0006 Decision 14's "PR 35's decision" — now made). The
+    top-level `basis_core` namespace remains untouched — see
+    `TestPublicExportRestraint.test_not_exported_from_basis_core` above,
+    which still holds."""
+
+    def test_exported_from_enforcement_package(self) -> None:
+        from basis_core.enforcement import operation_aware as concrete
+
+        for name in (
+            "OperationAwareEnforcementPoint",
+            "OperationAwareEnforcementResult",
+            "EnforcementDisposition",
+        ):
+            assert name in enforcement_package.__all__
+            assert getattr(enforcement_package, name) is getattr(concrete, name)
+
+    def test_enforcement_all_is_v01_plus_operation_aware(self) -> None:
+        assert enforcement_package.__all__ == [
+            "EnforcementPoint",
+            "EnforcementDisposition",
+            "OperationAwareEnforcementPoint",
+            "OperationAwareEnforcementResult",
+        ]
