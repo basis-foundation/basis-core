@@ -2728,12 +2728,73 @@ Compatibility risk: none — new file, new class, verified independent of
 Blocked by architecture decision: no.
 
 **PR 35 — Public API surface update.**
+
+**Status: complete on `feature/operation-aware-public-api` (uncommitted).**
+Delivered exactly the scope named below. Added the "Operation-aware public
+API (v0.2.0)" section to `docs/public-api.md` and updated `__all__` on all
+five touched package initializers — `src/basis_core/domain/__init__.py`
+(11 new symbols: `RedactionClassification`, `ReasonCode`, `EvidenceDigest`,
+`IdentityEvidenceReference`, `AdapterEvidenceReference`,
+`OperationAwareLocation`, `OperationAwareDevice`,
+`OperationAwareProtocolContext`, `OperationAwareSafetyContext`,
+`OperationAwareEnvironmentContext`, `OperationAwareRiskContext`),
+`decisions/__init__.py` (5 new: `OperationAwareDecisionRequest`,
+`OperationIntent`, `OperationAwareFailureReason`,
+`OperationAwareEvaluationStatus`, `OperationAwareDecisionOutcome`),
+`policy/__init__.py` (6 new: `PolicyCondition`, `OperationAwarePolicyRule`,
+`OperationAwarePolicyMatch`, `RuleEffect`, `PolicyBundle`,
+`PolicyBundleScope`), `audit/__init__.py` (12 new: `TraceRuleEvidence`,
+`TraceConditionEvidence`, `TraceRuleEffect`, `RuleResult`,
+`TraceConditionResult`, `EvaluationTrace`, `EvaluationStatus`,
+`TraceOutcome`, `TraceBundleApplicability`, `TraceFailureReason`,
+`AuditEvidence`, `AUDIT_EVIDENCE_SCHEMA_VERSION`), and
+`enforcement/__init__.py` (3 new, per ADR-0006 Decision 14:
+`EnforcementDisposition`, `OperationAwareEnforcementPoint`,
+`OperationAwareEnforcementResult`) — 37 new package-level symbols in total.
+Every v0.1.0 `__all__` entry was preserved unchanged, unremoved, and in its
+original relative order (verified by dedicated
+`test_v01_inventory_unchanged` tests added per package). `PolicyRule`
+continues to resolve to the v0.1.0 `Protocol`; the operation-aware data
+model is exported only as `OperationAwarePolicyRule`, never as `PolicyRule`.
+`basis_core.evaluation` and `basis_core.evaluation.operation_aware` remain
+internal, unchanged, with no `__all__` — deliberately excluded per this
+PR's own non-goals below. `src/basis_core/__init__.py` was not modified (no
+top-level re-exports were added, per the repository's existing
+"no top-level namespace" default). Internal policy orchestration/evaluation
+symbols (`determine_applicability`, `ApplicabilityResult`,
+`evaluate_rule_selectors`, condition operators, `aggregate_policy_outcome`,
+`validate_policy_bundle`, and their supporting types) remain internal, as do
+all evaluation-owned assembly functions and `OperationAwareDecisionResponse`
+itself — reachable only via direct submodule import.
+
+`tests/test_public_api.py` was extended (not replaced): existing v0.1
+assertions are unchanged in outcome; each package's `test_all_matches_inventory`
+now asserts the union of a preserved v0.1 set and a new operation-aware set;
+new test classes cover export-coverage (membership, identity, documented
+imports, no cross-package leakage, no v0.1 collision) for each of the five
+packages, plus internal-symbol restraint, evaluation-package exclusion, no
+top-level leakage, and docs/public-api.md agreement. 47 new tests added to
+`test_public_api.py` (59 → 106 tests, all passing).
+
+Fixing this PR also required updating 22 pre-existing "not yet exported"
+regression-guard tests across 9 files in `tests/operation_aware/` (added by
+PR 5, 6, 7, 13, 24, 25, 27A, and 34), each of which had explicitly asserted
+the *pre-PR-35* state in its own docstring ("Public API status: internal ...
+for now ... Milestone 11, PR 35") — this PR is the point those guards
+themselves named as their expected supersession. Updated in place (not
+deleted) to assert the new, correct graduated state, with docstrings
+recording the supersession; not listed in this PR's original "Expected
+files" set but required for `tests/operation_aware` to pass green, as the
+roadmap's own Validation section requires.
+
 Objective: add the new "Operation-aware public API (v0.2.0)" section to
 `docs/public-api.md` (Section 11 of this plan), update `__all__` on every
 touched package, extend `test_public_api.py`.
 Files: `docs/public-api.md`, `src/basis_core/{domain,decisions,policy,audit,
 enforcement}/__init__.py`, `tests/test_public_api.py` (extended, not
-replaced).
+replaced). Also touched (see status note above, not in the original file
+list): 9 files under `tests/operation_aware/` whose own pre-PR-35 "not yet
+exported" guards required updating to the post-PR-35 state.
 Non-goals: no existing `__all__` entry removed or reordered in a
 meaning-changing way. `evaluation/` and `evaluation/operation_aware/` are
 deliberately excluded from this list — the evaluation package remains
@@ -2748,10 +2809,14 @@ Required tests: `test_public_api.py`'s existing invariants (every symbol
 importable from its declared path; `__all__` matches the documented
 inventory; no internal symbol re-exported) extended to cover every new
 symbol.
-Completion criteria: green; the existing v0.1.0 portion of `test_public_api.py`
-unchanged in outcome.
+Completion criteria: green — `pytest` (3834 passed, 86 skipped),
+`tests/operation_aware` (3070 passed, 86 skipped), `ruff check`, `ruff
+format --check`, and `mypy src` all green; the existing v0.1.0 portion of
+`test_public_api.py` unchanged in outcome. Met.
 Compatibility risk: none (purely additive).
 Blocked by architecture decision: no.
+
+PR 36 (extension-contracts.md addition) remains next, not started.
 
 **PR 36 — Extension-contracts.md addition.**
 Objective: document, in `docs/extension-contracts.md`, that the

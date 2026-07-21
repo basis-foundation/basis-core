@@ -153,13 +153,21 @@ class TestModuleImportBoundaries:
         and inward-facing only; nothing in the existing v0.1.0 kernel
         depends on it. A sibling operation-aware module (e.g.
         `decisions/operation_aware.py`, PR 8) importing this one is
-        expected and excluded — see `_is_operation_aware_sibling_module`."""
+        expected and excluded — see `_is_operation_aware_sibling_module`.
+        `domain/__init__.py` is also excluded as of PR 35 (Milestone 11):
+        the package initializer legitimately imports this module to
+        graduate the six context value objects into the stable
+        package-level public API — the roadmap-scheduled export this
+        module's own docstring names as its expected future, not a v0.1.0
+        kernel dependency."""
+        pr35_exceptions = {SRC_ROOT / "domain" / "__init__.py"}
         violations: list[tuple[str, str]] = []
         for py_file in sorted(SRC_ROOT.rglob("*.py")):
             if (
                 "__pycache__" in str(py_file)
                 or py_file == MODULE_PATH
                 or _is_operation_aware_sibling_module(py_file)
+                or py_file in pr35_exceptions
             ):
                 continue
             for module in _collect_imports(py_file):
@@ -170,7 +178,13 @@ class TestModuleImportBoundaries:
         )
 
 
-class TestPublicApiSurfaceUnchanged:
+class TestPublicApiSurfaceGraduatedByPR35:
+    """As of PR 35 (Milestone 11), the six context value objects are
+    stabilized as part of `basis_core.domain`'s package-level public API —
+    this module's own docstring named this as the expected outcome.
+    Supersedes the prior `TestPublicApiSurfaceUnchanged` guard, which
+    asserted the pre-PR-35 state."""
+
     _NEW_TYPE_NAMES = (
         "OperationAwareLocation",
         "OperationAwareDevice",
@@ -180,26 +194,25 @@ class TestPublicApiSurfaceUnchanged:
         "OperationAwareRiskContext",
     )
 
-    def test_domain_init_does_not_export_the_new_types(self) -> None:
+    def test_domain_init_exports_the_new_types(self) -> None:
         init_path = SRC_ROOT / "domain" / "__init__.py"
         text = init_path.read_text(encoding="utf-8")
-        assert "operation_aware " not in text
-        assert "operation_aware\n" not in text
-        assert "from basis_core.domain.operation_aware " not in text
+        assert "from basis_core.domain.operation_aware import (" in text
         for name in self._NEW_TYPE_NAMES:
-            assert name not in text
+            assert name in text
 
-    def test_no_basis_core_package_init_exports_the_new_types(self) -> None:
-        for init_file in sorted(SRC_ROOT.rglob("__init__.py")):
-            text = init_file.read_text(encoding="utf-8")
-            for name in self._NEW_TYPE_NAMES:
-                assert name not in text
+    def test_domain_package_exports_the_new_types(self) -> None:
+        import basis_core.domain as domain_package
 
-    def test_public_api_doc_does_not_yet_list_the_new_types_as_stable(self) -> None:
+        for name in self._NEW_TYPE_NAMES:
+            assert name in domain_package.__all__
+            assert hasattr(domain_package, name)
+
+    def test_public_api_doc_lists_the_new_types_as_stable(self) -> None:
         public_api_doc = Path(__file__).parent.parent.parent / "docs" / "public-api.md"
         text = public_api_doc.read_text(encoding="utf-8")
         for name in self._NEW_TYPE_NAMES:
-            assert f"| `{name}` |" not in text
+            assert f"| `{name}` |" in text
 
 
 class TestNoSensitiveFieldsExposed:

@@ -734,10 +734,16 @@ class TestV01Compatibility:
         assert not issubclass(TraceRuleEvidence, RuleEvaluation)
         assert not issubclass(RuleEvaluation, TraceRuleEvidence)
 
-    def test_audit_package_public_symbols_unchanged(self) -> None:
+    def test_audit_package_v01_public_symbols_still_present_unchanged(self) -> None:
+        """PR 35 (Milestone 11) additively extends `basis_core.audit.__all__`
+        with the operation-aware trace/audit-evidence surface; every v0.1.0
+        symbol previously asserted here remains present, in the same
+        relative order, unremoved and unrenamed. See
+        `tests/test_public_api.py::TestAuditPackage::test_v01_inventory_unchanged`
+        for the authoritative harness."""
         import basis_core.audit as audit_package
 
-        assert audit_package.__all__ == [
+        v01_symbols = [
             "AuditEvent",
             "AuditEventType",
             "AuditOutcome",
@@ -748,21 +754,31 @@ class TestV01Compatibility:
             "DecisionTrace",
             "RuleEvaluation",
         ]
+        assert [name for name in audit_package.__all__ if name in v01_symbols] == v01_symbols
 
 
 # ══════════════════════════════════════════════════════════════════════════
-# Public API boundary — TraceRuleEvidence is not prematurely public
+# Public API boundary — TraceRuleEvidence graduated to stable public API by PR 35
 # ══════════════════════════════════════════════════════════════════════════
 
 
 class TestPublicAPIBoundary:
-    def test_trace_rule_evidence_not_exported_from_basis_core_audit(self) -> None:
-        import basis_core.audit as audit_package
+    """As of PR 35 (Milestone 11), `TraceRuleEvidence` and its nested closed
+    vocabularies are stabilized as part of `basis_core.audit`'s
+    package-level public API. Supersedes the prior "not prematurely public"
+    guard, which asserted the pre-PR-35 state."""
 
-        assert "TraceRuleEvidence" not in audit_package.__all__
-        assert not hasattr(audit_package, "TraceRuleEvidence")
+    def test_trace_rule_evidence_exported_from_basis_core_audit(self) -> None:
+        import basis_core.audit as audit_package
+        import basis_core.audit.operation_aware.trace_rule_evidence as concrete
+
+        assert "TraceRuleEvidence" in audit_package.__all__
+        assert audit_package.TraceRuleEvidence is concrete.TraceRuleEvidence
 
     def test_trace_rule_evidence_not_exported_from_operation_aware_package_init(self) -> None:
+        """`basis_core.audit.operation_aware` (the internal orchestration
+        subpackage's own __init__) remains un-exported from — only the
+        top-level `basis_core.audit` package gained the export."""
         import basis_core.audit.operation_aware as oa_audit_package
 
         assert not hasattr(oa_audit_package, "TraceRuleEvidence")

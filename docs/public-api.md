@@ -197,6 +197,123 @@ See `docs/extension-contracts.md` and `docs/adapter-contracts.md` for the full b
 
 ---
 
+## Operation-aware public API (v0.2.0)
+
+The following additive surface is stabilized on `main` for the forthcoming v0.2.0 release.
+
+The operation-aware API is a purely additive family of typed models, sitting alongside the v0.1 stable public API documented above. Every existing v0.1 stable and extension symbol listed above remains supported, unmodified, and at its existing import path — nothing in this section renames, replaces, subclasses, or reinterprets any v0.1 symbol. `OperationAwareDecisionRequest` coexists with `DecisionRequest`; `OperationAwareEnforcementPoint` coexists with `EnforcementPoint`; `AuditEvidence`/`EvaluationTrace`/`TraceRuleEvidence` coexist with `AuditEvent`/`DecisionTrace`/`RuleEvaluation`. This is not a migration path and not a deprecation of v0.1 — both families are expected to be used, independently, for as long as their respective consumers need them.
+
+Operation-aware policy (`PolicyCondition`, `OperationAwarePolicyRule`, `PolicyBundle`, and their nested shapes) is **structured data** — a bundle a policy author authors and a validator inspects — not executable code and not a new extension-point `Protocol`. This PR introduces no new extension API: implementors still satisfy exactly the three extension points documented above (`PolicyRule`, `AuditWriter`, `AdapterBase`). `docs/extension-contracts.md` will record this "policy is data, not a plugin interface" position explicitly in a later PR.
+
+The evaluation-orchestration package (`basis_core.evaluation`, including `basis_core.evaluation.operation_aware`) remains internal. It has no `__all__`, no package-level export, and no entry in this document. `OperationAwareEvaluationEngine`, `OperationAwareDecisionResponse`, and every response/trace/audit-evidence assembly function are implementation details reached only indirectly, through `OperationAwareEnforcementResult.response` after calling `OperationAwareEnforcementPoint.evaluate()`. Whether and how to expose the evaluation package directly is a later, separately-scoped public-integration decision, not made by this PR.
+
+Gateway- and runtime-enforcement concerns (`GatewayAuditEvent`, HTTP/routing behavior, retry/timeout policy) remain entirely outside `basis-core`, as before. Nothing in this section changes that boundary.
+
+### `basis_core.domain` — operation-aware additions
+
+Shared vocabulary, evidence-reference models, and context value objects consumed by `OperationAwareDecisionRequest` and by other operation-aware models throughout the kernel.
+
+| Symbol | Import path | Category | Responsibility | Compatibility |
+|---|---|---|---|---|
+| `RedactionClassification` | `basis_core.domain` | Stable model — vocabulary | Closed, five-value enum classifying how a piece of evidence may appear in a trace/audit/explanation artifact. | New in v0.2.0 |
+| `ReasonCode` | `basis_core.domain` | Stable model — vocabulary | Validated, machine-readable reason-code string token (lowercase snake_case format, open vocabulary). | New in v0.2.0 |
+| `EvidenceDigest` | `basis_core.domain` | Stable model | Structural digest reference (algorithm label + hex value) nested inside both evidence-reference models. | New in v0.2.0 |
+| `IdentityEvidenceReference` | `basis_core.domain` | Stable model | Safe reference to identity evidence produced outside the kernel (typically by basis-identity); never the evidence itself. | New in v0.2.0 |
+| `AdapterEvidenceReference` | `basis_core.domain` | Stable model | Safe reference to normalized adapter evidence produced outside the kernel (typically by basis-adapters). | New in v0.2.0 |
+| `OperationAwareLocation` | `basis_core.domain` | Stable model — context | Optional physical/logical location context (site, building, zone, area); no hierarchy enforcement. | New in v0.2.0 |
+| `OperationAwareDevice` | `basis_core.domain` | Stable model — context | Optional device context (device identifier, device class). | New in v0.2.0 |
+| `OperationAwareProtocolContext` | `basis_core.domain` | Stable model — context | Optional, protocol-neutral provenance context (protocol label, protocol-native operation name); evidence only. | New in v0.2.0 |
+| `OperationAwareSafetyContext` | `basis_core.domain` | Stable model — context | Optional supplied safety-relevant context; no safety-state inference or calculation. | New in v0.2.0 |
+| `OperationAwareEnvironmentContext` | `basis_core.domain` | Stable model — context | Optional supplied operational-environment context. | New in v0.2.0 |
+| `OperationAwareRiskContext` | `basis_core.domain` | Stable model — context | Optional supplied risk context; no risk calculation or enforced numeric range. | New in v0.2.0 |
+
+### `basis_core.decisions` — operation-aware additions
+
+The operation-aware authorization request and its closed evaluation-result vocabularies.
+
+| Symbol | Import path | Category | Responsibility | Compatibility |
+|---|---|---|---|---|
+| `OperationAwareDecisionRequest` | `basis_core.decisions` | Stable model | Typed, additive sibling of `DecisionRequest` carrying operational context (evidence references, location/device/protocol/safety/environment/risk context). | New in v0.2.0 |
+| `OperationIntent` | `basis_core.decisions` | Stable model — vocabulary | Closed, three-value vocabulary (`read_only` / `state_changing` / `control_affecting`) for a request's `operation_intent` field. | New in v0.2.0 |
+| `OperationAwareFailureReason` | `basis_core.decisions` | Stable model — vocabulary | Closed, six-value governed evaluator failure-category vocabulary, shared by policy/audit/evaluation. | New in v0.2.0 |
+| `OperationAwareEvaluationStatus` | `basis_core.decisions` | Stable model — vocabulary | Closed, two-value vocabulary (`completed` / `failed`) for whether evaluation produced a valid authorization decision. | New in v0.2.0 |
+| `OperationAwareDecisionOutcome` | `basis_core.decisions` | Stable model — vocabulary | Closed, three-value authorization-outcome vocabulary (`allow` / `deny` / `not_applicable`), matching the response/trace/policy-rule outcome vocabulary. | New in v0.2.0 |
+
+### `basis_core.policy` — operation-aware additions
+
+Structured operation-aware policy data models — data a bundle author authors, not a new extension point. `PolicyRule` (the v0.1.0 extension-point `Protocol`) is unaffected and unchanged.
+
+| Symbol | Import path | Category | Responsibility | Compatibility |
+|---|---|---|---|---|
+| `PolicyCondition` | `basis_core.policy` | Stable model | A single, inert, data-only predicate (field-path, open operator, expected value). Structural shape only — no evaluation. | New in v0.2.0 |
+| `OperationAwarePolicyRule` | `basis_core.policy` | Stable model | A single, inert, data-only unit of authorization evaluation (effect, match criteria, conditions). Distinct name from `PolicyRule` by design — see naming-collision note below. | New in v0.2.0 |
+| `OperationAwarePolicyMatch` | `basis_core.policy` | Stable model | Structured, closed-shape nested match object (twenty independently-optional selector categories). | New in v0.2.0 |
+| `RuleEffect` | `basis_core.policy` | Stable model — vocabulary | Closed, two-value vocabulary (`allow` / `deny`) for a rule's `effect` field. | New in v0.2.0 |
+| `PolicyBundle` | `basis_core.policy` | Stable model | The unit of policy identity, versioning, ownership, provenance, optional scope, and rule grouping. | New in v0.2.0 |
+| `PolicyBundleScope` | `basis_core.policy` | Stable model | Structured, closed-shape nested scope object (ten independently-optional selector categories). | New in v0.2.0 |
+
+**Naming-collision note.** `basis_core.policy.engine.PolicyRule` is a v0.1.0 `Protocol` (a code interface), already re-exported from `basis_core.policy` and unchanged by this PR. `OperationAwarePolicyRule` is an unrelated v0.2.0 *data model* (a Pydantic `BaseModel`). `from basis_core.policy import PolicyRule` continues to resolve to the existing v0.1.0 `Protocol`; the operation-aware model is exported only under its distinct name, `OperationAwarePolicyRule`, never as `PolicyRule`.
+
+**Internal — not exported.** Policy-owned bundle-applicability determination, rule-selector matching, condition operators/evaluation, aggregation, and structural/semantic bundle validation (`determine_applicability`, `ApplicabilityResult`, `evaluate_rule_selectors`, `SelectorEvaluation`, `CandidateRuleEvaluation`, condition operators, `ConditionEvaluation`, `RuleConditionEvaluation`, `aggregate_policy_outcome`, `OperationAwarePolicyOutcome`, `PolicyAggregationResult`, `validate_policy_bundle`, `PolicyBundleValidationError` and its subtypes) remain internal implementation detail. They are reachable only via direct submodule import, are not part of this documented public API, and carry no compatibility guarantee.
+
+### `basis_core.audit` — operation-aware additions
+
+Kernel-produced, bounded trace and audit evidence models. None of these extend, subclass, or alter `DecisionTrace`, `RuleEvaluation`, or `AuditEvent` above.
+
+| Symbol | Import path | Category | Responsibility | Compatibility |
+|---|---|---|---|---|
+| `TraceRuleEvidence` | `basis_core.audit` | Stable evidence model | Bounded explanation record for one policy rule considered during one evaluation. | New in v0.2.0 |
+| `TraceConditionEvidence` | `basis_core.audit` | Stable evidence model | Bounded per-condition entry nested inside `TraceRuleEvidence.condition_results`. | New in v0.2.0 |
+| `TraceRuleEffect` | `basis_core.audit` | Stable model — vocabulary | Closed `allow`/`deny` vocabulary for trace-evidence purposes (parity-tested against `policy`'s `RuleEffect`, not imported from it). | New in v0.2.0 |
+| `RuleResult` | `basis_core.audit` | Stable model — vocabulary | Closed `matched`/`not_matched`/`skipped`/`error` vocabulary. | New in v0.2.0 |
+| `TraceConditionResult` | `basis_core.audit` | Stable model — vocabulary | Closed `matched`/`not_matched`/`error` vocabulary. | New in v0.2.0 |
+| `EvaluationTrace` | `basis_core.audit` | Stable evidence model | Bounded, deterministic explanation of one kernel authorization evaluation. | New in v0.2.0 |
+| `EvaluationStatus` | `basis_core.audit` | Stable model — vocabulary | Closed `completed`/`failed` vocabulary (audit's own local copy; parity-tested against `decisions`'s `OperationAwareEvaluationStatus`). | New in v0.2.0 |
+| `TraceOutcome` | `basis_core.audit` | Stable model — vocabulary | Closed `allow`/`deny`/`not_applicable` vocabulary (audit's own local copy). | New in v0.2.0 |
+| `TraceBundleApplicability` | `basis_core.audit` | Stable model — vocabulary | Closed bundle-applicability vocabulary (audit's own local copy; parity-tested against `policy`'s internal `ApplicabilityResult`). | New in v0.2.0 |
+| `TraceFailureReason` | `basis_core.audit` | Stable model — vocabulary | Closed six-value governed failure-category vocabulary (audit's own local copy; parity-tested against `decisions`'s `OperationAwareFailureReason`). | New in v0.2.0 |
+| `AuditEvidence` | `basis_core.audit` | Stable evidence model | Bounded, durable, kernel-side evidence record of one operation-aware authorization evaluation. Not persisted by `basis-core`. | New in v0.2.0 |
+| `AUDIT_EVIDENCE_SCHEMA_VERSION` | `basis_core.audit` | Stable model — constant | String constant. Current `AuditEvidence` schema revision. | New in v0.2.0 |
+
+### `basis_core.enforcement` — operation-aware additions
+
+The operation-aware enforcement boundary. `EnforcementPoint` above is unaffected and unchanged; `OperationAwareEnforcementPoint` does not modify, subclass, or share implementation with it (ADR-0006 Decision 1).
+
+| Symbol | Import path | Category | Responsibility | Compatibility |
+|---|---|---|---|---|
+| `OperationAwareEnforcementPoint` | `basis_core.enforcement` | Stable entry point | Fail-closed operation-aware enforcement orchestration; `evaluate()` never raises. Composes evaluation, response assembly, and audit-evidence assembly. | New in v0.2.0 |
+| `OperationAwareEnforcementResult` | `basis_core.enforcement` | Stable enforcement result | Immutable carrier binding one evaluation's `OperationAwareDecisionResponse`, optional `AuditEvidence`, and `EnforcementDisposition` together. | New in v0.2.0 |
+| `EnforcementDisposition` | `basis_core.enforcement` | Stable model — vocabulary | Closed, two-value (`allow`/`deny`) enforcement-only vocabulary. Distinct from the three-value kernel authorization outcome. | New in v0.2.0 |
+
+Preferred import style:
+
+```python
+from basis_core.domain import (
+    RedactionClassification, ReasonCode, EvidenceDigest,
+    IdentityEvidenceReference, AdapterEvidenceReference,
+    OperationAwareLocation, OperationAwareDevice, OperationAwareProtocolContext,
+    OperationAwareSafetyContext, OperationAwareEnvironmentContext, OperationAwareRiskContext,
+)
+from basis_core.decisions import (
+    OperationAwareDecisionRequest, OperationIntent,
+    OperationAwareFailureReason, OperationAwareEvaluationStatus, OperationAwareDecisionOutcome,
+)
+from basis_core.policy import (
+    PolicyCondition, OperationAwarePolicyRule, OperationAwarePolicyMatch,
+    RuleEffect, PolicyBundle, PolicyBundleScope,
+)
+from basis_core.audit import (
+    TraceRuleEvidence, TraceConditionEvidence, TraceRuleEffect, RuleResult, TraceConditionResult,
+    EvaluationTrace, EvaluationStatus, TraceOutcome, TraceBundleApplicability, TraceFailureReason,
+    AuditEvidence, AUDIT_EVIDENCE_SCHEMA_VERSION,
+)
+from basis_core.enforcement import (
+    OperationAwareEnforcementPoint, OperationAwareEnforcementResult, EnforcementDisposition,
+)
+```
+
+---
+
 ## Internal symbols
 
 The following are implementation details. They must not be imported by code outside `basis_core`. No compatibility guarantee is made for any symbol beginning with `_`.

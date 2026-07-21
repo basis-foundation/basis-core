@@ -18,6 +18,16 @@ Public API
 ──────────
 All stable public symbols are available directly from this package.
 See ``docs/public-api.md`` for the full inventory and stability tiers.
+
+Operation-aware public API (v0.2.0)
+────────────────────────────────────
+Additive sibling surface: ``OperationAwareDecisionRequest`` (the richer
+operation-aware request, coexisting with ``DecisionRequest`` unchanged) and
+its closed vocabularies — ``OperationIntent``, ``OperationAwareFailureReason``,
+``OperationAwareEvaluationStatus``, ``OperationAwareDecisionOutcome``. The
+latter three are shared operation-aware evaluation-result vocabulary, also
+consumed by ``policy``, ``audit``, and ``evaluation`` internally. See
+``docs/public-api.md``'s "Operation-aware public API (v0.2.0)" section.
 """
 
 from basis_core.decisions.models import (
@@ -26,10 +36,23 @@ from basis_core.decisions.models import (
     DecisionResponse,
     FailureReason,
 )
+from basis_core.decisions.operation_aware import (
+    OperationAwareDecisionOutcome,
+    OperationAwareDecisionRequest,
+    OperationAwareEvaluationStatus,
+    OperationAwareFailureReason,
+    OperationIntent,
+)
 
 __all__ = [
     "DecisionRequest",
     "DecisionResponse",
     "DecisionOutcome",
     "FailureReason",
+    # operation-aware (v0.2.0)
+    "OperationAwareDecisionRequest",
+    "OperationIntent",
+    "OperationAwareFailureReason",
+    "OperationAwareEvaluationStatus",
+    "OperationAwareDecisionOutcome",
 ]

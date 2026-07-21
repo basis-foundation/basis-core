@@ -85,6 +85,117 @@ ENFORCEMENT_PUBLIC: frozenset[str] = frozenset({"EnforcementPoint"})
 ADAPTERS_PUBLIC: frozenset[str] = frozenset({"AdapterBase", "NormalizedEvent"})
 
 
+# ── Operation-aware (v0.2.0) canonical inventory ───────────────────────────────
+# Additive to the v0.1 sets above. Each package's __all__ must equal the union
+# of its v0.1 set and its operation-aware set below — the v0.1 set itself is
+# never modified by this section. See docs/public-api.md's "Operation-aware
+# public API (v0.2.0)" section, which this inventory must stay in lockstep with.
+
+DOMAIN_OA_PUBLIC: frozenset[str] = frozenset(
+    {
+        "RedactionClassification",
+        "ReasonCode",
+        "EvidenceDigest",
+        "IdentityEvidenceReference",
+        "AdapterEvidenceReference",
+        "OperationAwareLocation",
+        "OperationAwareDevice",
+        "OperationAwareProtocolContext",
+        "OperationAwareSafetyContext",
+        "OperationAwareEnvironmentContext",
+        "OperationAwareRiskContext",
+    }
+)
+
+DECISIONS_OA_PUBLIC: frozenset[str] = frozenset(
+    {
+        "OperationAwareDecisionRequest",
+        "OperationIntent",
+        "OperationAwareFailureReason",
+        "OperationAwareEvaluationStatus",
+        "OperationAwareDecisionOutcome",
+    }
+)
+
+POLICY_OA_PUBLIC: frozenset[str] = frozenset(
+    {
+        "PolicyCondition",
+        "OperationAwarePolicyRule",
+        "OperationAwarePolicyMatch",
+        "RuleEffect",
+        "PolicyBundle",
+        "PolicyBundleScope",
+    }
+)
+
+AUDIT_OA_PUBLIC: frozenset[str] = frozenset(
+    {
+        "TraceRuleEvidence",
+        "TraceConditionEvidence",
+        "TraceRuleEffect",
+        "RuleResult",
+        "TraceConditionResult",
+        "EvaluationTrace",
+        "EvaluationStatus",
+        "TraceOutcome",
+        "TraceBundleApplicability",
+        "TraceFailureReason",
+        "AuditEvidence",
+        "AUDIT_EVIDENCE_SCHEMA_VERSION",
+    }
+)
+
+ENFORCEMENT_OA_PUBLIC: frozenset[str] = frozenset(
+    {
+        "EnforcementDisposition",
+        "OperationAwareEnforcementPoint",
+        "OperationAwareEnforcementResult",
+    }
+)
+
+# Internal operation-aware implementation symbols that must NOT appear in any
+# package's __all__. Representative names drawn from every internal
+# evaluator/selector/operator/aggregation/validation/assembly/orchestration
+# module touched by the v0.2.0 roadmap (Section 11).
+INTERNAL_OPERATION_AWARE_SYMBOLS: frozenset[str] = frozenset(
+    {
+        # evaluation-orchestration (excluded from this PR entirely)
+        "OperationAwareEvaluationEngine",
+        "OperationAwareDecisionResponse",
+        "assemble_operation_aware_decision_response",
+        "assemble_audit_evidence",
+        "assemble_evaluation_trace",
+        "assemble_rule_evidence",
+        # policy-owned internal orchestration/evaluation/validation
+        "determine_applicability",
+        "ApplicabilityResult",
+        "select_candidate_rules",
+        "evaluate_rule_selectors",
+        "SelectorEvaluation",
+        "SelectorMatchResult",
+        "CandidateRuleEvaluation",
+        "evaluate_rule_conditions",
+        "ConditionEvaluation",
+        "ConditionResult",
+        "RuleConditionEvaluation",
+        "RuleConditionResult",
+        "aggregate_policy_results",
+        "aggregate_policy_outcome",
+        "OperationAwarePolicyOutcome",
+        "PolicyAggregationResult",
+        "PolicyAggregationStatus",
+        "PolicyAggregationInputError",
+        "EvaluatedRule",
+        "validate_policy_bundle",
+        "PolicyBundleValidationError",
+        "StructuralPolicyValidationError",
+        "SemanticPolicyValidationError",
+        "DuplicateRuleIdError",
+        "DuplicateConditionIdError",
+    }
+)
+
+
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
 
@@ -115,10 +226,27 @@ class TestDomainPackage:
     """basis_core.domain public API surface."""
 
     def test_all_matches_inventory(self) -> None:
-        assert _all_of("basis_core.domain") == DOMAIN_PUBLIC, (
-            "basis_core.domain.__all__ does not match the documented inventory. "
+        assert _all_of("basis_core.domain") == DOMAIN_PUBLIC | DOMAIN_OA_PUBLIC, (
+            "basis_core.domain.__all__ does not match the documented inventory "
+            "(v0.1 DOMAIN_PUBLIC union operation-aware DOMAIN_OA_PUBLIC). "
             "Update __all__ in src/basis_core/domain/__init__.py and "
             "docs/public-api.md together."
+        )
+
+    def test_v01_inventory_unchanged(self) -> None:
+        """The v0.1 DOMAIN_PUBLIC set itself is never modified by this PR."""
+        assert DOMAIN_PUBLIC == frozenset(
+            {
+                "Subject",
+                "SubjectType",
+                "subject_from_jwt",
+                "Resource",
+                "ResourceType",
+                "build_resource_id",
+                "parse_resource_id",
+                "IdentityContext",
+                "action",
+            }
         )
 
     def test_no_internal_exports(self) -> None:
@@ -212,7 +340,12 @@ class TestDecisionsPackage:
     """basis_core.decisions public API surface."""
 
     def test_all_matches_inventory(self) -> None:
-        assert _all_of("basis_core.decisions") == DECISIONS_PUBLIC
+        assert _all_of("basis_core.decisions") == DECISIONS_PUBLIC | DECISIONS_OA_PUBLIC
+
+    def test_v01_inventory_unchanged(self) -> None:
+        assert DECISIONS_PUBLIC == frozenset(
+            {"DecisionRequest", "DecisionResponse", "DecisionOutcome", "FailureReason"}
+        )
 
     def test_no_internal_exports(self) -> None:
         assert not _exported_internals("basis_core.decisions")
@@ -259,7 +392,30 @@ class TestPolicyPackage:
     """basis_core.policy public API surface."""
 
     def test_all_matches_inventory(self) -> None:
-        assert _all_of("basis_core.policy") == POLICY_PUBLIC
+        assert _all_of("basis_core.policy") == POLICY_PUBLIC | POLICY_OA_PUBLIC
+
+    def test_v01_inventory_unchanged(self) -> None:
+        assert POLICY_PUBLIC == frozenset(
+            {
+                "PolicyEngine",
+                "PolicyRule",
+                "Decision",
+                "PolicyOutcome",
+                "RolePolicyRule",
+                "ResourceTypePolicyRule",
+                "ActionPolicyRule",
+            }
+        )
+
+    def test_policy_rule_is_still_v01_protocol(self) -> None:
+        """The naming-collision guard required by PR 35: `PolicyRule` must
+        remain the v0.1.0 extension-point Protocol, never the operation-aware
+        `OperationAwarePolicyRule` data model."""
+        from basis_core.policy import OperationAwarePolicyRule, PolicyRule
+        from basis_core.policy.engine import PolicyRule as ConcretePolicyRule
+
+        assert PolicyRule is ConcretePolicyRule
+        assert PolicyRule is not OperationAwarePolicyRule
 
     def test_no_internal_exports(self) -> None:
         assert not _exported_internals("basis_core.policy")
@@ -306,7 +462,22 @@ class TestAuditPackage:
     """basis_core.audit public API surface."""
 
     def test_all_matches_inventory(self) -> None:
-        assert _all_of("basis_core.audit") == AUDIT_PUBLIC
+        assert _all_of("basis_core.audit") == AUDIT_PUBLIC | AUDIT_OA_PUBLIC
+
+    def test_v01_inventory_unchanged(self) -> None:
+        assert AUDIT_PUBLIC == frozenset(
+            {
+                "AuditEvent",
+                "AuditEventType",
+                "AuditOutcome",
+                "AUDIT_SCHEMA_VERSION",
+                "AuditWriter",
+                "NullAuditWriter",
+                "LogAuditWriter",
+                "DecisionTrace",
+                "RuleEvaluation",
+            }
+        )
 
     def test_no_internal_exports(self) -> None:
         assert not _exported_internals("basis_core.audit")
@@ -367,7 +538,10 @@ class TestEnforcementPackage:
     """basis_core.enforcement public API surface."""
 
     def test_all_matches_inventory(self) -> None:
-        assert _all_of("basis_core.enforcement") == ENFORCEMENT_PUBLIC
+        assert _all_of("basis_core.enforcement") == ENFORCEMENT_PUBLIC | ENFORCEMENT_OA_PUBLIC
+
+    def test_v01_inventory_unchanged(self) -> None:
+        assert ENFORCEMENT_PUBLIC == frozenset({"EnforcementPoint"})
 
     def test_no_internal_exports(self) -> None:
         assert not _exported_internals("basis_core.enforcement")
@@ -433,6 +607,416 @@ class TestAdaptersPackage:
         from basis_core.adapters.base import AdapterBase, NormalizedEvent  # noqa: F401
 
 
+# ── basis_core operation-aware (v0.2.0) public API ─────────────────────────────
+# PR 35: additive-only. Every check here is in addition to, never a
+# replacement for, the v0.1 checks above.
+
+
+class TestDomainOperationAwareExports:
+    """basis_core.domain operation-aware (v0.2.0) export coverage."""
+
+    def test_each_symbol_appears_exactly_once(self) -> None:
+        all_list = list(_all_of("basis_core.domain"))
+        for name in DOMAIN_OA_PUBLIC:
+            assert all_list.count(name) == 1, f"{name} must appear exactly once in __all__"
+
+    def test_each_symbol_is_package_attribute(self) -> None:
+        import basis_core.domain as pkg
+
+        for name in DOMAIN_OA_PUBLIC:
+            assert hasattr(pkg, name), f"basis_core.domain.{name} is missing"
+
+    def test_each_symbol_identical_to_concrete_object(self) -> None:
+        import basis_core.domain as pkg
+        import basis_core.domain.evidence as evidence
+        import basis_core.domain.operation_aware as operation_aware
+        import basis_core.domain.operation_aware_vocabulary as vocab
+
+        concrete = {
+            "RedactionClassification": vocab.RedactionClassification,
+            "ReasonCode": vocab.ReasonCode,
+            "EvidenceDigest": evidence.EvidenceDigest,
+            "IdentityEvidenceReference": evidence.IdentityEvidenceReference,
+            "AdapterEvidenceReference": evidence.AdapterEvidenceReference,
+            "OperationAwareLocation": operation_aware.OperationAwareLocation,
+            "OperationAwareDevice": operation_aware.OperationAwareDevice,
+            "OperationAwareProtocolContext": operation_aware.OperationAwareProtocolContext,
+            "OperationAwareSafetyContext": operation_aware.OperationAwareSafetyContext,
+            "OperationAwareEnvironmentContext": operation_aware.OperationAwareEnvironmentContext,
+            "OperationAwareRiskContext": operation_aware.OperationAwareRiskContext,
+        }
+        assert concrete.keys() == DOMAIN_OA_PUBLIC
+        for name, obj in concrete.items():
+            assert getattr(pkg, name) is obj, f"basis_core.domain.{name} is not the concrete object"
+
+    def test_documented_imports_succeed(self) -> None:
+        from basis_core.domain import (  # noqa: F401
+            AdapterEvidenceReference,
+            EvidenceDigest,
+            IdentityEvidenceReference,
+            OperationAwareDevice,
+            OperationAwareEnvironmentContext,
+            OperationAwareLocation,
+            OperationAwareProtocolContext,
+            OperationAwareRiskContext,
+            OperationAwareSafetyContext,
+            ReasonCode,
+            RedactionClassification,
+        )
+
+    def test_no_collision_with_v01_names(self) -> None:
+        assert not (DOMAIN_OA_PUBLIC & DOMAIN_PUBLIC)
+
+    def test_not_exported_from_unrelated_packages(self) -> None:
+        for other in ("basis_core.decisions", "basis_core.policy", "basis_core.audit"):
+            leaked = DOMAIN_OA_PUBLIC & _all_of(other)
+            assert not leaked, f"domain operation-aware symbols leaked into {other}: {leaked}"
+
+
+class TestDecisionsOperationAwareExports:
+    """basis_core.decisions operation-aware (v0.2.0) export coverage."""
+
+    def test_each_symbol_appears_exactly_once(self) -> None:
+        all_list = list(_all_of("basis_core.decisions"))
+        for name in DECISIONS_OA_PUBLIC:
+            assert all_list.count(name) == 1
+
+    def test_each_symbol_is_package_attribute(self) -> None:
+        import basis_core.decisions as pkg
+
+        for name in DECISIONS_OA_PUBLIC:
+            assert hasattr(pkg, name), f"basis_core.decisions.{name} is missing"
+
+    def test_each_symbol_identical_to_concrete_object(self) -> None:
+        import basis_core.decisions as pkg
+        import basis_core.decisions.operation_aware as oa
+
+        concrete = {
+            "OperationAwareDecisionRequest": oa.OperationAwareDecisionRequest,
+            "OperationIntent": oa.OperationIntent,
+            "OperationAwareFailureReason": oa.OperationAwareFailureReason,
+            "OperationAwareEvaluationStatus": oa.OperationAwareEvaluationStatus,
+            "OperationAwareDecisionOutcome": oa.OperationAwareDecisionOutcome,
+        }
+        assert concrete.keys() == DECISIONS_OA_PUBLIC
+        for name, obj in concrete.items():
+            assert getattr(pkg, name) is obj
+
+    def test_documented_imports_succeed(self) -> None:
+        from basis_core.decisions import (  # noqa: F401
+            OperationAwareDecisionOutcome,
+            OperationAwareDecisionRequest,
+            OperationAwareEvaluationStatus,
+            OperationAwareFailureReason,
+            OperationIntent,
+        )
+
+    def test_no_collision_with_v01_names(self) -> None:
+        assert not (DECISIONS_OA_PUBLIC & DECISIONS_PUBLIC)
+
+    def test_not_exported_from_unrelated_packages(self) -> None:
+        for other in ("basis_core.domain", "basis_core.policy", "basis_core.audit"):
+            leaked = DECISIONS_OA_PUBLIC & _all_of(other)
+            assert not leaked, f"decisions operation-aware symbols leaked into {other}: {leaked}"
+
+
+class TestPolicyOperationAwareExports:
+    """basis_core.policy operation-aware (v0.2.0) export coverage."""
+
+    def test_each_symbol_appears_exactly_once(self) -> None:
+        all_list = list(_all_of("basis_core.policy"))
+        for name in POLICY_OA_PUBLIC:
+            assert all_list.count(name) == 1
+
+    def test_each_symbol_is_package_attribute(self) -> None:
+        import basis_core.policy as pkg
+
+        for name in POLICY_OA_PUBLIC:
+            assert hasattr(pkg, name), f"basis_core.policy.{name} is missing"
+
+    def test_each_symbol_identical_to_concrete_object(self) -> None:
+        import basis_core.policy as pkg
+        import basis_core.policy.operation_aware.bundle as bundle
+        import basis_core.policy.operation_aware.condition as condition
+        import basis_core.policy.operation_aware.rule as rule
+
+        concrete = {
+            "PolicyCondition": condition.PolicyCondition,
+            "OperationAwarePolicyRule": rule.OperationAwarePolicyRule,
+            "OperationAwarePolicyMatch": rule.OperationAwarePolicyMatch,
+            "RuleEffect": rule.RuleEffect,
+            "PolicyBundle": bundle.PolicyBundle,
+            "PolicyBundleScope": bundle.PolicyBundleScope,
+        }
+        assert concrete.keys() == POLICY_OA_PUBLIC
+        for name, obj in concrete.items():
+            assert getattr(pkg, name) is obj
+
+    def test_documented_imports_succeed(self) -> None:
+        from basis_core.policy import (  # noqa: F401
+            OperationAwarePolicyMatch,
+            OperationAwarePolicyRule,
+            PolicyBundle,
+            PolicyBundleScope,
+            PolicyCondition,
+            RuleEffect,
+        )
+
+    def test_no_collision_with_v01_names(self) -> None:
+        assert not (POLICY_OA_PUBLIC & POLICY_PUBLIC)
+
+    def test_not_exported_from_unrelated_packages(self) -> None:
+        for other in ("basis_core.domain", "basis_core.decisions", "basis_core.audit"):
+            leaked = POLICY_OA_PUBLIC & _all_of(other)
+            assert not leaked, f"policy operation-aware symbols leaked into {other}: {leaked}"
+
+    def test_internal_policy_symbols_not_exported(self) -> None:
+        leaked = INTERNAL_OPERATION_AWARE_SYMBOLS & _all_of("basis_core.policy")
+        assert not leaked, f"internal policy symbols leaked into basis_core.policy: {leaked}"
+
+
+class TestAuditOperationAwareExports:
+    """basis_core.audit operation-aware (v0.2.0) export coverage."""
+
+    def test_each_symbol_appears_exactly_once(self) -> None:
+        all_list = list(_all_of("basis_core.audit"))
+        for name in AUDIT_OA_PUBLIC:
+            assert all_list.count(name) == 1
+
+    def test_each_symbol_is_package_attribute(self) -> None:
+        import basis_core.audit as pkg
+
+        for name in AUDIT_OA_PUBLIC:
+            assert hasattr(pkg, name), f"basis_core.audit.{name} is missing"
+
+    def test_each_symbol_identical_to_concrete_object(self) -> None:
+        import basis_core.audit as pkg
+        import basis_core.audit.operation_aware.audit_evidence as audit_evidence
+        import basis_core.audit.operation_aware.evaluation_trace as evaluation_trace
+        import basis_core.audit.operation_aware.trace_rule_evidence as trace_rule_evidence
+
+        concrete = {
+            "TraceRuleEvidence": trace_rule_evidence.TraceRuleEvidence,
+            "TraceConditionEvidence": trace_rule_evidence.TraceConditionEvidence,
+            "TraceRuleEffect": trace_rule_evidence.TraceRuleEffect,
+            "RuleResult": trace_rule_evidence.RuleResult,
+            "TraceConditionResult": trace_rule_evidence.TraceConditionResult,
+            "EvaluationTrace": evaluation_trace.EvaluationTrace,
+            "EvaluationStatus": evaluation_trace.EvaluationStatus,
+            "TraceOutcome": evaluation_trace.TraceOutcome,
+            "TraceBundleApplicability": evaluation_trace.TraceBundleApplicability,
+            "TraceFailureReason": evaluation_trace.TraceFailureReason,
+            "AuditEvidence": audit_evidence.AuditEvidence,
+            "AUDIT_EVIDENCE_SCHEMA_VERSION": audit_evidence.AUDIT_EVIDENCE_SCHEMA_VERSION,
+        }
+        assert concrete.keys() == AUDIT_OA_PUBLIC
+        for name, obj in concrete.items():
+            assert getattr(pkg, name) is obj
+
+    def test_documented_imports_succeed(self) -> None:
+        from basis_core.audit import (  # noqa: F401
+            AUDIT_EVIDENCE_SCHEMA_VERSION,
+            AuditEvidence,
+            EvaluationStatus,
+            EvaluationTrace,
+            RuleResult,
+            TraceBundleApplicability,
+            TraceConditionEvidence,
+            TraceConditionResult,
+            TraceFailureReason,
+            TraceOutcome,
+            TraceRuleEffect,
+            TraceRuleEvidence,
+        )
+
+    def test_no_collision_with_v01_names(self) -> None:
+        assert not (AUDIT_OA_PUBLIC & AUDIT_PUBLIC)
+
+    def test_not_exported_from_unrelated_packages(self) -> None:
+        for other in ("basis_core.domain", "basis_core.decisions", "basis_core.policy"):
+            leaked = AUDIT_OA_PUBLIC & _all_of(other)
+            assert not leaked, f"audit operation-aware symbols leaked into {other}: {leaked}"
+
+
+class TestEnforcementOperationAwareExports:
+    """basis_core.enforcement operation-aware (v0.2.0) export coverage."""
+
+    def test_each_symbol_appears_exactly_once(self) -> None:
+        all_list = list(_all_of("basis_core.enforcement"))
+        for name in ENFORCEMENT_OA_PUBLIC:
+            assert all_list.count(name) == 1
+
+    def test_each_symbol_is_package_attribute(self) -> None:
+        import basis_core.enforcement as pkg
+
+        for name in ENFORCEMENT_OA_PUBLIC:
+            assert hasattr(pkg, name), f"basis_core.enforcement.{name} is missing"
+
+    def test_each_symbol_identical_to_concrete_object(self) -> None:
+        import basis_core.enforcement as pkg
+        import basis_core.enforcement.operation_aware as oa
+
+        concrete = {
+            "EnforcementDisposition": oa.EnforcementDisposition,
+            "OperationAwareEnforcementPoint": oa.OperationAwareEnforcementPoint,
+            "OperationAwareEnforcementResult": oa.OperationAwareEnforcementResult,
+        }
+        assert concrete.keys() == ENFORCEMENT_OA_PUBLIC
+        for name, obj in concrete.items():
+            assert getattr(pkg, name) is obj
+
+    def test_documented_imports_succeed(self) -> None:
+        from basis_core.enforcement import (  # noqa: F401
+            EnforcementDisposition,
+            OperationAwareEnforcementPoint,
+            OperationAwareEnforcementResult,
+        )
+
+    def test_no_collision_with_v01_names(self) -> None:
+        assert not (ENFORCEMENT_OA_PUBLIC & ENFORCEMENT_PUBLIC)
+
+    def test_enforcement_point_still_v01_unchanged_sibling(self) -> None:
+        """ADR-0006: OperationAwareEnforcementPoint does not modify, subclass,
+        or share implementation with EnforcementPoint."""
+        from basis_core.enforcement import EnforcementPoint, OperationAwareEnforcementPoint
+
+        assert OperationAwareEnforcementPoint is not EnforcementPoint
+        assert not issubclass(OperationAwareEnforcementPoint, EnforcementPoint)
+        assert not issubclass(EnforcementPoint, OperationAwareEnforcementPoint)
+
+    def test_not_exported_from_unrelated_packages(self) -> None:
+        for other in (
+            "basis_core.domain",
+            "basis_core.decisions",
+            "basis_core.policy",
+            "basis_core.audit",
+        ):
+            leaked = ENFORCEMENT_OA_PUBLIC & _all_of(other)
+            assert not leaked, f"enforcement operation-aware symbols leaked into {other}: {leaked}"
+
+
+class TestInternalOperationAwareRestraint:
+    """No internal operation-aware implementation symbol is exported at the
+    package level, across every touched package."""
+
+    def test_no_internal_symbol_in_any_touched_package(self) -> None:
+        for package in (
+            "basis_core.domain",
+            "basis_core.decisions",
+            "basis_core.policy",
+            "basis_core.audit",
+            "basis_core.enforcement",
+        ):
+            leaked = INTERNAL_OPERATION_AWARE_SYMBOLS & _all_of(package)
+            assert not leaked, f"internal operation-aware symbols leaked into {package}: {leaked}"
+
+    def test_internal_symbols_still_importable_from_concrete_modules(self) -> None:
+        """'Internal' means 'not part of the approved package-level API', not
+        'unimportable' — direct submodule imports of these symbols must still
+        work."""
+        from basis_core.evaluation.operation_aware.response import (  # noqa: F401
+            OperationAwareDecisionResponse,
+        )
+        from basis_core.policy.operation_aware.aggregation import (  # noqa: F401
+            OperationAwarePolicyOutcome,
+            aggregate_policy_outcome,
+        )
+        from basis_core.policy.operation_aware.applicability import (  # noqa: F401
+            ApplicabilityResult,
+            determine_applicability,
+        )
+        from basis_core.policy.operation_aware.validation import (  # noqa: F401
+            PolicyBundleValidationError,
+            validate_policy_bundle,
+        )
+
+
+class TestEvaluationPackageRemainsInternal:
+    """The evaluation-orchestration package is deliberately excluded from
+    PR 35 — it gains no __all__, no package-level export, and no
+    docs/public-api.md entry."""
+
+    def test_evaluation_package_has_no_all(self) -> None:
+        import basis_core.evaluation as evaluation
+
+        assert not hasattr(evaluation, "__all__"), (
+            "basis_core.evaluation now declares __all__. This is an "
+            "evaluation-layer public API change explicitly out of scope for "
+            "PR 35 — see docs/implementation/basis-core-v0.2-operation-aware-"
+            "plan.md, PR 35's non-goals."
+        )
+
+    def test_evaluation_operation_aware_package_has_no_all(self) -> None:
+        import basis_core.evaluation.operation_aware as oa_evaluation
+
+        assert not hasattr(oa_evaluation, "__all__")
+
+    def test_evaluation_response_type_not_reexported_by_enforcement(self) -> None:
+        """OperationAwareDecisionResponse may be returned inside
+        OperationAwareEnforcementResult.response, but it must not gain a new
+        package-level import path through `enforcement`, `audit`, or
+        `decisions`."""
+        for package in ("basis_core.enforcement", "basis_core.audit", "basis_core.decisions"):
+            assert "OperationAwareDecisionResponse" not in _all_of(package)
+            assert "OperationAwareEvaluationEngine" not in _all_of(package)
+
+
+class TestOperationAwareDocumentationAgreement:
+    """docs/public-api.md's operation-aware inventory must match the
+    package-level __all__ inventory exactly (small explicit expected
+    inventory, matching this repository's existing convention — no Markdown
+    parser)."""
+
+    def test_public_api_doc_mentions_every_approved_symbol(self) -> None:
+        import pathlib
+
+        doc_path = pathlib.Path(__file__).resolve().parent.parent / "docs" / "public-api.md"
+        text = doc_path.read_text(encoding="utf-8")
+        all_oa_symbols = (
+            DOMAIN_OA_PUBLIC
+            | DECISIONS_OA_PUBLIC
+            | POLICY_OA_PUBLIC
+            | AUDIT_OA_PUBLIC
+            | ENFORCEMENT_OA_PUBLIC
+        )
+        missing = [name for name in all_oa_symbols if f"`{name}`" not in text]
+        assert not missing, f"docs/public-api.md is missing a mention of: {missing}"
+
+    def test_public_api_doc_has_operation_aware_section(self) -> None:
+        import pathlib
+
+        doc_path = pathlib.Path(__file__).resolve().parent.parent / "docs" / "public-api.md"
+        text = doc_path.read_text(encoding="utf-8")
+        assert "## Operation-aware public API (v0.2.0)" in text
+
+    def test_internal_symbols_not_mentioned_as_public_in_new_section(self) -> None:
+        """A representative sample of internal names must not appear inside
+        the operation-aware section's own text as if they were exported
+        symbols with an import path."""
+        import pathlib
+
+        doc_path = pathlib.Path(__file__).resolve().parent.parent / "docs" / "public-api.md"
+        text = doc_path.read_text(encoding="utf-8")
+        section_start = text.index("## Operation-aware public API (v0.2.0)")
+        section_end = text.index("## Internal symbols")
+        section_text = text[section_start:section_end]
+        for name in (
+            "OperationAwareEvaluationEngine",
+            "assemble_operation_aware_decision_response",
+            "assemble_audit_evidence",
+            "determine_applicability",
+            "aggregate_policy_outcome",
+            "validate_policy_bundle",
+        ):
+            # These names may appear in prose (e.g. explaining what stays
+            # internal) but must never appear inside a `Symbol` table cell
+            # backtick-quoted exactly like an approved export.
+            assert f"| `{name}` |" not in section_text, (
+                f"{name} appears formatted as an approved-export table row "
+                "in the operation-aware public-api.md section"
+            )
+
+
 # ── basis_core (top-level package) ───────────────────────────────────────────
 
 
@@ -459,3 +1043,20 @@ class TestTopLevelPackage:
         import basis_core  # noqa: F401
 
         assert basis_core is not None
+
+    def test_no_operation_aware_symbol_leaks_to_top_level(self) -> None:
+        """PR 35 does not modify src/basis_core/__init__.py; no operation-aware
+        symbol gains a new `basis_core.<Symbol>` top-level import path."""
+        import basis_core
+
+        all_oa_symbols = (
+            DOMAIN_OA_PUBLIC
+            | DECISIONS_OA_PUBLIC
+            | POLICY_OA_PUBLIC
+            | AUDIT_OA_PUBLIC
+            | ENFORCEMENT_OA_PUBLIC
+        )
+        for name in all_oa_symbols:
+            assert not hasattr(basis_core, name), (
+                f"basis_core.{name} unexpectedly resolves — top-level namespace restraint violated"
+            )

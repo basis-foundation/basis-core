@@ -1137,19 +1137,30 @@ class TestV01Compatibility:
 
 
 class TestPublicAPIBoundary:
-    def test_not_exported_from_basis_core_audit(self) -> None:
-        import basis_core.audit as audit_package
+    """As of PR 35 (Milestone 11), `AuditEvidence` and
+    `AUDIT_EVIDENCE_SCHEMA_VERSION` are stabilized as part of
+    `basis_core.audit`'s package-level public API. Supersedes the prior
+    "not prematurely public" guard, which asserted the pre-PR-35 state."""
 
-        assert not hasattr(audit_package, "AuditEvidence")
+    def test_exported_from_basis_core_audit(self) -> None:
+        import basis_core.audit as audit_package
+        import basis_core.audit.operation_aware.audit_evidence as concrete
+
+        assert "AuditEvidence" in audit_package.__all__
+        assert "AUDIT_EVIDENCE_SCHEMA_VERSION" in audit_package.__all__
+        assert audit_package.AuditEvidence is concrete.AuditEvidence
 
     def test_not_exported_from_operation_aware_package_init(self) -> None:
+        """`basis_core.audit.operation_aware` (the internal orchestration
+        subpackage's own __init__) remains un-exported from — only the
+        top-level `basis_core.audit` package gained the export."""
         import basis_core.audit.operation_aware as oa_audit_package
 
         assert not hasattr(oa_audit_package, "AuditEvidence")
 
-    def test_public_api_doc_does_not_list_audit_evidence_as_stable(self) -> None:
+    def test_public_api_doc_lists_audit_evidence_as_stable(self) -> None:
         from pathlib import Path
 
         public_api_doc = Path(__file__).parent.parent.parent / "docs" / "public-api.md"
         text = public_api_doc.read_text(encoding="utf-8")
-        assert "| `AuditEvidence` |" not in text
+        assert "| `AuditEvidence` |" in text

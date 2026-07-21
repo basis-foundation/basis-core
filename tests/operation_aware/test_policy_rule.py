@@ -946,11 +946,21 @@ class TestNamingCollisionRegression:
 
         assert OperationAwarePolicyRule is not PolicyRule
 
-    def test_operation_aware_policy_rule_is_not_exported_from_basis_core_policy(self) -> None:
+    def test_operation_aware_policy_rule_exported_under_its_own_distinct_name(self) -> None:
+        """As of PR 35 (Milestone 11), `OperationAwarePolicyRule` is
+        stabilized as part of `basis_core.policy`'s package-level public
+        API — but only under its own distinct name, never as `PolicyRule`.
+        `PolicyRule` above (this class's other tests) continues to resolve
+        to the unrelated v0.1.0 Protocol, unchanged."""
         import basis_core.policy as policy_package
+        from basis_core.policy.operation_aware.rule import (
+            OperationAwarePolicyRule as concrete,
+        )
 
-        assert "OperationAwarePolicyRule" not in policy_package.__all__
-        assert not hasattr(policy_package, "OperationAwarePolicyRule")
+        assert "OperationAwarePolicyRule" in policy_package.__all__
+        assert policy_package.OperationAwarePolicyRule is concrete
+        assert "PolicyRule" in policy_package.__all__
+        assert policy_package.PolicyRule is not policy_package.OperationAwarePolicyRule
 
     def test_v01_policy_rule_is_a_protocol_not_a_pydantic_model(self) -> None:
         import typing
