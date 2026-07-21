@@ -2686,6 +2686,18 @@ Compatibility risk: none.
 Blocked by architecture decision: no.
 
 **PR 34 — `OperationAwareEnforcementPoint` implementation.**
+Status: **Complete on `feature/operation-aware-enforcement-point`
+(uncommitted).** Implemented exactly at the settled target: one new file,
+`src/basis_core/enforcement/operation_aware.py` (`EnforcementDisposition`,
+`OperationAwareEnforcementResult`, `OperationAwareEnforcementPoint`, one
+disposition-mapping helper, one internal-error fallback helper), with the
+full ADR-0006 PR 34 test contract (22 items) at
+`tests/operation_aware/test_operation_aware_enforcement_point.py`. No
+existing file changed; `EnforcementPoint`'s own test suite
+(`tests/test_enforcement_point.py`) passes unmodified; no public export
+added (verified by test and by direct import-time check). Not yet
+committed — see this PR's final implementation report for full validation
+results (ruff, mypy, `pytest`, import-boundary and forbidden-symbol scans).
 Objective: compose the `evaluation/operation_aware/` orchestration engine
 (`OperationAwareEvaluationEngine`, PR 27B, which itself invokes policy-owned
 bundle validation from PR 15, policy-owned aggregation from PR 27, and
