@@ -2816,20 +2816,39 @@ format --check`, and `mypy src` all green; the existing v0.1.0 portion of
 Compatibility risk: none (purely additive).
 Blocked by architecture decision: no.
 
-PR 36 (extension-contracts.md addition) remains next, not started.
-
 **PR 36 — Extension-contracts.md addition.**
+
+**Status: implemented** (`docs/operation-aware-extension-contract-position`).
+Appended a new "Operation-aware policy is structured data" section to
+`docs/extension-contracts.md`, recording Section 11's conclusion: the
+operation-aware policy family (`PolicyBundle`, `PolicyBundleScope`,
+`OperationAwarePolicyRule`, `OperationAwarePolicyMatch`, `PolicyCondition`,
+`RuleEffect`) is authored, validated structured data, not a new
+executable extension-point Protocol. The section contrasts the v0.1
+executable `PolicyRule` Protocol with the operation-aware data models,
+explains why no new callback-based extension point exists for this
+release, documents the data-level customization already supported,
+explicitly excludes internal evaluation machinery (including the
+condition-operator implementation) from extension-contract status, states
+the governance bar a future executable operation-aware extension point
+would have to clear, lists illustrative unauthorized informal extension
+mechanisms, and restates that `PolicyRule`, `AuditWriter`, and `AdapterBase`
+remain supported, unchanged, and not deprecated. No new Protocol, abstract
+base class, callable type alias, registration function, or plugin loader
+was added anywhere in `src/`; no `__all__` changed; `pyproject.toml` was not
+modified. `tests/test_extension_contracts.py` was not modified — its
+existing 68 assertions are unaffected by this docs-only change.
 Objective: document, in `docs/extension-contracts.md`, that the
 operation-aware policy model is data (not a new extension-point Protocol),
 per Section 11's conclusion — so a future contributor does not have to
 re-derive the "no new extension point" finding.
 Files: `docs/extension-contracts.md` (new section appended, existing
-sections unchanged).
+sections unchanged); this plan (status update only).
 Non-goals: no new Protocol, no code.
 Dependencies: PR 35.
 Architecture/schema references: Section 11 of this plan.
 Required tests: `test_extension_contracts.py`'s existing assertions
-unaffected (docs-only change).
+unaffected (docs-only change). Confirmed: 68 passed, unmodified test file.
 Completion criteria: merged.
 Compatibility risk: none.
 Blocked by architecture decision: no.
