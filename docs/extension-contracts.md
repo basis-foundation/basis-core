@@ -328,3 +328,175 @@ A compatibility change breaks extensions if it changes the data contract they in
 Adding new optional fields to any of these types, adding new enum values with defined semantics, and adding new optional `PolicyRule.evaluate()` parameters with defaults are additive changes. They do not break existing extension implementations provided they are introduced with defined absence semantics.
 
 See `docs/architecture/compatibility-philosophy.md` in basis-architecture for the governing compatibility commitments.
+
+---
+
+## Operation-aware policy is structured data
+
+This section records a conclusion, not a new contract: **the initial operation-aware authorization family (v0.2.0) does not introduce a new executable extension-point Protocol.** It exists so that a future contributor encountering `OperationAwarePolicyRule`, `PolicyBundle`, or the condition-operator implementation and wondering whether basis-core now has a second pluggable rule interface does not have to re-derive the answer from first principles. The answer is no, and this section explains why, what is actually customizable today, and what threshold a future executable extension point would have to clear.
+
+This section is additive. It changes nothing about the three governed extension points documented above (`PolicyRule`, `AuditWriter`, `AdapterBase`) or about `NormalizedEvent`'s role as an adapter output contract rather than an independently executable plugin interface. Their signatures, behavioral requirements, determinism requirements, statefulness guidance, forbidden side effects, failure behavior, and compatibility commitments are unchanged and are not restated or reinterpreted here.
+
+### The operation-aware policy family is authored data
+
+The operation-aware Python package surface adds a family of validated, structured policy values to `basis_core.policy`: `PolicyBundle`, `PolicyBundleScope`, `OperationAwarePolicyRule`, `OperationAwarePolicyMatch`, `PolicyCondition`, and `RuleEffect`. The bundle, scope, rule, match, and condition types are validated Pydantic models; `RuleEffect` is a closed enum. They are structured data and vocabulary, not executable policy callbacks.
+
+A `PolicyBundle` is authored by a bundle author—a human or an offline generation process. Its source representation may be YAML, JSON, or directly constructed Python data, but parsing and loading belong to the calling application or deployment layer. `basis-core` receives and validates the resulting typed `PolicyBundle`; it does not own YAML or JSON loading in the runtime evaluation path. Once constructed, a bundle is:
+
+- **authored as data** — a bundle author fills in fields (rule identity, effect, match criteria, conditions), the same way a config file or a policy YAML document is written, not the way a Python class implementing an interface is written;
+- **loaded or constructed outside evaluation** — bundle construction and validation happen before an `OperationAwareEvaluationEngine.evaluate()` call, not during it;
+- **validated by basis-core** — structural shape, required fields, and enum membership are enforced by Pydantic validation and by `basis_core.policy.operation_aware.validation`'s semantic checks, during typed model construction and semantic bundle validation, before evaluation;
+- **interpreted by deterministic kernel semantics** — the governed selector-matching, condition-evaluation, and aggregation logic in `policy/operation_aware/` reads the bundle's data and produces a result; the bundle itself contains no logic to invoke;
+- **passed to `OperationAwareEnforcementPoint`** — the enforcement point (and the evaluation engine beneath it) receives the validated bundle as configuration, the same conceptual relationship `EnforcementPoint` has to its configured `PolicyEngine`;
+- **not implemented by downstream consumers as Python callbacks** — a bundle author never writes a method the kernel calls back into. There is no `evaluate()`, `match()`, or `check()` method for a bundle author to implement anywhere in this family.
+
+### `PolicyRule` versus `OperationAwarePolicyRule`: same-sounding names, different kinds of thing
+
+The v0.1 `PolicyRule` extension point, documented in full at the top of this document, is **executable**: an object satisfies it by implementing
+
+```python
+def evaluate(
+    self,
+    subject: Subject,
+    action: str,
+    resource_id: str | None = None,
+    identity_context: IdentityContext | None = None,
+    context: dict[str, Any] | None = None,
+) -> Decision: ...
+```
+
+Downstream consumers may implement this `Protocol` today, subject to every behavioral requirement in the "PolicyRule contract" section above — determinism, statelessness, forbidden side effects, NOT_APPLICABLE-for-out-of-scope, and the rest. Nothing in the operation-aware release changes that.
+
+`OperationAwarePolicyRule` is not a variant, extension, or successor of `PolicyRule`. It is a Pydantic `BaseModel` — a validated record containing an effect, match criteria, and conditions. A bundle author does not implement `OperationAwarePolicyRule.evaluate()`. No such method, and no such public protocol, exists anywhere in the v0.2.0 surface:
+
+```text
+PolicyBundle
+    contains
+OperationAwarePolicyRule records
+    containing
+structured match and condition data
+```
+
+To state the distinction plainly:
+
+```text
+PolicyRule
+    remains the v0.1 executable extension protocol
+
+OperationAwarePolicyRule
+    is a validated operation-aware data model
+```
+
+The similar names — chosen because `PolicyRule` was already taken, per `docs/public-api.md`'s "Naming-collision note" — do not imply equivalent extension semantics. One is a code interface; the other is a record shape.
+
+### Why no new executable extension point exists
+
+The absence of an operation-aware `evaluate()`-style callback is a deliberate architectural position, not an oversight:
+
+- **Deterministic behavior must remain centrally governed.** Selector matching, condition evaluation, and outcome aggregation for the operation-aware family are implemented once, in `policy/operation_aware/`, and reviewed as a unit. An executable per-rule callback would let each bundle author's code decide its own matching or aggregation behavior, fragmenting a semantic that `docs/kernel-constitution.md` Invariant 5 requires to be deterministic and centrally reasoned about.
+- **Trace, response, and `AuditEvidence` semantics depend on a closed, reviewable evaluation pipeline.** `EvaluationTrace`, `OperationAwareDecisionResponse`, and `AuditEvidence` are assembled from the kernel's own bounded evaluation stages. A callback with unbounded behavior would make it impossible to guarantee the trace and audit-evidence artifacts faithfully and completely describe what happened.
+- **Arbitrary callbacks would complicate reproducibility.** The determinism guarantee this document already states for `PolicyRule` — same inputs, same outcome, every call — is far harder to audit for third-party code invoked mid-pipeline than for structured data a validator can inspect once, statically.
+- **Arbitrary callbacks could introduce hidden state or side effects.** A data model cannot make a network call, hold mutable state, or read a clock. A callback could, unless independently re-litigated against every forbidden-side-effect rule this document already establishes for `PolicyRule`.
+- **Arbitrary callbacks could weaken bounded failure handling.** The six-value `OperationAwareFailureReason` vocabulary and the fail-closed guarantees of `OperationAwareEnforcementPoint` (ADR-0006, Decisions 7-9) are proven against a known, bounded set of failure modes. An arbitrary callback introduces failure modes the enforcement point cannot enumerate in advance.
+- **Arbitrary callbacks could make canonical conformance difficult or impossible.** The canonical compatibility vectors (Milestone 12) assert that a given request and bundle produce an exact, reproducible response/trace/evidence shape. Executable per-bundle logic would make that assertion consumer-dependent rather than kernel-owned.
+- **Arbitrary callbacks could bypass approved condition and aggregation semantics.** The ten-operator condition set and the deny-precedence/default-deny aggregation rules are the approved, reviewed authorization semantics for this family. A callback extension point would hand a bundle author a way to route around them entirely.
+- **Public plugin interfaces create long-term compatibility obligations.** Per `docs/breaking-change-discipline.md`, an extension interface is a compatibility surface felt by every consumer simultaneously. Adding one is not free; it is a standing commitment.
+- **No demonstrated requirement currently justifies that obligation.** Nothing in the accepted roadmap, the canonical vectors, or the merged operation-aware surface has identified a use case that structured data cannot already express.
+
+None of this should be read as "executable extensibility is inherently bad" — `PolicyRule` itself is an executable extension point and remains fully supported. The correct framing is narrower: an executable operation-aware extension point has not been authorized for the initial v0.2.0 release because the need for one, and the compatibility contract it would require, have not been established.
+
+### Supported customization today
+
+A bundle author customizes operation-aware authorization entirely by authoring data within the governed model. This includes:
+
+- bundle identity and version (`PolicyBundle`'s identity/version fields);
+- bundle scope (`PolicyBundleScope`'s ten independently-optional selector categories);
+- rule identity (`OperationAwarePolicyRule`'s identity field);
+- rule effect (`RuleEffect`: `allow` / `deny`);
+- selectors and match criteria (`OperationAwarePolicyMatch`'s twenty independently-optional selector categories);
+- supported policy conditions (`PolicyCondition`'s field-path/operator/expected-value shape, using the currently-supported operator set — see below);
+- rule ordering inputs where defined by the contract;
+- evidence references and request context accepted by the public models (`IdentityEvidenceReference`, `AdapterEvidenceReference`, and the optional location/device/protocol/safety/environment/risk context objects on `OperationAwareDecisionRequest`).
+
+This list tracks the merged model capabilities exactly, as inventoried in `docs/public-api.md`'s "Operation-aware public API (v0.2.0)" section. It does not extend to fields or semantics that do not exist in that inventory, and internal helper functions (next section) are never customization surfaces, however convenient a direct import might seem.
+
+### Internal evaluation machinery is not an extension contract
+
+The following are internal implementation detail, not extension contracts, regardless of the fact that they are implemented as importable Python functions and classes:
+
+- `OperationAwareEvaluationEngine` (`evaluation/operation_aware/engine.py`);
+- bundle-applicability helpers (`determine_applicability`, `ApplicabilityResult`, `policy/operation_aware/applicability.py`);
+- selector helpers (`evaluate_rule_selectors`, `SelectorEvaluation`, `CandidateRuleEvaluation`, `policy/operation_aware/selector.py`);
+- candidate-selection functions built on the above;
+- condition evaluation functions (`evaluate_condition`, `ConditionEvaluation`, `RuleConditionEvaluation`, `policy/operation_aware/condition_eval.py`);
+- the condition-operator implementation registry (`policy/operation_aware/operators.py`, including `SUPPORTED_OPERATORS` — see the dedicated treatment below);
+- aggregation helpers (`aggregate_policy_outcome`, `OperationAwarePolicyOutcome`, `PolicyAggregationResult`, `policy/operation_aware/aggregation.py`);
+- validation pipelines (`validate_policy_bundle`, `PolicyBundleValidationError` and its subtypes, `policy/operation_aware/validation.py`);
+- trace assembly (`evaluation/operation_aware/trace_assembly.py`);
+- response assembly (`assemble_operation_aware_decision_response`, `evaluation/operation_aware/response_assembly.py`);
+- `AuditEvidence` assembly (`assemble_audit_evidence`, `evaluation/operation_aware/response_assembly.py`);
+- private enforcement helpers inside `OperationAwareEnforcementPoint`.
+
+`docs/public-api.md` already states this directly: these symbols are "reachable only via direct submodule import" and "not part of this documented public API," carrying "no compatibility guarantee." This section restates it here because the question this section exists to answer — "is there a second plugin interface?" — is exactly the question a contributor asks after finding one of these modules by grep. The fact that a function or class is importable, has a clear docstring, or is even convenient to call directly does not make it a supported plugin interface. Only the package surface and extension contracts actually documented in `docs/public-api.md` and in this document are supported contracts.
+
+### Condition operators are governed semantics, not a plugin registry
+
+`policy/operation_aware/operators.py` implements a fixed, ten-operator set (`SUPPORTED_OPERATORS`, an internal module-level immutable `frozenset[str]`) approved by the corresponding basis-architecture condition-operator-semantics clarification. This module must not be described, in this document or elsewhere, as:
+
+- a plugin registry;
+- a public registration API;
+- dynamically extensible;
+- an entry-point mechanism;
+- a downstream callback interface.
+
+`PolicyCondition.operator` is an open, structurally-validated string field — it does not reject an operator name the kernel does not implement at construction time — but this openness is a validation-shape decision, not an invitation for third parties to supply their own operator behavior. A structurally valid but unimplemented operator produces a governed, bounded outcome (a `no_match`/`error`-classified `ConditionEvaluation`, per `operators.py`'s own contract), never a callout to consumer-supplied code.
+
+Adding a new built-in operator to this set is possible, and may be a purely additive semantic expansion, but it is not a matter of local convenience. It requires, at minimum: architecture review where required; contract and vocabulary review (the operator set is governed by a basis-architecture clarification, not solely by this repository); a deterministic implementation; compatibility analysis; exhaustive tests; documentation; and schema or shared-contract alignment where applicable. No mechanism exists, and none is proposed here, for a third party to register an arbitrary operator at runtime.
+
+### The threshold for a future executable operation-aware extension point
+
+Nothing in this section forecloses a future executable operation-aware extension mechanism. No such mechanism is part of the initial v0.2.0 surface, but the correct wording for that fact is bounded, not absolute:
+
+No executable operation-aware policy extension point is part of the initial v0.2.0 surface. A future governed decision may add one if a real need is demonstrated. Until then, contributors must not introduce one informally.
+
+A future decision to add one would be a new, separately governed architecture decision — an ADR in basis-architecture, following the same process `docs/breaking-change-discipline.md` requires for any new extension-interface surface — and would need to define, at minimum:
+
+- demonstrated use cases;
+- interface ownership;
+- exact method signatures;
+- input and output contracts;
+- deterministic requirements;
+- permitted and forbidden state;
+- permitted and forbidden side effects;
+- failure containment;
+- timeout or resource-bound behavior, if applicable;
+- trace and `AuditEvidence` integration;
+- serialization and versioning;
+- compatibility obligations;
+- import boundaries;
+- security implications;
+- canonical conformance behavior;
+- deprecation and breaking-change policy.
+
+This section does not create that ADR, does not design the hypothetical protocol, and does not speculate about its shape. It states only the governance bar a future proposal would have to clear.
+
+### What would count as an unauthorized informal extension point
+
+The following changes — an illustrative list, not an exhaustive design specification — would introduce an executable operation-aware extension point and therefore require the governance described above before landing. None of them exist in the merged v0.2.0 surface:
+
+- adding an `OperationAwarePolicyRuleProtocol`;
+- adding `evaluate()` callbacks to operation-aware rules;
+- accepting arbitrary Python callables as conditions;
+- runtime operator registration;
+- package entry-point discovery;
+- dynamic module loading;
+- user-supplied evaluator classes;
+- arbitrary expression-language execution;
+- adding a plugin object to `PolicyBundle`;
+- allowing callbacks to directly construct authoritative traces, responses, or `AuditEvidence`.
+
+A contributor proposing any of these — even framed as a small convenience, an internal helper, or a test-only mechanism that might later be exposed — should treat it as a new extension-point proposal subject to the threshold above, not as an implementation detail of the current roadmap.
+
+### v0.1 contracts are preserved, unchanged, and not deprecated
+
+`PolicyRule`, `AuditWriter`, and `AdapterBase` remain supported exactly as documented above. Their existing contracts are unchanged by anything in this section or by the operation-aware release generally. No migration is required for v0.1 consumers, and operation-aware additions do not deprecate the v0.1 extension points. The operation-aware data model (`PolicyBundle` and its nested shapes) is an additive parallel family, evaluated through its own `OperationAwareEnforcementPoint` alongside the existing `EnforcementPoint` — not a replacement for, and not implying any recommended rewrite of, v0.1 policies. Downstream consumers are not expected to migrate v0.1 `PolicyRule` implementations into operation-aware bundles unless a future, separately-scoped migration or adoption guide says otherwise.
