@@ -2856,14 +2856,51 @@ Blocked by architecture decision: no.
 ### Milestone 12 — Canonical compatibility vectors
 
 **PR 37 — Wire the five canonical scenarios end-to-end.**
-**Status: unblocked, not complete** (canonical-vector field-by-field
-comparison against the vendored `v0.2.1` compatibility fixtures surfaced
-three repeatable disagreements between this repository's merged
-implementation and the fixtures. `basis-architecture` has since resolved
-all three at the semantics level — see the merged clarification,
+**Status: complete at the implementation level, pending review/merge**
+(canonical-vector field-by-field comparison against the vendored `v0.2.1`
+compatibility fixtures had surfaced three repeatable disagreements between
+this repository's merged implementation and the fixtures. `basis-architecture`
+resolved all three at the semantics level — see the merged clarification,
 `docs/architecture/operation-aware-evidence-provenance-semantics.md`
-(commit `6d3a65f`) — and `basis-schemas` v0.2.2 has published corrected
+(commit `6d3a65f`) — and `basis-schemas` v0.2.2 published corrected
 canonical fixtures reflecting that resolution.
+
+With the branch rebased onto current `main` (which carries both
+prerequisites — `fix: project operation-aware rule rationale by result`
+(#60) and `chore: vendor basis-schemas v0.2.2` (#61)) and the restored
+`tests/operation_aware/test_canonical_vectors.py` re-pointed at the active
+`v0.2.2` snapshot (a test-only correction: one self-guard assertion and its
+surrounding docstring prose still named the superseded `v0.2.1` release),
+all five canonical `v0.2.2` scenarios (`allow-basic`, `deny-precedence`,
+`default-deny`, `not-applicable`, `invalid-policy-bundle`) now execute
+through the real `OperationAwareEnforcementPoint.evaluate()` and agree
+field-by-field with the vendored expected fixtures. `OperationAwareDecisionResponse`
+equality, `EvaluationTrace` equality, and `AuditEvidence` equality all pass
+for every scenario, for both the reference-only and embedded-trace
+executions, and under repeat-run determinism. Per-rule evidence follows the
+governed provenance semantics landed in #60 (a `matched` rule's authored
+`reason_code`/`explanation` are preserved verbatim, including a
+matched-but-non-decisive rule under deny precedence; `not_matched`/`skipped`
+rules carry `null`). Top-level `explanation` remains `null` on every
+scenario's response/trace/audit-evidence, exactly as the `v0.2.2` fixtures
+publish — no aggregate prose is synthesized. Bundle identity
+(`bundle_id`/`bundle_version`) is preserved wherever a trustworthy typed
+`PolicyBundle` exists for the evaluation, including `invalid-policy-bundle`
+(`bundle-compat-invalid-policy` / `1.0.0`), per the corrected `v0.2.2`
+provenance semantics. `expected-gateway-audit-event.yaml` and
+`GatewayAuditEvent` remain outside this PR's (and the kernel's) assertion
+boundary, per Milestone 12's existing PR 37/PR 38 split — untouched here.
+
+The focused canonical-vector run (16/16), the related operation-aware
+validation set, the full `tests/operation_aware` suite, and the full
+repository test suite all pass with no failures (pre-existing, unrelated
+skips only). `ruff check`, `ruff format --check`, `mypy`, and
+`git diff --check` all pass clean. The only files touched are
+`tests/operation_aware/test_canonical_vectors.py` (test-only) and this
+roadmap document — no production `src`, vendored fixture, snapshot-helper,
+or package-metadata change was required or made. PR 37 is complete on
+`test/operation-aware-canonical-conformance` but has not been merged; PR 38
+is next.
 
 Top-level explanation semantics are settled: `basis-core` does not
 synthesize aggregate, human-readable prose; `OperationAwareDecisionResponse
