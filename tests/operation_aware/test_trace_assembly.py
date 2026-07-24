@@ -44,8 +44,10 @@ from basis_core.audit.operation_aware.trace_rule_evidence import (
     TraceRuleEvidence,
 )
 from basis_core.decisions.operation_aware import OperationAwareDecisionRequest
+from basis_core.domain.operation_aware_vocabulary import ReasonCode
 from basis_core.evaluation.operation_aware.trace_assembly import (
     RuleIdentityMismatchError,
+    _project_rule_rationale,
     assemble_evaluation_trace,
     assemble_rule_evidence,
 )
@@ -796,3 +798,208 @@ class TestV01Compatibility:
         from basis_core.audit.trace import RuleEvaluation
 
         assert set(RuleEvaluation.model_fields) == {"rule_name", "outcome", "reason"}
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# 16. Rule-evidence rationale projection
+#     (fix/operation-aware-rule-evidence-projection)
+# ══════════════════════════════════════════════════════════════════════════
+#
+# `assemble_rule_evidence` previously copied `rule.reason_code`/
+# `rule.explanation` into `TraceRuleEvidence` unconditionally, regardless of
+# `rule_result`. Per `basis-architecture`'s merged evidence-provenance
+# clarification (`docs/architecture/operation-aware-evidence-provenance-
+# semantics.md` §3), a `matched` rule's authored rationale is preserved
+# verbatim; a `not_matched`/`skipped`/`error` rule's is not. This section
+# proves the corrected, `rule_result`-keyed projection performed by
+# `_project_rule_rationale`.
+
+
+class TestRationaleProjectionMatched:
+    def test_matched_allow_preserves_authored_rationale_verbatim(self) -> None:
+        request = _build_request(action="read:ahu")
+        rule = _build_rule(
+            rule_id="rule-matched-allow",
+            match={"actions": ["read:ahu"]},
+            effect="allow",
+            reason_code="allow_rule_matched",
+            explanation="Operators may read AHU telemetry.",
+        )
+        evaluation = evaluate_rule_conditions(rule, request)
+        assert evaluation.result is RuleConditionResult.MATCHED
+
+        evidence = assemble_rule_evidence(rule, evaluation)
+
+        assert evidence.rule_result is RuleResult.MATCHED
+        assert evidence.effect is TraceRuleEffect.ALLOW
+        assert evidence.reason_code == "allow_rule_matched"
+        assert evidence.explanation == "Operators may read AHU telemetry."
+
+    def test_matched_deny_preserves_authored_rationale_verbatim(self) -> None:
+        request = _build_request(action="write:hvac:setpoint")
+        rule = _build_rule(
+            rule_id="rule-matched-deny",
+            match={"actions": ["write:hvac:setpoint"]},
+            effect="deny",
+            reason_code="deny_rule_matched",
+            explanation=("Deny precedence applied; an interlock-scoped deny rule matched."),
+        )
+        evaluation = evaluate_rule_conditions(rule, request)
+        assert evaluation.result is RuleConditionResult.MATCHED
+
+        evidence = assemble_rule_evidence(rule, evaluation)
+
+        assert evidence.rule_result is RuleResult.MATCHED
+        assert evidence.effect is TraceRuleEffect.DENY
+        assert evidence.reason_code == "deny_rule_matched"
+        assert (
+            evidence.explanation
+            == "Deny precedence applied; an interlock-scoped deny rule matched."
+        )
+
+
+class TestRationaleProjectionNotMatched:
+    def test_not_matched_allow_omits_authored_rationale(self) -> None:
+        request = _build_request(action="read:ahu")
+        rule = _build_rule(
+            rule_id="rule-not-matched-allow",
+            match={"actions": ["write:ahu"]},  # does not match the request's action
+            effect="allow",
+            reason_code="allow_rule_matched",
+            explanation="Operators may read AHU telemetry.",
+        )
+        evaluation = evaluate_rule_conditions(rule, request)
+        assert evaluation.result is RuleConditionResult.NOT_MATCHED
+
+        evidence = assemble_rule_evidence(rule, evaluation)
+
+        # Other bounded evidence remains intact -- only the rationale
+        # projection changes.
+        assert evidence.rule_id == "rule-not-matched-allow"
+        assert evidence.effect is TraceRuleEffect.ALLOW
+        assert evidence.rule_result is RuleResult.NOT_MATCHED
+        assert evidence.condition_results is None
+        assert evidence.reason_code is None
+        assert evidence.explanation is None
+
+    def test_not_matched_deny_omits_authored_rationale(self) -> None:
+        request = _build_request(action="read:ahu")
+        rule = _build_rule(
+            rule_id="rule-not-matched-deny",
+            match={"actions": ["write:ahu"]},
+            effect="deny",
+            reason_code="deny_rule_matched",
+            explanation=("Deny precedence applied; an interlock-scoped deny rule matched."),
+        )
+        evaluation = evaluate_rule_conditions(rule, request)
+        assert evaluation.result is RuleConditionResult.NOT_MATCHED
+
+        evidence = assemble_rule_evidence(rule, evaluation)
+
+        assert evidence.rule_id == "rule-not-matched-deny"
+        assert evidence.effect is TraceRuleEffect.DENY
+        assert evidence.rule_result is RuleResult.NOT_MATCHED
+        assert evidence.condition_results is None
+        assert evidence.reason_code is None
+        assert evidence.explanation is None
+
+
+class TestRationaleProjectionSkipped:
+    def test_skipped_rule_result_omits_rationale_via_projection_helper(self) -> None:
+        """`assemble_rule_evidence` cannot actually produce `RuleResult.
+        SKIPPED` through its only production call path today --
+        `RuleConditionResult` (`policy.operation_aware.condition_eval`) has
+        no member meaning "this rule was never evaluated", so
+        `_RULE_CONDITION_RESULT_TO_RULE_RESULT` has no entry that could ever
+        map to it (see `trace_assembly.py`'s own docstring, "Condition
+        evidence -- no synthetic states"). This test exercises the real,
+        existing typed `RuleResult.SKIPPED` value directly against
+        `_project_rule_rationale` -- the narrow trace-assembly boundary --
+        rather than inventing a second evaluator or a synthetic production
+        path that does not exist."""
+        reason_code, explanation = _project_rule_rationale(
+            rule_result=RuleResult.SKIPPED,
+            authored_reason_code=ReasonCode("would_have_matched"),
+            authored_explanation="Authored rationale for a rule never reached.",
+        )
+        assert reason_code is None
+        assert explanation is None
+
+
+class TestRationaleProjectionError:
+    def test_error_rule_never_uses_authored_success_or_deny_rationale(self) -> None:
+        request = _build_request(action="read:ahu")
+        rule = _build_rule(
+            rule_id="rule-error-rationale",
+            conditions=[_match_cond("cond-ok"), _error_cond("cond-bad")],
+            effect="deny",
+            reason_code="deny_rule_matched",
+            explanation=("Deny precedence applied; an interlock-scoped deny rule matched."),
+        )
+        evaluation = evaluate_rule_conditions(rule, request)
+        assert evaluation.result is RuleConditionResult.ERROR
+
+        evidence = assemble_rule_evidence(rule, evaluation)
+
+        assert evidence.rule_result is RuleResult.ERROR
+        # No governed evaluation-error reason_code/explanation exists yet
+        # anywhere in this pipeline (see `trace_assembly.py`'s docstring,
+        # "Rule-evidence rationale projection") -- the rule's own authored
+        # deny rationale must never stand in for it.
+        assert evidence.reason_code is None
+        assert evidence.explanation is None
+        # Condition-level evidence is still fully preserved -- this fix
+        # changes only rule-level rationale projection, not condition
+        # evidence (already proven unconditionally by
+        # `TestConditionError` above).
+        assert evidence.condition_results is not None
+        results = {c.condition_id: c.result for c in evidence.condition_results}
+        assert results["cond-ok"] is TraceConditionResult.MATCHED
+        assert results["cond-bad"] is TraceConditionResult.ERROR
+
+
+class TestRationaleProjectionHelperExhaustiveAndDeterministic:
+    """Direct tests of `_project_rule_rationale` -- the single, pure,
+    total function this fix introduces. Exhaustive over every `RuleResult`
+    member (including `SKIPPED`, unreachable through `assemble_rule_
+    evidence`'s only production call path today) and proves determinism
+    (equal inputs -> equal output), independent of `assemble_rule_
+    evidence`'s own vocabulary mapping and condition-evidence handling."""
+
+    @pytest.mark.parametrize(
+        ("rule_result", "expected"),
+        [
+            (RuleResult.MATCHED, ("authored_reason", "authored_explanation")),
+            (RuleResult.NOT_MATCHED, (None, None)),
+            (RuleResult.SKIPPED, (None, None)),
+            (RuleResult.ERROR, (None, None)),
+        ],
+    )
+    def test_projection_by_rule_result(
+        self, rule_result: RuleResult, expected: tuple[str | None, str | None]
+    ) -> None:
+        result = _project_rule_rationale(
+            rule_result=rule_result,
+            authored_reason_code=ReasonCode("authored_reason"),
+            authored_explanation="authored_explanation",
+        )
+        assert result == expected
+
+    def test_projection_is_deterministic(self) -> None:
+        kwargs: dict[str, object] = {
+            "rule_result": RuleResult.MATCHED,
+            "authored_reason_code": ReasonCode("stable_reason"),
+            "authored_explanation": "Stable explanation.",
+        }
+        assert _project_rule_rationale(**kwargs) == _project_rule_rationale(**kwargs)  # type: ignore[arg-type]
+
+    def test_projection_handles_no_authored_rationale(self) -> None:
+        """A matched rule that authored no `reason_code`/`explanation` at
+        all (both `None`) projects `None`/`None` -- not an error, and not a
+        synthesized value standing in for the missing rationale."""
+        result = _project_rule_rationale(
+            rule_result=RuleResult.MATCHED,
+            authored_reason_code=None,
+            authored_explanation=None,
+        )
+        assert result == (None, None)

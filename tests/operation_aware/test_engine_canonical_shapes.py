@@ -289,12 +289,14 @@ def test_deny_precedence_canonical_shape() -> None:
         effect=RuleEffect.ALLOW,
         match=_match(actions=("write:hvac:setpoint",)),
         reason_code="allow_rule_matched",
+        explanation="Operators may write HVAC setpoints.",
     )
     deny_rule = _rule(
         rule_id="rule-deny-interlock",
         effect=RuleEffect.DENY,
         match=_match(actions=("write:hvac:setpoint",)),
         reason_code="deny_rule_matched",
+        explanation="Deny precedence applied; an interlock-scoped deny rule matched.",
     )
     bundle = _bundle(
         bundle_id="bundle-canonical-deny-precedence",
@@ -328,6 +330,25 @@ def test_deny_precedence_canonical_shape() -> None:
         "rule-allow-priority",
         "rule-deny-interlock",
     ]
+
+    # Deny precedence controls the *aggregate* outcome; it does not rewrite
+    # history about which rules matched. Both the matched ALLOW rule and the
+    # matched DENY rule retain their own authored per-rule rationale in the
+    # trace's rule evidence -- "non-decisive" describes the ALLOW rule's
+    # effect on the final outcome, not its evidentiary status (see
+    # `basis-architecture`'s merged evidence-provenance clarification,
+    # `docs/architecture/operation-aware-evidence-provenance-semantics.md`
+    # §3).
+    evidence_by_id = {e.rule_id: e for e in trace.rule_evidence}
+    assert evidence_by_id["rule-allow-priority"].reason_code == "allow_rule_matched"
+    assert (
+        evidence_by_id["rule-allow-priority"].explanation == "Operators may write HVAC setpoints."
+    )
+    assert evidence_by_id["rule-deny-interlock"].reason_code == "deny_rule_matched"
+    assert (
+        evidence_by_id["rule-deny-interlock"].explanation
+        == "Deny precedence applied; an interlock-scoped deny rule matched."
+    )
 
     # Final reason code represents explicit deny-rule matching.
     assert trace.reason_code == "deny_rule_matched"
@@ -377,6 +398,7 @@ def test_default_deny_canonical_shape() -> None:
                 effect=RuleEffect.ALLOW,
                 match=_match(subject_roles=("operator",)),  # vendor subject won't match
                 reason_code="allow_rule_matched",
+                explanation="Operators may read AHU telemetry.",
             )
         ],
     )
@@ -400,6 +422,12 @@ def test_default_deny_canonical_shape() -> None:
     assert evidence.rule_id == "rule-allow-operator-only"
     assert evidence.rule_result is RuleResult.NOT_MATCHED
     assert evidence.condition_results is None
+
+    # A rule that did not match emitted no rationale for this evaluation --
+    # its authored (would-match) reason_code/explanation must not appear as
+    # though they had been satisfied.
+    assert evidence.reason_code is None
+    assert evidence.explanation is None
 
     # Default-deny's reason code is distinguishable from explicit deny
     # precedence's reason code (proven against Scenario 2's own result).

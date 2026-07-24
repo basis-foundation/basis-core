@@ -2856,6 +2856,47 @@ Blocked by architecture decision: no.
 ### Milestone 12 — Canonical compatibility vectors
 
 **PR 37 — Wire the five canonical scenarios end-to-end.**
+**Status: blocked, not complete** (canonical-vector field-by-field
+comparison against the vendored `v0.2.1` compatibility fixtures surfaced
+three repeatable disagreements between this repository's merged
+implementation and the fixtures. `basis-architecture` has since resolved
+all three at the semantics level — see the merged clarification,
+`docs/architecture/operation-aware-evidence-provenance-semantics.md`
+(commit `6d3a65f`) — and `basis-schemas` v0.2.2 has published corrected
+canonical fixtures reflecting that resolution.
+
+Top-level explanation semantics are settled: `basis-core` does not
+synthesize aggregate, human-readable prose; `OperationAwareDecisionResponse
+.explanation` / `EvaluationTrace.explanation` / `AuditEvidence.explanation`
+remain `null` whenever no governed stage supplies one, and that `null` is
+the correct, complete value, not a defect. Bundle-identity semantics are
+settled: `bundle_id`/`bundle_version` remain present on the response,
+trace, and audit-evidence artifacts whenever a trustworthy typed
+`PolicyBundle` exists for the evaluation, independent of whether that
+bundle applied, matched, or passed semantic validation.
+
+The third disagreement — unconditional per-rule
+`TraceRuleEvidence.reason_code`/`.explanation` projection — is resolved on
+this branch (`fix/operation-aware-rule-evidence-projection`,
+`evaluation/operation_aware/trace_assembly.py`'s
+`assemble_rule_evidence`/`_project_rule_rationale`), ahead of and
+independent from PR 37 itself: a `matched` rule's authored `reason_code`/
+`explanation` are preserved verbatim (including a matched-but-non-decisive
+rule under deny precedence); a `not_matched` or `skipped` rule's are
+omitted (`null`); an `error` rule's are never the rule's authored
+success/deny rationale (currently also `null`, because no governed
+evaluation-error `reason_code`/`explanation` exists yet anywhere in this
+pipeline — see that fix's own final report for the open limitation). This
+correction did not change authorization outcomes or aggregate `reason_code`
+selection.
+
+With all three evidence-provenance questions now settled and corrected
+fixtures published, PR 37 remains blocked solely because `basis-schemas`
+v0.2.2 has not yet been vendored and activated in `basis-core` — the next
+prerequisite is the v0.2.2 snapshot-vendoring PR. This fix does not vendor
+v0.2.2, does not claim PR 37 complete, and does not begin PR 38, which
+remains sequenced after PR 37.
+
 Objective: load each vendored canonical-vector directory (Section 4), run
 `OperationAwareEnforcementPoint.evaluate()` against its request + bundle, and
 assert the result matches the vendored `expected-operation-aware-decision-

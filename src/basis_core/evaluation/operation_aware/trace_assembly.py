@@ -18,8 +18,16 @@ What this module does
     `OperationAwarePolicyRule` and its already-produced
     `RuleConditionEvaluation` into one `TraceRuleEvidence`, preserving the
     evaluator's own ordered `condition_results` (when any conditions were
-    actually evaluated) and the rule's own authored `reason_code`/
-    `explanation`.
+    actually evaluated) and projecting the rule's own authored
+    `reason_code`/`explanation` according to `rule_result`, per
+    `basis-architecture`'s merged evidence-provenance clarification
+    (`docs/architecture/operation-aware-evidence-provenance-semantics.md`
+    §3): a `matched` rule's authored `reason_code`/`explanation` are
+    preserved verbatim; a `not_matched` or `skipped` rule's are omitted
+    (`null`) — the rule emitted no rationale for this evaluation; an
+    `error` rule's are never the rule's authored success/deny rationale
+    (see `_project_rule_rationale` below for the exact projection and why
+    `error` currently also projects to `null`).
   - `assemble_evaluation_trace(rule_evidence, ...)` composes an already-
     assembled, already-ordered sequence of `TraceRuleEvidence` plus
     caller-supplied, already-determined trace-level state
@@ -47,6 +55,51 @@ caller that pairs a rule with a different rule's evaluator result is a
 caller bug, not an authorization outcome; this module refuses to silently
 prefer one identifier, overwrite either, or construct evidence under an
 identifier neither input actually confirms. See `RuleIdentityMismatchError`.
+
+Rule-evidence rationale projection — by rule_result, never unconditional
+──────────────────────────────────────────────────────────────────────────
+`assemble_rule_evidence` does not copy `rule.reason_code`/`rule.explanation`
+unconditionally. It projects them through `_project_rule_rationale`,
+keyed on the rule's own `rule_result` (the already-mapped
+`audit.operation_aware.trace_rule_evidence.RuleResult`, not the raw
+`RuleConditionResult` this module maps it from):
+
+    matched       → the rule's authored `reason_code`/`explanation`,
+                    preserved verbatim (never rewritten, never
+                    suppressed merely because another rule is decisive
+                    under deny precedence — deny precedence governs the
+                    final authorization outcome, not whether this rule
+                    actually matched).
+    not_matched   → `None`/`None`. A rule that did not match emitted no
+                    reason code and authored no explanation for this
+                    evaluation; its authored (would-match) rationale must
+                    not appear as though it had been satisfied.
+    skipped       → `None`/`None`, for the same reason as `not_matched` —
+                    a rule that was never evaluated emitted nothing.
+                    `assemble_rule_evidence` never actually produces
+                    `RuleResult.SKIPPED` today (see "Condition evidence"
+                    below); this branch exists so the projection is total
+                    over `RuleResult`'s four members, not merely over the
+                    three this module's current callers can reach.
+    error         → `None`/`None`. This module does not invent a governed
+                    evaluation-error `reason_code`/`explanation` — none
+                    exists yet anywhere in this pipeline
+                    (`policy.operation_aware.condition_eval.
+                    RuleConditionEvaluation` and `policy.operation_aware.
+                    operators.ConditionEvaluation` both deliberately carry
+                    no error-code/reason-code field). The one constraint
+                    this module enforces is negative, not positive: an
+                    errored rule's evidence must never present the rule's
+                    authored success/deny rationale as though the rule had
+                    actually reached that outcome. If a future PR
+                    introduces a governed evaluation-error evidence
+                    source, `_project_rule_rationale`'s `error` branch is
+                    the one place that changes.
+
+This is the sole semantic correction this module makes relative to its
+previous unconditional-copy behavior; every other assembly behavior
+(vocabulary mappings, condition-evidence handling, ordering, purity,
+boundedness, rule-identity agreement) is unchanged.
 
 Condition evidence — no synthetic states
 ──────────────────────────────────────────
@@ -138,6 +191,45 @@ __all__ = [
 ]
 
 
+def _project_rule_rationale(
+    *,
+    rule_result: RuleResult,
+    authored_reason_code: ReasonCode | None,
+    authored_explanation: str | None,
+) -> tuple[ReasonCode | None, str | None]:
+    """
+    Project a rule's own authored `reason_code`/`explanation` into the
+    values `TraceRuleEvidence` should carry for this rule, keyed on
+    `rule_result` — never an unconditional copy.
+
+    See this module's docstring, "Rule-evidence rationale projection", for
+    the full governing table and the `basis-architecture` clarification it
+    implements. Summary:
+
+        matched       → (authored_reason_code, authored_explanation),
+                        preserved verbatim.
+        not_matched   → (None, None).
+        skipped       → (None, None).
+        error         → (None, None) — no governed evaluation-error
+                        `reason_code`/`explanation` exists yet anywhere in
+                        this pipeline to draw on; the rule's authored
+                        success/deny rationale must never be substituted
+                        for it.
+
+    Pure and total over every `RuleResult` member. Deterministic: equal
+    inputs always produce an equal result.
+    """
+    if rule_result is RuleResult.MATCHED:
+        return authored_reason_code, authored_explanation
+    if rule_result is RuleResult.NOT_MATCHED:
+        return None, None
+    if rule_result is RuleResult.SKIPPED:
+        return None, None
+    if rule_result is RuleResult.ERROR:
+        return None, None
+    raise AssertionError(f"unreachable: unhandled RuleResult member {rule_result!r}")
+
+
 class RuleIdentityMismatchError(ValueError):
     """
     Raised by `assemble_rule_evidence` when the authored
@@ -197,8 +289,12 @@ def assemble_rule_evidence(
 
     This function evaluates nothing. It maps already-determined facts
     through the explicit vocabulary tables above, preserves
-    `evaluation.condition_results`' order exactly, and carries the rule's
-    own authored `reason_code`/`explanation` forward unchanged.
+    `evaluation.condition_results`' order exactly, and projects the rule's
+    own authored `reason_code`/`explanation` through
+    `_project_rule_rationale`, keyed on the resulting `rule_result` — see
+    this module's docstring, "Rule-evidence rationale projection", for the
+    full governing table. A `matched` rule's authored rationale is
+    preserved verbatim; a `not_matched`/`skipped`/`error` rule's is not.
 
     Rule identity agreement:
         `rule.rule_id` and `evaluation.rule_id` must be equal. If they are
@@ -253,13 +349,20 @@ def assemble_rule_evidence(
     else:
         condition_results = None
 
+    rule_result = _RULE_CONDITION_RESULT_TO_RULE_RESULT[evaluation.result]
+    projected_reason_code, projected_explanation = _project_rule_rationale(
+        rule_result=rule_result,
+        authored_reason_code=rule.reason_code,
+        authored_explanation=rule.explanation,
+    )
+
     return TraceRuleEvidence(
         rule_id=rule.rule_id,
         effect=_RULE_EFFECT_TO_TRACE_RULE_EFFECT[rule.effect],
-        rule_result=_RULE_CONDITION_RESULT_TO_RULE_RESULT[evaluation.result],
+        rule_result=rule_result,
         condition_results=condition_results,
-        reason_code=rule.reason_code,
-        explanation=rule.explanation,
+        reason_code=projected_reason_code,
+        explanation=projected_explanation,
     )
 
 
