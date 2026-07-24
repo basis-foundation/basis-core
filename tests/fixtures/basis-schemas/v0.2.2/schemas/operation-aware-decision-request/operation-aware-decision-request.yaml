@@ -1,0 +1,910 @@
+# BASIS Operation-Aware Decision Request — published contract.
+#
+# This file PUBLISHES the richer, operation-aware kernel-input shape decided
+# in basis-architecture's operation-aware authorization model (ADR-0001,
+# docs/architecture/operation-aware-authorization-model.md, Section 3) and
+# sequenced for schema publication by the operation-aware schema readiness
+# plan (ADR-0005, docs/architecture/operation-aware-schema-readiness-plan.md,
+# "PR C — Operation-Aware DecisionRequest"). It does not invent new
+# authorization semantics: every field below formalizes a conceptual category
+# ADR-0001 already named. Architecture governs; schemas publish;
+# implementations consume.
+#
+# This is a SEPARATE, ADDITIVE vNext contract. The existing first-wave
+# schemas/decision-request/decision-request.yaml (the v0.1-era request:
+# subject_id/subject_roles/subject_attrs, action, resource_id, context,
+# required timestamp) is NOT modified, renamed, replaced, widened, or
+# reinterpreted by this file. It remains the published v0.1-era request
+# contract, unchanged, alongside this new operation-aware surface. See
+# docs/operation-aware-decision-request.md, "Relationship to the existing
+# decision-request", for the full compatibility discussion.
+#
+# This contract publishes the machine-readable request SHAPE only. It does
+# not assemble requests (basis-gateway does), evaluate them (basis-core
+# does), retrieve evidence (basis-identity / basis-adapters do), or enforce
+# decisions (basis-gateway does). No implementation repository consumes this
+# contract yet.
+#
+# The `lifecycle` is `experimental`: this is the first publication of the
+# operation-aware request shape, ahead of any real consumer, and several
+# field-level choices documented below (operation_intent's closed vocabulary,
+# the optional evaluation_time, the omission of a v0.1-era-style `context`
+# catch-all) are new design decisions made in this repository, not
+# open architecture questions.
+
+contract:
+  name: operation-aware-decision-request
+  title: BASIS Operation-Aware Decision Request
+  version: 0.1.0
+  lifecycle: experimental
+  governed_by: basis-architecture
+  published_by: basis-schemas
+  source: docs/architecture/operation-aware-schema-readiness-plan.md
+  description: >-
+    The operation-aware authorization request: an additive, richer sibling of
+    the first-wave decision-request contract that lets basis-gateway assemble
+    a structured request carrying the operational context an operation-aware
+    basis-core v0.2.0 kernel will evaluate — subject identity and attributes,
+    identity source/authority mode and an optional identity evidence
+    reference, the composite action, an optional canonical resource
+    identifier and explicit resource type, optional location and device
+    context, optional protocol evidence and adapter evidence reference,
+    optional operation intent, optional safety/environment/risk context, an
+    optional evaluation time, and an optional expected policy version. The
+    request carries only supplied context; it does not cause basis-core to
+    fetch context from identity providers, tokens, sessions, protocol
+    networks, device networks, topology services, risk engines, safety
+    systems, or external policy services. This contract defines the request
+    shape only — it does not define evaluation semantics (basis-core),
+    request assembly (basis-gateway), or evidence retrieval (basis-identity /
+    basis-adapters).
+  # contract-metadata: this file's own `contract:` block follows the
+  # formalized pattern. action-string / resource-identifier: the action and
+  # resource fields reuse those published formats unchanged. identity-
+  # evidence-reference / adapter-evidence-reference: the optional evidence
+  # fields carry values shaped by those published contracts, referenced, not
+  # duplicated. reason-code and redaction-classification are deliberately NOT
+  # declared: this request carries no reason_code field (that is a response/
+  # trace concept, deferred to PR E) and no top-level redaction_classification
+  # field of its own (the nested evidence references already carry theirs).
+  depends_on:
+    - contract-metadata
+    - action-string
+    - resource-identifier
+    - identity-evidence-reference
+    - adapter-evidence-reference
+
+operation_aware_decision_request:
+  # The request is a single object. Required fields are deliberately the
+  # smallest usable authorization identity: request_id, subject_id, and
+  # action. Everything else — including evaluation_time, which the v0.1-era
+  # decision-request requires as `timestamp` — is optional here. See
+  # docs/operation-aware-decision-request.md, "Required vs. optional design",
+  # for the reasoning behind this compatibility difference.
+  required:
+    - request_id
+    - subject_id
+    - action
+  optional:
+    - correlation_id
+    - subject_roles
+    - subject_attrs
+    - identity_source
+    - authority_mode
+    - identity_evidence_reference
+    - resource
+    - resource_type
+    - location
+    - device
+    - protocol_context
+    - operation_intent
+    - adapter_evidence_reference
+    - safety_context
+    - environment_context
+    - risk_context
+    - evaluation_time
+    - expected_policy_version
+  additional_properties: false
+
+  fields:
+    # --- Request identity and correlation -----------------------------
+    - id: request_id
+      type: string
+      required: true
+      non_empty: true
+      description: >-
+        Unique identifier for this specific authorization evaluation
+        request. Same meaning and convention as decision-request's
+        request_id (UUID v4 recommended); required and non-empty on the
+        wire.
+    - id: correlation_id
+      type:
+        - string
+        - "null"
+      required: false
+      default: null
+      description: >-
+        Optional identifier associating this request with a broader
+        end-to-end operation, workflow, or request chain spanning
+        basis-identity, basis-gateway, and basis-adapters. Distinct from
+        request_id, which identifies only this evaluation request. Passed
+        through verbatim, mirroring identity-evidence-reference's and
+        adapter-evidence-reference's correlation_id (no format constraint
+        beyond being a string or null).
+
+    # --- Subject --------------------------------------------------------
+    - id: subject_id
+      type: string
+      required: true
+      non_empty: true
+      description: >-
+        Stable identifier of the requesting subject. Same meaning as
+        decision-request's subject_id: the gateway derives it from the
+        authenticated identity; callers never send a subject of their own
+        choosing. Non-empty.
+    - id: subject_roles
+      type: array
+      item_type: string
+      required: false
+      default: []
+      description: >-
+        Role names held by the subject at request time. Same meaning as
+        decision-request's subject_roles: authorization input, not proof of
+        authentication. Items are strings; this contract validates each
+        item's type but does not itself enforce item non-emptiness,
+        de-duplication, or sort order (decision-request's own runtime
+        normalizes to a sorted, deduplicated set, but that normalization
+        behavior is not restated here as a static validation rule this
+        contract does not implement).
+    - id: subject_attrs
+      type: object
+      value_type: string
+      required: false
+      default: {}
+      description: >-
+        Additional subject attributes for ABAC policy conditions. Same
+        meaning as decision-request's subject_attrs. All keys and values are
+        strings.
+    - id: identity_source
+      type:
+        - string
+        - "null"
+      required: false
+      default: null
+      non_empty: true
+      description: >-
+        Opaque, provider-neutral label identifying the identity source or
+        authority that produced the subject's identity, when the gateway
+        already has this available as lightweight request context — for
+        example when no identity_evidence_reference is attached, or as a
+        convenience alongside one. Same field semantics as
+        identity-evidence-reference's identity_source (an opaque label, never
+        an OIDC- or JWT-specific value); this is a distinct field on this
+        request, not a duplicate declaration of that contract's field. See
+        "Identity evidence reference" below for the relationship between the
+        two.
+    - id: authority_mode
+      type:
+        - string
+        - "null"
+      required: false
+      default: null
+      non_empty: true
+      pattern: "^[a-z][a-z0-9_-]*$"
+      description: >-
+        Opaque, deployment-defined label for the identity authority mode
+        that produced the subject's identity (for example federated,
+        synchronized, or standalone-air-gapped, per basis-identity's
+        identity authority modes) — a reference, not provider-specific
+        detail. Open lowercase label, not a closed enum: basis-architecture
+        has not published a governed authority-mode vocabulary as a schema
+        contract, so this field validates only that the label is
+        well-formed, not that it names one of a fixed set of modes.
+    - id: identity_evidence_reference
+      type:
+        - object
+        - "null"
+      required: false
+      default: null
+      governed_by: identity-evidence-reference
+      description: >-
+        Optional reference to the trusted identity evidence that supports
+        this request's subject context, shaped exactly as published by the
+        identity-evidence-reference contract. Never embeds raw identity
+        evidence. See "Evidence reference composition" below for how this
+        field's request_id/correlation_id relate to this request's own.
+
+    # --- Target: action and resource ------------------------------------
+    - id: action
+      type: string
+      required: true
+      non_empty: true
+      governed_by: action-string
+      description: >-
+        The composite action being requested, in the canonical
+        {verb}:{domain}[:{object}] form published by the action-string
+        contract. Same meaning and format as decision-request's action;
+        this contract does not invent a second action grammar or carry a
+        protocol-native operation value in this field — see
+        protocol_context.operation for that distinct concept.
+    - id: resource
+      type:
+        - string
+        - "null"
+      required: false
+      default: null
+      governed_by: resource-identifier
+      description: >-
+        The canonical typed resource identifier in the
+        {resource_type}:{local_resource_id} form published by the
+        resource-identifier contract (e.g. ahu:rooftop-1). Same meaning as
+        decision-request's resource_id field, serialized under the name
+        `resource` on this contract to sit naturally alongside the new,
+        explicit resource_type field below — see "Resource and resource-type
+        semantics" in the companion doc for why the name differs from
+        decision-request while the meaning does not. Null (or absent) when
+        the request is not resource-specific.
+    - id: resource_type
+      type:
+        - string
+        - "null"
+      required: false
+      default: null
+      non_empty: true
+      pattern: "^[a-z][a-z0-9_-]*$"
+      description: >-
+        Explicit, normalized resource-type classification for policy
+        matching (e.g. ahu, setpoint, controller) — the same charset as the
+        resource_type segment of the resource-identifier contract. This is
+        provided as its own field, distinct from the type prefix embedded in
+        `resource`, because operation-aware policy may need to match on
+        resource type even for a resource-independent request, or a producer
+        may know the type ahead of composing a full canonical identifier.
+        This contract does not implement or enforce cross-field consistency
+        between `resource_type` and the prefix of `resource` when both are
+        present; producers are expected to keep them aligned, but validating
+        that alignment is not implemented here.
+
+    # --- Location ---------------------------------------------------------
+    - id: location
+      type:
+        - object
+        - "null"
+      required: false
+      default: null
+      description: >-
+        Optional physical/logical location context in which the resource
+        sits — see location_shape below. Every level is independently
+        optional; this contract does not require a full site/building/zone/
+        area hierarchy, does not enforce parent/child relationships between
+        levels, and does not implement topology lookup or a topology graph.
+
+    # --- Device -------------------------------------------------------
+    - id: device
+      type:
+        - object
+        - "null"
+      required: false
+      default: null
+      description: >-
+        Optional device context — see device_shape below. Distinct from
+        `resource`: `resource` is the authorization target, `device` is the
+        physical or logical device involved in exposing or acting on that
+        resource. They are not assumed to always be identical. Protocol-
+        neutral: carries no device credentials, no raw device configuration,
+        and this contract implements no live device lookup.
+
+    # --- Operation: protocol evidence, intent, adapter evidence ---------
+    - id: protocol_context
+      type:
+        - object
+        - "null"
+      required: false
+      default: null
+      description: >-
+        Optional protocol evidence/provenance context — see
+        protocol_context_shape below. Evidence only: its presence does not
+        make basis-core protocol-aware. This contract carries no
+        protocol-specific payload field and no protocol library dependency;
+        basis-core may match policy against the normalized string context
+        here, but does not parse BACnet, Modbus, OPC UA, MQTT, DNP3,
+        IEC 61850, KNX, Niagara, REST, or any future protocol.
+    - id: operation_intent
+      type:
+        - string
+        - "null"
+      required: false
+      default: null
+      enum:
+        - read_only
+        - state_changing
+        - control_affecting
+        - null
+      description: >-
+        Whether the operation is read-only, state-changing, or
+        command/control-affecting — a concept distinct from, and
+        complementary to, the `action` verb. Closed to these three values
+        because ADR-0001 and the operation-aware authorization and
+        policy/rule-model documents name exactly these three categories
+        consistently and without qualification (unlike, for example,
+        reason-code, which ADR-0003 explicitly calls "examples only, not a
+        final vocabulary"). Serialized in this repository's lowercase
+        snake_case convention. Not an enforcement command, an obligation, or
+        executable behavior — purely descriptive classification for policy
+        matching.
+    - id: adapter_evidence_reference
+      type:
+        - object
+        - "null"
+      required: false
+      default: null
+      governed_by: adapter-evidence-reference
+      description: >-
+        Optional reference to the normalized adapter evidence that produced
+        this request's operation context, shaped exactly as published by the
+        adapter-evidence-reference contract. Never embeds a raw protocol
+        payload. See "Evidence reference composition" below.
+
+    # --- Evaluation context: safety, environment, risk -------------------
+    - id: safety_context
+      type:
+        - object
+        - "null"
+      required: false
+      default: null
+      description: >-
+        Optional safety-relevant context — see safety_context_shape below.
+        Deterministic, structured data only. This contract does not design a
+        safety system, does not claim safety certification, does not make
+        BASIS a safety controller, and carries no control commands or
+        executable policy.
+    - id: environment_context
+      type:
+        - object
+        - "null"
+      required: false
+      default: null
+      description: >-
+        Optional operational environment context distinct from safety
+        context (for example a maintenance mode or a degraded-connectivity
+        condition) — see environment_context_shape below. Illustrative only;
+        this contract does not define a closed environment-state ontology
+        and implements no runtime discovery behavior.
+    - id: risk_context
+      type:
+        - object
+        - "null"
+      required: false
+      default: null
+      description: >-
+        Optional, deployment-defined risk context — see risk_context_shape
+        below. This contract defines no risk taxonomy, no risk engine, and
+        no risk-calculation behavior, and makes no accuracy claim about any
+        classification or score carried here.
+    - id: evaluation_time
+      type:
+        - string
+        - "null"
+      required: false
+      default: null
+      format: date-time
+      description: >-
+        ISO 8601, timezone-aware timestamp supplied by the producer for
+        evaluation to reason about (e.g. for a future time-window policy
+        condition). Optional here, unlike decision-request's required
+        `timestamp` — see "Time context" in the companion doc. This contract
+        carries supplied time context only: no runtime clock lookup, no
+        time-window evaluation behavior, and no timezone-database behavior
+        are implemented here.
+
+    # --- Policy -----------------------------------------------------------
+    - id: expected_policy_version
+      type:
+        - string
+        - "null"
+      required: false
+      default: null
+      non_empty: true
+      description: >-
+        The policy bundle version the request expects to be evaluated
+        against, stated by the producer as an expectation — distinct from
+        whatever policy version a future DecisionResponse records as
+        actually evaluated. Non-empty when present. This contract implements
+        no policy loading, negotiation, selection, or compatibility-
+        resolution behavior; it only publishes the field's shape. No
+        version-format (e.g. semver) is enforced here because the policy
+        bundle's own versioning scheme is deferred to PR D.
+
+  # --- Nested shapes ------------------------------------------------------
+
+  location_shape:
+    optional:
+      - site_id
+      - building_id
+      - zone_id
+      - area_id
+    additional_properties: false
+    fields:
+      - id: site_id
+        type:
+          - string
+          - "null"
+        required: false
+        default: null
+        non_empty: true
+        description: Identifier of the site, when known. Non-empty when present.
+      - id: building_id
+        type:
+          - string
+          - "null"
+        required: false
+        default: null
+        non_empty: true
+        description: Identifier of the building, when known. Non-empty when present.
+      - id: zone_id
+        type:
+          - string
+          - "null"
+        required: false
+        default: null
+        non_empty: true
+        description: Identifier of the zone, when known. Non-empty when present.
+      - id: area_id
+        type:
+          - string
+          - "null"
+        required: false
+        default: null
+        non_empty: true
+        description: Identifier of the area, when known. Non-empty when present.
+
+  device_shape:
+    optional:
+      - device_id
+      - device_class
+    additional_properties: false
+    fields:
+      - id: device_id
+        type:
+          - string
+          - "null"
+        required: false
+        default: null
+        non_empty: true
+        description: >-
+          Identifier of the specific device involved, when known. Non-empty
+          when present. Carries no device credential or configuration.
+      - id: device_class
+        type:
+          - string
+          - "null"
+        required: false
+        default: null
+        non_empty: true
+        pattern: "^[a-z][a-z0-9_-]*$"
+        description: >-
+          Operational category of device (e.g. controller, sensor, actuator,
+          gateway), independent of the specific device identity. Open
+          lowercase label, not a closed enum.
+
+  protocol_context_shape:
+    optional:
+      - protocol
+      - operation
+    additional_properties: false
+    fields:
+      - id: protocol
+        type:
+          - string
+          - "null"
+        required: false
+        default: null
+        pattern: "^[a-z][a-z0-9_-]*$"
+        description: >-
+          Open, lowercase protocol label carried as safe provenance metadata
+          only, using the same pattern as adapter-evidence-reference's
+          protocol field. Not a closed enum, and never a protocol-specific
+          payload field.
+      - id: operation
+        type:
+          - string
+          - "null"
+        required: false
+        default: null
+        non_empty: true
+        description: >-
+          The protocol-native operation name the adapter normalized (for
+          example a BACnet service name or a Modbus function), preserved as
+          evidence alongside the normalized `action`. Free-form non-empty
+          string: protocol-native operation names do not share one charset,
+          so no cross-protocol pattern is enforced. Evidence only — this is
+          a label, never a protocol payload, and this contract implements no
+          protocol parsing.
+
+  safety_context_shape:
+    optional:
+      - mode
+      - classification
+      - constraint_ids
+    additional_properties: false
+    fields:
+      - id: mode
+        type:
+          - string
+          - "null"
+        required: false
+        default: null
+        non_empty: true
+        pattern: "^[a-z][a-z0-9_-]*$"
+        description: >-
+          Deployment-defined, open lowercase label for the safety mode in
+          effect (for example a lockout/tagout or interlock-engaged mode),
+          when applicable. Not a closed enum: basis-architecture has not
+          published a closed safety-mode vocabulary.
+      - id: classification
+        type:
+          - string
+          - "null"
+        required: false
+        default: null
+        non_empty: true
+        pattern: "^[a-z][a-z0-9_-]*$"
+        description: >-
+          Deployment-defined, open lowercase safety classification label,
+          when applicable.
+      - id: constraint_ids
+        type: array
+        item_type: string
+        required: false
+        default: []
+        description: >-
+          Identifiers of safety constraints applicable to this request, when
+          known. Items are strings; this contract validates each item's
+          type but does not itself enforce item non-emptiness, and does not
+          define what a constraint identifier resolves to.
+
+  environment_context_shape:
+    optional:
+      - mode
+      - condition_ids
+    additional_properties: false
+    fields:
+      - id: mode
+        type:
+          - string
+          - "null"
+        required: false
+        default: null
+        non_empty: true
+        pattern: "^[a-z][a-z0-9_-]*$"
+        description: >-
+          Deployment-defined, open lowercase label for the operational
+          environment mode in effect (for example maintenance_mode or
+          degraded_connectivity — illustrative, not a closed list), when
+          applicable.
+      - id: condition_ids
+        type: array
+        item_type: string
+        required: false
+        default: []
+        description: >-
+          Identifiers of environment conditions applicable to this request,
+          when known. Items are strings; this contract validates each
+          item's type but does not itself enforce item non-emptiness.
+
+  risk_context_shape:
+    optional:
+      - classification
+      - score
+    additional_properties: false
+    fields:
+      - id: classification
+        type:
+          - string
+          - "null"
+        required: false
+        default: null
+        non_empty: true
+        pattern: "^[a-z][a-z0-9_-]*$"
+        description: >-
+          Deployment-defined, open lowercase risk classification label, when
+          a deployment chooses to define one. This contract defines no final
+          risk taxonomy.
+      - id: score
+        type:
+          - number
+          - "null"
+        required: false
+        default: null
+        description: >-
+          Deployment-defined numeric risk score, when a deployment chooses
+          to define one. No bounds, scale, or calculation method is defined
+          or enforced by this contract; a consumer must not assume any
+          particular range without deployment-specific documentation. This
+          contract makes no accuracy claim about the value.
+
+  # Reproduced verbatim from the dependency contracts, matching
+  # decision-request's own convention, so a consumer can validate a request
+  # without dereferencing them. Parity with the canonical files is enforced
+  # by this repository's test suite.
+  action_pattern: "^[a-z][a-z0-9_-]*:[a-z][a-z0-9_-]*(:[a-z][a-z0-9_-]*)?$"
+  resource_pattern: "^[a-z][a-z0-9_-]*:[a-z0-9][a-z0-9_-]*$"
+  resource_type_pattern: "^[a-z][a-z0-9_-]*$"
+  open_identifier_pattern: "^[a-z][a-z0-9_-]*$"
+  evaluation_time_pattern: "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|[+-]\\d{2}:\\d{2})$"
+  operation_intent_values:
+    - read_only
+    - state_changing
+    - control_affecting
+
+  constraints:
+    - request_id, subject_id, and action are required; every other field is
+      optional.
+    - request_id and subject_id must be non-empty.
+    - action must be non-empty and match the canonical action-string
+      pattern reproduced above (action_pattern).
+    - resource, when present and non-null, must match the canonical
+      resource-identifier pattern reproduced above (resource_pattern); null
+      or absent is valid for resource-independent requests.
+    - resource_type, when present and non-null, must be non-empty and match
+      resource_type_pattern. No cross-field consistency is validated between
+      resource_type and the type prefix embedded in resource.
+    - identity_source, when present and non-null, must be non-empty.
+    - authority_mode, when present and non-null, must be non-empty and match
+      open_identifier_pattern.
+    - identity_evidence_reference, when present and non-null, must satisfy
+      the identity-evidence-reference contract's own published rules.
+    - adapter_evidence_reference, when present and non-null, must satisfy
+      the adapter-evidence-reference contract's own published rules.
+    - location, device, protocol_context, safety_context,
+      environment_context, and risk_context, when present, must be objects
+      matching their respective *_shape and rejecting unknown nested fields;
+      every field within each is individually optional.
+    - operation_intent, when present and non-null, must be one of
+      operation_intent_values.
+    - evaluation_time, when present and non-null, must match
+      evaluation_time_pattern (timezone-aware ISO 8601).
+    - expected_policy_version, when present and non-null, must be non-empty.
+    - correlation_id, when present, is passed through verbatim with no
+      format constraint beyond being a string or null.
+    - This contract defines no access_token, id_token, refresh_token, jwt,
+      bearer_token, authorization_header, cookie, session_secret,
+      client_secret, password, private_key, api_key, raw_claims,
+      full_claim_set, raw_payload, raw_protocol_payload, packet, frame, or
+      device_secret field. Any such field is rejected as unknown.
+    - >-
+      Unknown / additional top-level fields are rejected (additional
+      properties are set to false), and unknown fields within each nested
+      *_shape are rejected the same way.
+
+  # Provenance association: this request and a nested evidence reference can
+  # carry overlapping information under different field names. In every
+  # such case, the PARENT request's field is authoritative for the
+  # evaluation; the nested reference's same-concept field is provenance
+  # metadata, produced earlier and independently by identity-evidence-
+  # reference / adapter-evidence-reference (for example at login time, or
+  # during adapter normalization, ahead of this specific request existing).
+  # Producers should keep overlapping values aligned when both are present,
+  # but this contract implements no automatic reconciliation or cross-field
+  # consistency validation between them; that remains a future
+  # implementation concern, not something the static contract expresses.
+  # This rule is uniform across every overlapping pair below, listed in
+  # overlapping_field_pairs.
+  provenance_association:
+    parent_fields_authoritative: true
+    nested_reference_fields: provenance_metadata_only
+    automatic_reconciliation: false
+    overlapping_field_pairs:
+      - parent: request_id
+        nested: identity_evidence_reference.request_id
+      - parent: request_id
+        nested: adapter_evidence_reference.request_id
+      - parent: correlation_id
+        nested: identity_evidence_reference.correlation_id
+      - parent: correlation_id
+        nested: adapter_evidence_reference.correlation_id
+      - parent: identity_source
+        nested: identity_evidence_reference.identity_source
+      - parent: protocol_context.protocol
+        nested: adapter_evidence_reference.protocol
+
+  # Where each part of the request is produced and consumed. Informative; it
+  # records the boundary ownership decided in basis-architecture, it adds no
+  # structure.
+  composition:
+    identity_context_established_by: basis-identity   # produces verified identity context and identity evidence references
+    operation_context_normalized_by: basis-adapters    # normalizes protocol operations and produces adapter evidence references
+    assembled_by: basis-gateway   # assembles this request from identity context, normalized adapter evidence, and runtime-supplied context; validates runtime inputs; later enforces the decision
+    evaluated_by: basis-core      # evaluates the structured request deterministically; does not authenticate, parse protocols, retrieve evidence, or enforce
+    published_by: basis-schemas   # publishes the request shape only; implements none of the above
+
+  examples:
+    # These examples are synthetic and independent of the first-wave
+    # decision-request examples' request_id series (a1b2c3d4-*), using a
+    # distinct oadr-* prefix so the two contracts' fixtures are never
+    # mistaken for one another.
+    valid:
+      # 1. Minimal request: only the three required fields.
+      - request_id: oadr-0001-0000-0000-000000000001
+        subject_id: svc-scheduler
+        action: browse:ahu
+      # 2. Subject-rich request: roles, attributes, identity source/
+      #    authority mode, and an identity evidence reference.
+      - request_id: oadr-0002-0000-0000-000000000002
+        correlation_id: corr-0002-0000-0000-000000000002
+        subject_id: a7b8c9d0-1234-5678-abcd-ef0123456789
+        subject_roles:
+          - operator
+        subject_attrs:
+          clearance: level-2
+        identity_source: oidc:https://idp.example.com
+        authority_mode: federated
+        identity_evidence_reference:
+          reference_id: idev-0002-0000-0000-000000000002
+          evidence_digest:
+            algorithm: sha-256
+            value: 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08
+          identity_source: oidc:https://idp.example.com
+          redaction_classification: reference_only
+        action: write:hvac:setpoint
+      # 3. OT operation-rich request: resource, resource type, location,
+      #    device, protocol context, adapter evidence reference, and
+      #    operation intent.
+      - request_id: oadr-0003-0000-0000-000000000003
+        subject_id: a7b8c9d0-1234-5678-abcd-ef0123456789
+        subject_roles:
+          - operator
+        action: write:hvac:setpoint
+        resource: hvac:zone-a
+        resource_type: hvac
+        location:
+          site_id: west-campus
+          building_id: bldg-3
+          zone_id: zone-a
+        device:
+          device_id: ahu-14
+          device_class: controller
+        protocol_context:
+          protocol: bacnet
+          operation: WriteProperty
+        adapter_evidence_reference:
+          reference_id: adev-0003-0000-0000-000000000003
+          evidence_digest:
+            algorithm: sha-256
+            value: 1f825aa2f0020ef7cf91dfa30da4668d791c5d4824fc8e41354b89ec05795ab
+          adapter_source: basis-adapters:bacnet
+          protocol: bacnet
+          redaction_classification: reference_only
+        operation_intent: state_changing
+      # 4. Full contextual request: safety, environment, time, risk,
+      #    correlation, and expected policy version.
+      - request_id: oadr-0004-0000-0000-000000000004
+        correlation_id: corr-0004-0000-0000-000000000004
+        subject_id: svc-maintenance-bot
+        action: execute:hvac:reset
+        resource: hvac:zone-a
+        safety_context:
+          mode: interlock-engaged
+          classification: elevated
+          constraint_ids:
+            - lockout-tagout-active
+        environment_context:
+          mode: maintenance_mode
+          condition_ids:
+            - scheduled-window-open
+        risk_context:
+          classification: elevated
+          score: 0.62
+        evaluation_time: "2026-05-22T14:30:00Z"
+        expected_policy_version: "0.2.0"
+    invalid:
+      - reason: missing required request_id
+        value:
+          subject_id: svc-scheduler
+          action: browse:ahu
+      - reason: empty request_id
+        value:
+          request_id: ""
+          subject_id: svc-scheduler
+          action: browse:ahu
+      - reason: missing required subject_id
+        value:
+          request_id: oadr-1001-0000-0000-000000000001
+          action: browse:ahu
+      - reason: empty subject_id
+        value:
+          request_id: oadr-1002-0000-0000-000000000002
+          subject_id: ""
+          action: browse:ahu
+      - reason: invalid action string (single segment; no domain)
+        value:
+          request_id: oadr-1003-0000-0000-000000000003
+          subject_id: svc-scheduler
+          action: read
+      - reason: malformed resource identifier (no type prefix)
+        value:
+          request_id: oadr-1004-0000-0000-000000000004
+          subject_id: svc-scheduler
+          action: read:ahu
+          resource: rooftop-1
+      - reason: unknown top-level field rejected
+        value:
+          request_id: oadr-1005-0000-0000-000000000005
+          subject_id: svc-scheduler
+          action: read:ahu
+          confidence: 0.97
+      - reason: malformed nested structure (unknown key in location)
+        value:
+          request_id: oadr-1006-0000-0000-000000000006
+          subject_id: svc-scheduler
+          action: read:ahu
+          location:
+            site_id: west-campus
+            country: unsupported-nested-key
+      - reason: unsupported operation_intent value (closed enum)
+        value:
+          request_id: oadr-1007-0000-0000-000000000007
+          subject_id: svc-scheduler
+          action: write:hvac:setpoint
+          operation_intent: destructive
+      - reason: invalid evaluation_time (timezone-naive, no offset)
+        value:
+          request_id: oadr-1008-0000-0000-000000000008
+          subject_id: svc-scheduler
+          action: read:ahu
+          evaluation_time: "2026-05-22T14:30:00"
+      - reason: malformed expected_policy_version (empty)
+        value:
+          request_id: oadr-1009-0000-0000-000000000009
+          subject_id: svc-scheduler
+          action: read:ahu
+          expected_policy_version: ""
+      - reason: malformed identity evidence reference (missing required reference_id)
+        value:
+          request_id: oadr-1010-0000-0000-000000000010
+          subject_id: svc-scheduler
+          action: read:ahu
+          identity_evidence_reference:
+            evidence_digest:
+              algorithm: sha-256
+              value: 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08
+            identity_source: oidc:https://idp.example.com
+            redaction_classification: reference_only
+      - reason: malformed adapter evidence reference (invalid digest algorithm format)
+        value:
+          request_id: oadr-1011-0000-0000-000000000011
+          subject_id: svc-scheduler
+          action: read:ahu
+          adapter_evidence_reference:
+            reference_id: adev-1011-0000-0000-000000000011
+            evidence_digest:
+              algorithm: SHA256
+              value: 1f825aa2f0020ef7cf91dfa30da4668d791c5d4824fc8e41354b89ec05795ab
+            adapter_source: basis-adapters:modbus
+            redaction_classification: reference_only
+      - reason: raw access token field rejected (unknown field)
+        value:
+          request_id: oadr-1012-0000-0000-000000000012
+          subject_id: svc-scheduler
+          action: read:ahu
+          access_token: eyJhbGciOiJSUzI1NiJ9.example.signature
+      - reason: raw claims field rejected (unknown field)
+        value:
+          request_id: oadr-1013-0000-0000-000000000013
+          subject_id: svc-scheduler
+          action: read:ahu
+          raw_claims:
+            sub: alice
+            email: alice@example.com
+      - reason: raw protocol payload field rejected (unknown field)
+        value:
+          request_id: oadr-1014-0000-0000-000000000014
+          subject_id: svc-scheduler
+          action: read:ahu
+          raw_protocol_payload: "0x0300000A"
+      - reason: malformed authority_mode (uppercase, not open-identifier shaped)
+        value:
+          request_id: oadr-1015-0000-0000-000000000015
+          subject_id: svc-scheduler
+          action: read:ahu
+          authority_mode: Federated

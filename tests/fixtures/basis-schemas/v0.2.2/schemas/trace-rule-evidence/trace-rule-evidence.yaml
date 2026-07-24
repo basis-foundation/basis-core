@@ -1,0 +1,456 @@
+# BASIS Trace Rule Evidence — published contract.
+#
+# This file PUBLISHES the bounded, deterministic per-rule explanation shape
+# decided in basis-architecture's operation-aware trace and audit evidence
+# model (ADR-0003, docs/architecture/operation-aware-trace-audit-evidence.md,
+# Section 5 "Rule Evaluation Evidence") and sequenced for schema publication
+# by the operation-aware schema readiness plan (ADR-0005,
+# docs/architecture/operation-aware-schema-readiness-plan.md, "PR E —
+# DecisionResponse and EvaluationTrace"). It does not invent new trace
+# semantics: every field below formalizes a conceptual category ADR-0003
+# Section 5 already named. Architecture governs; schemas publish;
+# implementations consume.
+#
+# CRITICAL DESIGN BOUNDARY: this publishes the bounded EXPLANATION record for
+# one rule considered during one evaluation, not the rule itself. It does not
+# copy the complete policy-rule object (no match criteria, no raw condition
+# field paths/operators/expected values), does not embed executable policy,
+# does not embed the full request, and does not embed raw evidence. It
+# reuses policy-rule's rule_id concept and closed allow/deny effect
+# vocabulary unchanged (parity-tested), and reuses policy-condition's
+# condition_id concept for condition-level evidence. This contract does not
+# implement rule matching, condition evaluation, deny precedence, or any
+# other evaluation semantics — that is a future basis-core v0.2.0
+# responsibility; this file publishes the evidence *shape* a future
+# evaluator produces once it has already evaluated.
+#
+# RULE_RESULT IS A NEW, FIRST-PUBLISHED CLOSED VOCABULARY: matched /
+# not_matched / skipped / error. This is not invented here — it directly
+# reproduces the categories ADR-0003 Section 5 names ("Match / no-match /
+# error") together with the "skipped rule IDs" category ADR-0003 Section 4
+# and the "skipped rules" expectation in the operation-aware evaluation
+# semantics document (Section 13, "clear about matched rules, skipped
+# rules, missing context, and reason codes"). Deliberately avoids the
+# ambiguous words "passed" / "failed" / "success" this document's governing
+# plan warns against, because those could be confused with evaluator success
+# or failure (a distinct, response-level concept — see
+# operation-aware-decision-response.yaml).
+#
+# CONDITION-LEVEL EVIDENCE IS BOUNDED. Per ADR-0002 Section 9, a condition
+# produces exactly one of three outcomes: match / no-match / evaluation
+# error. condition_results, when present, carries only condition_id, that
+# three-value result, an optional reason_code, and an optional explanation —
+# never the condition's field_path, operator, expected_value, or the raw
+# request value it was compared against.
+#
+# A CONDITION EVALUATION ERROR FORCES THE CONTAINING RULE'S rule_result TO
+# error. If any entry in condition_results carries result: error, this
+# record's own rule_result MUST also be error — a rule cannot be reported as
+# matched or not_matched while one of its own conditions could not be
+# evaluated (ADR-0002 Section 9 treats "evaluation error" as a distinct
+# outcome from both match and no-match, not a value a rule can route around).
+# This mirrors, and composes with, evaluation-trace.yaml's own requirement
+# that any rule_result: error forces the containing trace's
+# evaluation_status to failed.
+#
+# SKIPPED IS A PER-RULE STATE, NEVER A BUNDLE-APPLICABILITY OUTCOME.
+# rule_result: skipped describes one candidate rule, inside an applicable
+# bundle, that evaluation did not reach — it is never interchangeable with
+# NOT_APPLICABLE (evaluation-trace.yaml's bundle_applicability field), which
+# describes a bundle-scope decision that no rule in it was ever a candidate
+# at all (ADR-0002 Section 5). This file publishes only the rule-level
+# concept; see evaluation-trace.md, "Bundle applicability", for the
+# bundle-level one.
+#
+# The `lifecycle` is `experimental`: this is the first publication of the
+# trace rule evidence shape, ahead of any real consumer.
+
+contract:
+  name: trace-rule-evidence
+  title: BASIS Trace Rule Evidence
+  version: 0.1.0
+  lifecycle: experimental
+  governed_by: basis-architecture
+  published_by: basis-schemas
+  source: docs/architecture/operation-aware-schema-readiness-plan.md
+  description: >-
+    The bounded, deterministic explanation record for one policy rule
+    considered during one operation-aware evaluation: the rule's stable
+    identifier, its closed allow/deny effect (reused from policy-rule
+    unchanged), a closed rule_result (matched / not_matched / skipped /
+    error), optional bounded condition-level evidence, an optional reason
+    code (reusing the reason-code contract unchanged), and an optional
+    static, non-executable explanation. Publishes the rule-evidence *shape*
+    only: this contract does not implement rule matching, condition
+    evaluation, or any other evaluation semantics. Never copies a complete
+    policy-rule object, embeds executable policy, embeds the full request, or
+    embeds raw evidence.
+  # policy-rule: rule_id and effect reuse that contract's identifier concept
+  # and closed allow/deny vocabulary unchanged (parity-tested). policy-
+  # condition: condition_results reuses that contract's condition_id concept
+  # for bounded condition-level evidence. reason-code: the optional
+  # reason_code field (at both rule and condition level) reuses that
+  # contract's format unchanged, introducing no new closed vocabulary.
+  depends_on:
+    - contract-metadata
+    - policy-rule
+    - policy-condition
+    - reason-code
+
+trace_rule_evidence:
+  # A rule-evidence record is a single object. rule_id, effect, and
+  # rule_result are always required — the smallest usable per-rule
+  # explanation. condition_results, reason_code, and explanation are
+  # independently optional. Unknown fields are rejected.
+  required:
+    - rule_id
+    - effect
+    - rule_result
+  optional:
+    - condition_results
+    - reason_code
+    - explanation
+  additional_properties: false
+
+  fields:
+    - id: rule_id
+      type: string
+      required: true
+      non_empty: true
+      description: >-
+        The rule_id of the policy-rule this evidence explains (see
+        policy-rule.md). Reused unchanged: this contract does not redefine
+        rule_id's meaning or format. Stable and safe to place in trace,
+        audit, compatibility tests, and operator explanations.
+    - id: effect
+      type: string
+      required: true
+      enum:
+        - allow
+        - deny
+      description: >-
+        The effect the referenced rule declares, reused unchanged from
+        policy-rule's closed allow/deny vocabulary (parity-tested). Not
+        applicable is rejected here for the same reason it is rejected on
+        policy-rule: it is a bundle-applicability outcome, never a rule
+        effect — see evaluation-trace.yaml's bundle_applicability field for
+        that concept.
+    - id: rule_result
+      type: string
+      required: true
+      enum:
+        - matched
+        - not_matched
+        - skipped
+        - error
+      description: >-
+        Whether this rule matched the request during evaluation. Closed to
+        exactly these four lowercase values, reproducing ADR-0003 Section 5
+        ("Match / no-match / error") and Section 4's "skipped rule IDs"
+        category unchanged. 'matched': the rule's match/conditions were
+        satisfied and its effect contributed to combining. 'not_matched':
+        the rule was a candidate but its match/conditions were not
+        satisfied. 'skipped': the rule was not evaluated at all (for
+        example, evaluation short-circuited before reaching it). 'error':
+        the rule could not be evaluated (for example, one of its conditions
+        raised a condition evaluation error, per ADR-0002 Section 9).
+        Deliberately not named "passed" / "failed" / "success", which could
+        be confused with evaluator success or failure — a distinct,
+        response-level concept (see
+        operation-aware-decision-response.yaml's evaluation_status).
+    - id: condition_results
+      type:
+        - array
+        - "null"
+      required: false
+      default: []
+      description: >-
+        Zero or more bounded condition-level evidence records — see
+        condition_result_shape below. Each entry reuses policy-condition's
+        condition_id concept for a single condition considered while
+        evaluating this rule. Never carries the condition's field_path,
+        operator, expected_value, or the raw request value compared against
+        it (ADR-0003 Section 5: "Rule evidence should support operator
+        explanations without exposing raw sensitive context"). When
+        present, must be non-empty (an empty array conveys nothing).
+    - id: reason_code
+      type:
+        - string
+        - "null"
+      required: false
+      default: null
+      pattern: "^[a-z][a-z0-9]*(_[a-z0-9]+)*$"
+      governed_by: reason-code
+      description: >-
+        Optional stable, machine-readable reason code this rule's
+        contribution to the evaluation carries, reusing the reason-code
+        contract's format unchanged (no new pattern, no new closed
+        vocabulary, no new official codes introduced by this PR).
+    - id: explanation
+      type:
+        - string
+        - "null"
+      required: false
+      default: null
+      non_empty: true
+      description: >-
+        Optional static, non-empty, human-readable explanation of this
+        rule's contribution to the evaluation. Descriptive rendering only —
+        not authoritative; the machine-readable rule_result and reason_code
+        are authoritative (ADR-0003 Section 11: "Explanation must not
+        invent facts... must be derived from trace/evidence"). No template
+        field, no variable-interpolation syntax, no expression-evaluation
+        mechanism, and no HTML/script-execution mechanism are defined; this
+        is a single opaque string field. Must not contain secrets or
+        credential material.
+
+  # --- Condition-level evidence shape -----------------------------------
+
+  condition_result_shape:
+    required:
+      - condition_id
+      - result
+    optional:
+      - reason_code
+      - explanation
+    additional_properties: false
+    fields:
+      - id: condition_id
+        type: string
+        required: true
+        non_empty: true
+        description: >-
+          The condition_id of the policy-condition this evidence explains
+          (see policy-condition.md). Reused unchanged. Must be unique within
+          this rule-evidence record's condition_results array (rule-evidence-
+          level validation — see constraints below).
+      - id: result
+        type: string
+        required: true
+        enum:
+          - matched
+          - not_matched
+          - error
+        description: >-
+          The bounded outcome of evaluating this condition, reproducing
+          ADR-0002 Section 9 exactly: "A condition should produce one of
+          three outcomes: Match / No match / Evaluation error." No fourth
+          "skipped" value is published for conditions: ADR-0002 Section 9
+          names exactly three condition outcomes, unlike the four rule_result
+          values above (which additionally include "skipped", a category
+          ADR-0003 Section 4 names for whole rules, not individual
+          conditions).
+      - id: reason_code
+        type:
+          - string
+          - "null"
+        required: false
+        default: null
+        pattern: "^[a-z][a-z0-9]*(_[a-z0-9]+)*$"
+        governed_by: reason-code
+        description: >-
+          Optional reason code for this specific condition's result, reusing
+          the reason-code contract's format unchanged.
+      - id: explanation
+        type:
+          - string
+          - "null"
+        required: false
+        default: null
+        non_empty: true
+        description: >-
+          Optional static, non-empty, human-readable explanation of this
+          condition's result. Same constraints as the rule-level explanation
+          field above: descriptive only, not authoritative, no template or
+          execution mechanism, must not contain secrets.
+
+  # Reproduced from policy-rule.yaml / reason-code.yaml so a consumer can
+  # validate without dereferencing them. Parity with the canonical files is
+  # enforced by this repository's test suite.
+  effect_values:
+    - allow
+    - deny
+  rule_result_values:
+    - matched
+    - not_matched
+    - skipped
+    - error
+  condition_result_values:
+    - matched
+    - not_matched
+    - error
+  reason_code_pattern: "^[a-z][a-z0-9]*(_[a-z0-9]+)*$"
+
+  constraints:
+    - rule_id, effect, and rule_result are required.
+    - rule_id must be a non-empty string.
+    - effect must be exactly "allow" or "deny" (parity with policy-rule).
+      "not_applicable" is rejected — it is a bundle-applicability outcome,
+      not a rule effect.
+    - rule_result must be one of matched, not_matched, skipped, or error.
+    - >-
+      condition_results, when present, must be a non-empty array of objects
+      matching condition_result_shape, must reject unknown keys within each
+      entry, and must reject a condition_id repeated more than once within
+      the same array (rule-evidence-level validation — a cross-condition
+      uniqueness concern a single condition_result_shape entry's own type
+      declaration cannot express).
+    - condition_results item.result must be one of matched, not_matched, or
+      error.
+    - >-
+      If any condition_results item.result is error, this record's own
+      rule_result MUST also be error (see the file header, "A condition
+      evaluation error forces the containing rule's rule_result to
+      error"). A rule cannot be reported matched or not_matched while one
+      of its own conditions could not be evaluated.
+    - reason_code (rule-level and condition-level), when present and
+      non-null, must match reason_code_pattern (parity with the reason-code
+      contract). This contract introduces no new closed reason-code
+      vocabulary.
+    - explanation (rule-level and condition-level), when present and
+      non-null, must be a non-empty string. No template, variable-
+      interpolation, expression-evaluation, or script-execution mechanism is
+      defined for explanation text.
+    - >-
+      This contract does not carry a policy-rule's match criteria,
+      conditions' field_path/operator/expected_value, the full request, raw
+      identity or adapter evidence, credentials, tokens, or key material. It
+      does not define access_token, id_token, refresh_token, jwt,
+      bearer_token, authorization_header, cookie, session_secret,
+      client_secret, password, private_key, api_key, credential, raw_claims,
+      full_claim_set, raw_payload, raw_protocol_payload, full_request,
+      request_snapshot, full_policy, policy_document, debug, exception,
+      stack_trace, or traceback fields. Any such field is rejected as
+      unknown.
+    - >-
+      Unknown / additional top-level fields are rejected (additional
+      properties are set to false), and unknown fields within
+      condition_result_shape are rejected the same way.
+
+  # Where this shape is produced, consumed, and governed. Informative; it
+  # records boundary ownership already established in ADR-0003, it adds no
+  # structure of its own.
+  composition:
+    authored_as_part_of: evaluation-trace   # rule-evidence records are carried inside an evaluation-trace's rule_evidence array
+    produced_by: basis-core                 # future v0.2.0 kernel produces this evidence as part of evaluation
+    published_by: basis-schemas             # publishes the evidence shape only; implements none of the above
+
+  examples:
+    valid:
+      # 1. Matching ALLOW rule.
+      - rule_id: rule-operator-read-ahu-telemetry
+        effect: allow
+        rule_result: matched
+        reason_code: allow_rule_matched
+        explanation: Operator role matched an allow rule for read:ahu.
+      # 2. Matching DENY rule (deny precedence).
+      - rule_id: rule-deny-control-during-interlock
+        effect: deny
+        rule_result: matched
+        reason_code: deny_rule_matched
+        explanation: >-
+          Control-affecting operation denied while an interlock is engaged.
+      # 3. Non-matching rule (a candidate that was considered but did not
+      #    match).
+      - rule_id: rule-west-campus-hvac-allow
+        effect: allow
+        rule_result: not_matched
+      # 4. Rule with bounded condition-level evidence.
+      - rule_id: rule-deny-elevated-risk
+        effect: deny
+        rule_result: matched
+        condition_results:
+          - condition_id: cond-risk-score-high
+            result: matched
+            reason_code: risk_score_above_threshold
+        reason_code: deny_rule_matched
+      # 5. Skipped rule (evaluation did not reach it), with a reason code.
+      - rule_id: rule-legacy-operator-read-ahu
+        effect: allow
+        rule_result: skipped
+        reason_code: evaluation_short_circuited
+      # 6. Rule that could not be evaluated (a condition raised an
+      #    evaluation error).
+      - rule_id: rule-deny-elevated-risk
+        effect: deny
+        rule_result: error
+        condition_results:
+          - condition_id: cond-risk-score-high
+            result: error
+            reason_code: condition_type_mismatch
+        reason_code: condition_evaluation_error
+    invalid:
+      - reason: missing required rule ID
+        value:
+          effect: allow
+          rule_result: matched
+      - reason: empty rule ID
+        value:
+          rule_id: ""
+          effect: allow
+          rule_result: matched
+      - reason: invalid effect (not allow/deny)
+        value:
+          rule_id: rule-invalid-effect
+          effect: permit
+          rule_result: matched
+      - reason: not_applicable effect rejected (bundle-applicability outcome, not a rule effect)
+        value:
+          rule_id: rule-not-applicable-effect
+          effect: not_applicable
+          rule_result: matched
+      - reason: invalid rule_result value (ambiguous "passed", not a published value)
+        value:
+          rule_id: rule-invalid-result
+          effect: allow
+          rule_result: passed
+      - reason: malformed condition evidence (missing required result)
+        value:
+          rule_id: rule-malformed-condition
+          effect: deny
+          rule_result: error
+          condition_results:
+            - condition_id: cond-missing-result
+      - reason: duplicate condition IDs within one rule-evidence record
+        value:
+          rule_id: rule-duplicate-condition-ids
+          effect: deny
+          rule_result: matched
+          condition_results:
+            - condition_id: cond-duplicate
+              result: matched
+            - condition_id: cond-duplicate
+              result: not_matched
+      - reason: malformed reason code (uppercase)
+        value:
+          rule_id: rule-malformed-reason-code
+          effect: allow
+          rule_result: matched
+          reason_code: ALLOW_RULE_MATCHED
+      - reason: unknown field rejected
+        value:
+          rule_id: rule-unknown-field
+          effect: allow
+          rule_result: matched
+          priority: 1
+      - reason: raw evidence field rejected (unknown field)
+        value:
+          rule_id: rule-raw-evidence
+          effect: allow
+          rule_result: matched
+          raw_claims:
+            sub: alice
+      - reason: debug/stack-trace field rejected (unknown field)
+        value:
+          rule_id: rule-debug-field
+          effect: deny
+          rule_result: error
+          stack_trace: "Traceback (most recent call last): ..."
+      - reason: condition error present but rule_result is matched (must be error)
+        value:
+          rule_id: rule-inconsistent-condition-error
+          effect: deny
+          rule_result: matched
+          condition_results:
+            - condition_id: cond-risk-score-high
+              result: error

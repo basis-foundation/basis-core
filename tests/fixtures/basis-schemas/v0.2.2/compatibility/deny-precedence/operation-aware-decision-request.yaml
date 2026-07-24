@@ -1,0 +1,25 @@
+# Canonical compatibility fixture — scenario: deny-precedence.
+#
+# An operator requests a control-affecting HVAC setpoint write while an
+# interlock is engaged. Matches both an ALLOW rule (operator + the write
+# action) and a DENY rule (interlock-engaged safety mode + control-affecting
+# intent) in the paired policy-bundle.yaml, so deny precedence is exercised
+# unambiguously.
+
+request_id: req-compat-deny-precedence-001
+subject_id: svc-compat-operator-002
+subject_roles:
+  - operator
+action: "write:hvac:setpoint"
+resource: "hvac:zone-a"
+resource_type: hvac
+location:
+  site_id: west-campus
+  zone_id: zone-a
+safety_context:
+  mode: interlock-engaged
+  classification: elevated
+  constraint_ids:
+    - lockout-tagout-active
+operation_intent: control_affecting
+evaluation_time: "2026-07-09T09:05:00Z"

@@ -1,0 +1,22 @@
+# Canonical compatibility fixture — scenario: invalid-policy-bundle.
+#
+# outcome: null and evaluation_status: failed together (the required
+# invariant operation-aware-decision-response.yaml enforces): a failed
+# evaluation never serializes allow, deny, or not_applicable. bundle_id /
+# bundle_version ARE retained here: invalid-policy-bundle.yaml constructs as
+# a well-formed, identified typed bundle object that is then rejected by a
+# cross-rule invariant (duplicate rule_id) -- it is still the specific
+# policy artifact that was evaluated and rejected, so its identity is
+# retained as provenance (basis-architecture's operation-aware
+# evidence-provenance semantics clarification, "Bundle Identity
+# Provenance"), distinct from a structural bundle-parsing/model-construction
+# failure, where no trustworthy typed bundle identity would exist to report.
+
+request_id: req-compat-invalid-policy-001
+evaluation_status: failed
+outcome: null
+failure_reason: policy_validation_failure
+bundle_id: bundle-compat-invalid-policy
+bundle_version: "1.0.0"
+trace_id: trace-compat-invalid-policy-001
+explanation: null

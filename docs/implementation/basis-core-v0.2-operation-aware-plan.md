@@ -2856,7 +2856,7 @@ Blocked by architecture decision: no.
 ### Milestone 12 — Canonical compatibility vectors
 
 **PR 37 — Wire the five canonical scenarios end-to-end.**
-**Status: blocked, not complete** (canonical-vector field-by-field
+**Status: unblocked, not complete** (canonical-vector field-by-field
 comparison against the vendored `v0.2.1` compatibility fixtures surfaced
 three repeatable disagreements between this repository's merged
 implementation and the fixtures. `basis-architecture` has since resolved
@@ -2891,11 +2891,22 @@ correction did not change authorization outcomes or aggregate `reason_code`
 selection.
 
 With all three evidence-provenance questions now settled and corrected
-fixtures published, PR 37 remains blocked solely because `basis-schemas`
-v0.2.2 has not yet been vendored and activated in `basis-core` — the next
-prerequisite is the v0.2.2 snapshot-vendoring PR. This fix does not vendor
-v0.2.2, does not claim PR 37 complete, and does not begin PR 38, which
-remains sequenced after PR 37.
+fixtures published, PR 37 was blocked solely on vendoring and activating
+`basis-schemas` v0.2.2 in `basis-core`. That prerequisite is now complete:
+the rule-evidence projection correction
+(`fix/operation-aware-rule-evidence-projection`, merged as
+`fix: project operation-aware rule rationale by result` (#60)) landed
+first, and the `chore/vendor-basis-schemas-v0.2.2` PR then vendored the
+corrected `v0.2.2` canonical fixtures into
+`tests/fixtures/basis-schemas/v0.2.2/` and repointed
+`tests/helpers/basis_schemas_snapshot.py`'s `SNAPSHOT_RELEASE` to `v0.2.2`
+(see `tests/fixtures/basis-schemas/v0.2.2/README.md` for what changed from
+`v0.2.1`, and `tests/test_basis_schemas_snapshot_v0_2_2_correction.py` for
+regression coverage of the correction). All reconciliation prerequisites
+for PR 37 are now complete — PR 37 may be rebased, restored, and rerun
+against the vendored `v0.2.2` fixtures. Vendoring `v0.2.2` does not itself
+claim PR 37 complete and does not begin PR 38, which remains sequenced
+after PR 37.
 
 Objective: load each vendored canonical-vector directory (Section 4), run
 `OperationAwareEnforcementPoint.evaluate()` against its request + bundle, and

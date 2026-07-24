@@ -1,0 +1,21 @@
+# Canonical compatibility fixture — scenario: not-applicable.
+#
+# bundle_applicability: not_applicable requires rule_evidence to be empty
+# (evaluation-trace.yaml's own constraint): no bundle applied, so no rule was
+# ever a candidate. bundle_id/bundle_version are nonetheless retained: the
+# bundle whose scope was checked and found not to cover this request is a
+# known, specific, typed bundle (basis-architecture's operation-aware
+# evidence-provenance semantics clarification, "Bundle Identity Provenance") —
+# reporting its identity is provenance for which bundle was checked, not a
+# claim that the bundle applied.
+
+trace_id: trace-compat-not-applicable-001
+request_id: req-compat-not-applicable-001
+evaluation_status: completed
+outcome: not_applicable
+bundle_applicability: not_applicable
+bundle_id: bundle-compat-hvac-scope
+bundle_version: "1.0.0"
+rule_evidence: []
+reason_code: no_applicable_bundle
+explanation: null

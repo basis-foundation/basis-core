@@ -1,0 +1,112 @@
+# BASIS Redaction Classification — published contract.
+#
+# This file PUBLISHES the redaction-classification vocabulary decided in
+# basis-architecture (docs/architecture/operation-aware-trace-audit-evidence.md,
+# ADR-0003, Section 10 "Redaction and Secret Handling"). It does not invent or
+# redefine the classifications; it does not implement redaction behavior. This
+# contract carries classification vocabulary only — which category a piece of
+# evidence belongs to. It says nothing about how a producer decides which
+# category applies to a given field, or how a consumer performs the actual
+# redaction; that remains implementation behavior owned by whichever component
+# produces or renders the evidence.
+#
+# The `lifecycle` is `experimental` because this published contract is new in
+# basis-schemas, not because the classification vocabulary is unsettled.
+
+contract:
+  name: redaction-classification
+  title: BASIS Redaction Classification
+  version: 0.1.0
+  lifecycle: experimental
+  governed_by: basis-architecture
+  published_by: basis-schemas
+  source: docs/architecture/operation-aware-trace-audit-evidence.md
+  description: >-
+    The five redaction classifications evidence is sorted into before it may
+    appear in a trace, audit, or explanation artifact: safe_to_expose,
+    safe_after_redaction, reference_only, never_store, and never_display.
+    Publishes the classification vocabulary decided in basis-architecture
+    (ADR-0003, Section 10) as a machine-readable companion so future request,
+    response, trace, audit, and evidence-reference contracts can carry a
+    classification value rather than leaving redaction to each publisher's
+    discretion. Defines vocabulary only; no runtime redaction function is
+    defined or implied here.
+  depends_on:
+    - contract-metadata
+
+redaction_classification:
+  values:
+    - id: safe_to_expose
+      description: >-
+        The value may be included in appropriately authorized operator, audit,
+        trace, or explanation views without additional content redaction (for
+        example, a matched rule ID or a reason code). This classification does
+        not mean the value is public — normal authorization and access
+        controls still apply to whatever view carries it.
+    - id: safe_after_redaction
+      description: >-
+        The value may be retained or displayed only after deterministic
+        redaction or minimization has removed sensitive content (for example, a
+        claim value that identifies a subject attribute used in a condition,
+        with the raw claim redacted but the fact that the condition matched
+        preserved).
+    - id: reference_only
+      description: >-
+        The raw value must not be duplicated into trace, audit, or explanation
+        artifacts. A stable identifier, hash, or reference must be used instead
+        (for example, a session reference rather than session contents).
+    - id: never_store
+      description: >-
+        The value must not be persisted in trace, audit, explanation,
+        compatibility-example, or similar evidence artifacts, even in redacted
+        form, because no redaction makes it safe or useful (for example, raw
+        protocol payload bytes with no defined redaction rule).
+    - id: never_display
+      description: >-
+        The value must not be rendered in operator, console, training-mode, or
+        audit-review interfaces. Distinct from never_store: a never_display
+        value may still exist in a durable record for a narrow purpose such as
+        cryptographic verification, but it must never appear in a human-facing
+        view. never_store forbids persistence itself; never_display forbids
+        rendering a value that may legitimately be persisted.
+
+  # The classification is a closed, five-value vocabulary — unlike reason-code,
+  # it is not extensible without an architecture decision, because the
+  # boundaries between the five categories are a security property, not a
+  # convenience taxonomy.
+  constraints:
+    - >-
+      Exactly five classifications are defined — safe_to_expose,
+      safe_after_redaction, reference_only, never_store, and never_display.
+    - >-
+      Values are serialized in lowercase snake_case, matching this
+      repository's existing enum convention (e.g. the vocabulary contract's
+      verbs and the decision-response contract's outcome and failure_reason
+      values).
+    - >-
+      A classification value outside this set is invalid; adding a sixth
+      classification requires an architecture decision in basis-architecture,
+      not a change made silently in basis-schemas.
+    - >-
+      never_store and never_display are distinct and must not be conflated —
+      a value may be never_display without being never_store (it may be
+      persisted for a narrow non-display purpose), but the reverse
+      combination is meaningless (a value that must never be stored has
+      nothing to display).
+
+  examples:
+    valid:
+      - safe_to_expose
+      - safe_after_redaction
+      - reference_only
+      - never_store
+      - never_display
+    invalid:
+      - reason: wrong case (classifications are serialized lowercase)
+        value: SAFE_TO_EXPOSE
+      - reason: wrong separator (hyphen instead of underscore)
+        value: safe-to-expose
+      - reason: not one of the five published classifications
+        value: public
+      - reason: empty value
+        value: ""

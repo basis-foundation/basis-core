@@ -1,0 +1,36 @@
+# Canonical compatibility fixture — scenario: allow-basic.
+#
+# The expected audit-evidence (schemas/audit-evidence/audit-evidence.yaml)
+# derived from req-compat-allow-001's response and trace, including the
+# same identity/adapter evidence references carried on the request.
+
+evidence_id: audit-compat-allow-001
+request_id: req-compat-allow-001
+correlation_id: corr-compat-allow-001
+trace_id: trace-compat-allow-001
+evaluation_status: completed
+outcome: allow
+failure_reason: null
+bundle_id: bundle-compat-allow
+bundle_version: "1.0.0"
+matched_rule_ids:
+  - allow-operator-read-ahu
+identity_evidence_reference:
+  reference_id: idev-compat-allow-001
+  evidence_digest:
+    algorithm: sha-256
+    value: 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08
+  identity_source: "oidc:https://idp.example.com"
+  redaction_classification: reference_only
+adapter_evidence_reference:
+  reference_id: adev-compat-allow-001
+  evidence_digest:
+    algorithm: sha-256
+    value: 1f825aa2f0020ef7cf91dfa30da4668d791c5d4824fc8e41354b89ec05795ab
+  adapter_source: "basis-adapters:bacnet"
+  protocol: bacnet
+  redaction_classification: reference_only
+reason_code: allow_rule_matched
+explanation: null
+recorded_at: "2026-07-09T09:00:01Z"
+schema_version: "0.1.0"

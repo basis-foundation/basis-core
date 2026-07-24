@@ -199,18 +199,31 @@ release** from silent drift, so that future operation-aware implementation
 work has a reproducible, offline, immutable target to build and test
 against.
 
-**Location:** `tests/fixtures/basis-schemas/v0.2.1/` — 14 operation-aware
+**Location:** `tests/fixtures/basis-schemas/v0.2.2/` — 14 operation-aware
 contract YAMLs under `schemas/` and 5 canonical compatibility scenarios under
-`compatibility/`, pinned to `basis-schemas` tag `v0.2.1` (commit
-`945acd107016bcbcb114f440474df204ead3f8f3`), the currently active snapshot
-per `tests/helpers/basis_schemas_snapshot.py`'s `SNAPSHOT_RELEASE`. `v0.2.1`
-corrects the `invalid-policy-bundle` scenario's `failure_reason` (and drops
-an unrelated `reason_code`) from the prior `v0.2.0` release; no
-`basis-core` evaluator behavior changed as a result. The historical
-`tests/fixtures/basis-schemas/v0.2.0/` snapshot remains on disk, unchanged,
-for reference. See `v0.2.1/README.md` for the full ownership, boundary, and
-refresh documentation — this section only orients where it fits alongside
-the harness above.
+`compatibility/`, pinned to `basis-schemas` tag `v0.2.2` (commit
+`da7832972dad36dea6ef2796161a1990fbbe6a05`), the currently active snapshot
+per `tests/helpers/basis_schemas_snapshot.py`'s `SNAPSHOT_RELEASE`. `v0.2.2`
+is now the active vendored compatibility snapshot; `v0.2.0` and `v0.2.1`
+remain immutable historical snapshots, captured from the immutable `v0.2.2`
+tag and its exact source commit. `v0.2.2` corrects three evidence-provenance
+disagreements the prior `v0.2.1` release's fixtures still carried: it stops
+expecting a synthesized top-level `explanation` (which now stays `null`
+throughout, per governed semantics), it corrects per-rule authored-rationale
+projection to follow `rule_result` (`matched` preserves it verbatim,
+`not_matched`/`skipped` omit it), and it restores `bundle_id`/
+`bundle_version` on the `not-applicable` and `invalid-policy-bundle`
+scenarios' result artifacts. No schema shapes changed and no `basis-core`
+authorization outcome changed as a result — only the 20 `expected-*.yaml`
+result artifacts across the five scenarios differ from `v0.2.1`; every
+input artifact and all 14 schema contracts remain byte-identical. The
+historical `tests/fixtures/basis-schemas/v0.2.0/` and
+`tests/fixtures/basis-schemas/v0.2.1/` snapshots remain on disk, unchanged,
+for reference. Snapshot updates must continue to go only through the
+repository-owned `scripts/update_basis_schemas_snapshot.py` refresh tool.
+See `v0.2.2/README.md` for the full ownership, boundary, and refresh
+documentation — this section only orients where it fits alongside the
+harness above.
 
 **Test coverage:**
 
@@ -221,6 +234,7 @@ the harness above.
 | Source provenance (`source_repository`/`source_release`/`source_commit`) | `tests/test_basis_schemas_snapshot_provenance.py` |
 | Refresh tool happy/failure paths | `tests/test_update_basis_schemas_snapshot.py` |
 | Public API and runtime-import boundaries unchanged | `tests/test_basis_schemas_snapshot_boundaries.py` |
+| `v0.2.2` evidence-provenance correction regression (explanation nullity, per-rule rationale, bundle identity, cross-artifact agreement, negative mutation coverage) | `tests/test_basis_schemas_snapshot_v0_2_2_correction.py` |
 
 **Helpers:** `tests/helpers/basis_schemas_snapshot.py` provides
 `get_schema_path`, `get_scenario_artifact`, `list_operation_aware_contracts`,

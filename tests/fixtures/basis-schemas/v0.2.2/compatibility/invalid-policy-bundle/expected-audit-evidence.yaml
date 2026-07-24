@@ -1,0 +1,12 @@
+# Canonical compatibility fixture — scenario: invalid-policy-bundle.
+
+evidence_id: audit-compat-invalid-policy-001
+request_id: req-compat-invalid-policy-001
+trace_id: trace-compat-invalid-policy-001
+evaluation_status: failed
+outcome: null
+failure_reason: policy_validation_failure
+bundle_id: bundle-compat-invalid-policy
+bundle_version: "1.0.0"
+explanation: null
+recorded_at: "2026-07-09T09:20:01Z"
