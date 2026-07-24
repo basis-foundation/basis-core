@@ -1,0 +1,19 @@
+# Canonical compatibility fixture — scenario: allow-basic.
+#
+# The expected operation-aware-decision-response
+# (schemas/operation-aware-decision-response/operation-aware-decision-response.yaml)
+# for req-compat-allow-001. References the trace by trace_id rather than
+# embedding it; see expected-evaluation-trace.yaml for the full trace and
+# examples/operation-aware/compatibility/README.md, "Cross-artifact
+# validation," for how the two are checked for agreement.
+
+request_id: req-compat-allow-001
+correlation_id: corr-compat-allow-001
+evaluation_status: completed
+outcome: allow
+failure_reason: null
+bundle_id: bundle-compat-allow
+bundle_version: "1.0.0"
+trace_id: trace-compat-allow-001
+reason_code: allow_rule_matched
+explanation: null

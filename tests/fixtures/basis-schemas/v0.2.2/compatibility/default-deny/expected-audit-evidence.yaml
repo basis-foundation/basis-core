@@ -1,0 +1,14 @@
+# Canonical compatibility fixture — scenario: default-deny.
+
+evidence_id: audit-compat-default-deny-001
+request_id: req-compat-default-deny-001
+trace_id: trace-compat-default-deny-001
+evaluation_status: completed
+outcome: deny
+failure_reason: null
+bundle_id: bundle-compat-default-deny
+bundle_version: "1.0.0"
+matched_rule_ids: []
+reason_code: no_allow_rule_matched
+explanation: null
+recorded_at: "2026-07-09T09:10:01Z"

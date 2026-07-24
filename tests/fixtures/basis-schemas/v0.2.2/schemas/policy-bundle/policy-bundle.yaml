@@ -1,0 +1,748 @@
+# BASIS Policy Bundle — published contract.
+#
+# This file PUBLISHES the unit-of-policy-identity, versioning, scope,
+# ownership, provenance, and validation shape decided in basis-architecture's
+# operation-aware policy bundle and rule model (ADR-0004,
+# docs/architecture/operation-aware-policy-rule-model.md, Sections 2, 3, and
+# 12) and sequenced for schema publication by the operation-aware schema
+# readiness plan (ADR-0005,
+# docs/architecture/operation-aware-schema-readiness-plan.md, "PR D — Policy
+# Bundle and Rule Contracts"). It does not invent new policy semantics: every
+# field below formalizes a conceptual category ADR-0004 Section 2 already
+# named. Architecture governs; schemas publish; implementations consume.
+#
+# A POLICY BUNDLE IS NOT NECESSARILY A FILE FORMAT (ADR-0004 Section 2). This
+# contract publishes a conceptual bundle SHAPE — the boundary within which
+# rules are versioned and validated together — not a storage format, a
+# distribution mechanism, or a loading behavior. It does not implement policy
+# loading, storage, distribution, synchronization, signing, signature
+# verification, tamper-evident packaging, an approval workflow, an authoring
+# UI, a simulation UI, or deployment behavior — every one of those is
+# explicitly deferred by ADR-0004 Section 18 and this contract does not
+# narrow that deferral.
+#
+# BUNDLE SCOPE IS DISTINCT FROM RULE MATCH CRITERIA (ADR-0004 Section 3):
+# scope determines whether a bundle applies to a request AT ALL; a rule's
+# own `match` (published by policy-rule.yaml) determines which ALLOW/DENY
+# rules inside an ALREADY-APPLICABLE bundle are candidates for that request.
+# Scope OMITTED means globally applicable; scope PRESENT restricts
+# applicability to requests whose context matches every populated scope
+# selector. Whether a present-but-non-matching scope resolves to
+# NOT_APPLICABLE is evaluation semantics (ADR-0002 Section 5) — documented
+# here, not implemented: this contract publishes shape only.
+#
+# THIS CONTRACT DOES NOT PUBLISH A validation_status FIELD. A bundle cannot
+# make itself valid by declaring itself valid; whether a bundle is valid is
+# derived by a future basis-core validator/runtime process, never
+# self-asserted by the bundle's own authored content. See
+# docs/policy-bundle.md, "Validation status as derived state".
+#
+# The `lifecycle` is `experimental`: this is the first publication of the
+# policy bundle shape, ahead of any real consumer.
+
+contract:
+  name: policy-bundle
+  title: BASIS Policy Bundle
+  version: 0.1.0
+  lifecycle: experimental
+  governed_by: basis-architecture
+  published_by: basis-schemas
+  source: docs/architecture/operation-aware-schema-readiness-plan.md
+  description: >-
+    The unit of policy identity, versioning, scope, ownership, provenance,
+    validation, compatibility, and rule grouping: a stable bundle
+    identifier, an explicit bundle content version distinct from the
+    bundle-format schema version, a policy owner/authority reference, an
+    optional structured applicability scope (omitted means globally
+    applicable), a non-empty collection of policy-rule-shaped rules, and
+    optional descriptive/provenance/deprecation metadata. Not necessarily a
+    file format: this contract defines the conceptual boundary within which
+    rules are versioned and validated together, not a storage or
+    distribution mechanism. Publishes the bundle *shape* only: this
+    contract does not implement policy loading, storage, distribution,
+    signing, validation-status determination, or evaluation — all of that
+    is deferred to a future basis-core v0.2.0 policy validator/evaluator and
+    a future basis-gateway policy-loading mechanism.
+  # policy-rule: a bundle's rules are policy-rule-shaped values, referenced
+  # not redefined. contract-metadata: this file's own contract: block
+  # follows the formalized pattern. No other contract's field validation is
+  # directly used at the bundle level: scope's selector patterns are
+  # reproduced from policy-rule.yaml's own already-parity-tested copies
+  # (action_pattern / resource_type_pattern / open_identifier_pattern)
+  # rather than re-declaring a separate direct dependency on action-string
+  # or resource-identifier here.
+  depends_on:
+    - contract-metadata
+    - policy-rule
+
+policy_bundle:
+  # A bundle is a single object. bundle_id, bundle_version, schema_version,
+  # policy_owner, and rules are always required — the smallest usable
+  # policy-identity plus its rule content. scope is optional: its absence
+  # means globally applicable (see file header and scope_semantics below).
+  # description/source_ref/approval_ref/created_at/updated_at/
+  # compatibility_target/deprecated/replaced_by are optional
+  # metadata/provenance/deprecation fields, kept to the smallest set
+  # justified by ADR-0004 Section 12. No validation_status field is
+  # published (see file header). Unknown fields are rejected.
+  required:
+    - bundle_id
+    - bundle_version
+    - schema_version
+    - policy_owner
+    - rules
+  optional:
+    - scope
+    - description
+    - source_ref
+    - approval_ref
+    - created_at
+    - updated_at
+    - compatibility_target
+    - deprecated
+    - replaced_by
+  additional_properties: false
+
+  fields:
+    - id: bundle_id
+      type: string
+      required: true
+      non_empty: true
+      description: >-
+        Stable, machine-readable identifier for this bundle, independent of
+        any local filename or repository path, suitable for use in a future
+        DecisionResponse, evaluation trace, audit record, compatibility
+        test, or console explanation. No UUID requirement: a short, stable,
+        human-readable token (e.g. building-automation-baseline) is
+        preferred. Distinct from bundle_version: bundle_id identifies "the
+        same bundle" across successive content revisions (ADR-0004
+        Section 2).
+    - id: bundle_version
+      type: string
+      required: true
+      non_empty: true
+      pattern: "^\\d+\\.\\d+\\.\\d+$"
+      description: >-
+        The version of THIS BUNDLE's authored rule content (semantic-version
+        form, MAJOR.MINOR.PATCH). Distinct from schema_version (the version
+        of the policy-bundle contract SHAPE this instance conforms to) and
+        from the basis-schemas package version — neither is conflated with
+        bundle_version. This contract publishes version metadata only: it
+        implements no version negotiation or compatibility resolution.
+    - id: schema_version
+      type: string
+      required: true
+      non_empty: true
+      pattern: "^\\d+\\.\\d+\\.\\d+$"
+      description: >-
+        The version of the policy-bundle CONTRACT SHAPE this bundle
+        instance was authored against — distinct from bundle_version (this
+        bundle's own content version) and from the basis-schemas package
+        version. Required so a future basis-core validator can determine,
+        before evaluation begins, whether it supports this bundle's shape
+        (per the operation-aware evaluation semantics document, Section 12,
+        "schema version compatibility," and evaluation phase 2, "validate
+        policy bundle shape and version"). This contract does not implement
+        version negotiation or compatibility resolution; it only publishes
+        the field.
+    - id: policy_owner
+      type: string
+      required: true
+      non_empty: true
+      description: >-
+        Stable reference to who authored or is accountable for this
+        bundle's content (ADR-0004 Section 12, "Author/source reference").
+        Provenance and governance metadata only: policy_owner is NOT an
+        authorization subject, grants no permission by its presence, and
+        must not contain credential material. An opaque label (e.g. a team
+        name, a system identifier, or an owning-repository reference) is
+        sufficient; this contract does not require or assume any specific
+        identity-system shape for this field.
+    - id: scope
+      type:
+        - object
+        - "null"
+      required: false
+      default: null
+      description: >-
+        Optional, structured applicability scope — see scope_shape and
+        scope_semantics below. ABSENT (or explicit null) means this bundle
+        is GLOBALLY APPLICABLE; PRESENT restricts applicability to requests
+        matching every populated scope selector. Distinct from a rule's own
+        `match` (policy-rule.yaml): scope determines whether this bundle
+        applies to a request at all; a rule's match determines which
+        ALLOW/DENY rules inside an already-applicable bundle are candidates.
+        This contract does not implement the applicability determination
+        itself (that is future basis-core evaluation, per ADR-0002
+        Section 5's NOT_APPLICABLE semantics) — it only publishes the scope
+        shape and documents the semantic contract a future evaluator must
+        honor.
+    - id: rules
+      type: array
+      required: true
+      description: >-
+        Non-empty collection of policy-rule-shaped values (see
+        policy-rule.md) — referenced, not redefined. At least one rule is
+        required: a bundle with zero rules cannot produce a substantive
+        decision. Duplicate rule_id values across this array are rejected
+        during BUNDLE-level validation (see constraints below), not by this
+        field's own array-of-object type declaration — array position is
+        never rule identity, and this schema does not treat declaration
+        order in this array as evaluation-significant (per ADR-0004
+        Section 10 and policy-rule.yaml's own rule-ordering deferral).
+    - id: description
+      type:
+        - string
+        - "null"
+      required: false
+      default: null
+      non_empty: true
+      description: >-
+        Optional human-readable summary of what this bundle governs.
+        Informative only; never used for correlation, compatibility, or
+        evaluation.
+    - id: source_ref
+      type:
+        - string
+        - "null"
+      required: false
+      default: null
+      non_empty: true
+      description: >-
+        Optional informative reference to where/how this bundle's content
+        was authored or sourced (for example, an authoring-repository path
+        or a change-management reference). Provenance metadata only; not a
+        resolvable dependency, and must not contain credential material.
+    - id: approval_ref
+      type:
+        - string
+        - "null"
+      required: false
+      default: null
+      non_empty: true
+      description: >-
+        Optional informative reference to an approval or review record for
+        this bundle revision (for example, a change-ticket identifier),
+        when a deployment tracks one (ADR-0004 Section 12, "Approval/review
+        reference, if available"). This contract does not define or
+        implement an approval workflow; it only publishes an optional
+        reference field a deployment's own process may populate.
+    - id: created_at
+      type:
+        - string
+        - "null"
+      required: false
+      default: null
+      format: date-time
+      description: >-
+        Optional, timezone-aware ISO 8601 timestamp of when this bundle
+        revision was authored, when tracked. Provenance metadata only; this
+        contract implements no runtime clock behavior.
+    - id: updated_at
+      type:
+        - string
+        - "null"
+      required: false
+      default: null
+      format: date-time
+      description: >-
+        Optional, timezone-aware ISO 8601 timestamp of when this bundle
+        revision was last modified, when tracked. Provenance metadata only.
+    - id: compatibility_target
+      type:
+        - string
+        - "null"
+      required: false
+      default: null
+      non_empty: true
+      description: >-
+        Optional, informative label describing what this bundle is intended
+        to be compatible with (for example, a target basis-core version
+        range), when a deployment chooses to track one (ADR-0004
+        Section 12, "Compatibility target"). This contract implements no
+        compatibility resolution or enforcement based on this field's
+        value; it is documentation carried alongside the bundle.
+    - id: deprecated
+      type: boolean
+      required: false
+      default: false
+      description: >-
+        Explicit deprecation flag for this bundle. Deprecation does NOT
+        imply removal or an automatic behavior change: this contract
+        implements no migration, redirection, or enforcement behavior based
+        on this flag. Defaults to false.
+    - id: replaced_by
+      type:
+        - string
+        - "null"
+      required: false
+      default: null
+      non_empty: true
+      description: >-
+        Optional bundle_id of the bundle that replaces this one, when a
+        specific replacement is known. This contract does not enforce that
+        replaced_by is populated only when deprecated is true, and does not
+        validate that the referenced bundle_id actually exists — producers
+        are expected to keep the two fields logically consistent, but that
+        alignment is not implemented here. No migration behavior is implied
+        or implemented.
+
+  # --- Scope shape --------------------------------------------------------
+
+  # Structured applicability selectors, per ADR-0004 Section 3: domain/
+  # action-vocabulary scope, resource-type scope, site/building/zone/area
+  # scope, device-class scope, environment/deployment scope, identity
+  # authority-mode scope, and protocol scope. No separate "domain" selector
+  # is published: domain-level scoping is expressed through the `actions`
+  # selector's domain segment or the `resource_types` selector, consistent
+  # with "only include selectors that are actually useful/grounded." No
+  # metadata/extensions/custom/arbitrary_context bag.
+  scope_shape:
+    optional:
+      - actions
+      - resource_types
+      - site_ids
+      - building_ids
+      - zone_ids
+      - area_ids
+      - device_classes
+      - environment_modes
+      - authority_modes
+      - protocols
+    additional_properties: false
+    fields:
+      - id: actions
+        type: array
+        item_type: string
+        required: false
+        default: []
+        pattern: "^[a-z][a-z0-9_-]*:[a-z][a-z0-9_-]*(:[a-z][a-z0-9_-]*)?$"
+        description: >-
+          Action-vocabulary scope: composite actions this bundle's rules
+          are meant to cover, validated against the canonical action-string
+          pattern (reproduced from policy-rule.yaml). Non-empty array when
+          present.
+      - id: resource_types
+        type: array
+        item_type: string
+        required: false
+        default: []
+        pattern: "^[a-z][a-z0-9_-]*$"
+        description: >-
+          Resource-type scope: resource types this bundle's rules are meant
+          to cover, validated against the resource-identifier resource_type
+          segment pattern (reproduced from policy-rule.yaml). Non-empty
+          array when present.
+      - id: site_ids
+        type: array
+        item_type: string
+        required: false
+        default: []
+        description: >-
+          Site scope. Non-empty array of non-empty strings when present.
+      - id: building_ids
+        type: array
+        item_type: string
+        required: false
+        default: []
+        description: >-
+          Building scope. Non-empty array of non-empty strings when
+          present.
+      - id: zone_ids
+        type: array
+        item_type: string
+        required: false
+        default: []
+        description: >-
+          Zone scope. Non-empty array of non-empty strings when present.
+      - id: area_ids
+        type: array
+        item_type: string
+        required: false
+        default: []
+        description: >-
+          Area scope. Non-empty array of non-empty strings when present.
+      - id: device_classes
+        type: array
+        item_type: string
+        required: false
+        default: []
+        pattern: "^[a-z][a-z0-9_-]*$"
+        description: >-
+          Device-class scope, validated against the same open identifier
+          pattern operation-aware-decision-request publishes for
+          device_class (reproduced from policy-rule.yaml). Non-empty array
+          when present.
+      - id: environment_modes
+        type: array
+        item_type: string
+        required: false
+        default: []
+        pattern: "^[a-z][a-z0-9_-]*$"
+        description: >-
+          Environment/deployment scope (for example, restricting a bundle
+          to a training or staging environment_mode), validated against the
+          same open identifier pattern operation-aware-decision-request
+          publishes for environment mode. Non-empty array when present.
+      - id: authority_modes
+        type: array
+        item_type: string
+        required: false
+        default: []
+        pattern: "^[a-z][a-z0-9_-]*$"
+        description: >-
+          Identity authority-mode scope, validated against the same open
+          identifier pattern operation-aware-decision-request publishes for
+          authority_mode. Non-empty array when present.
+      - id: protocols
+        type: array
+        item_type: string
+        required: false
+        default: []
+        pattern: "^[a-z][a-z0-9_-]*$"
+        description: >-
+          Protocol scope: this bundle's rules reference protocol evidence
+          carried in the request, subject to the same protocol-agnostic
+          caution ADR-0004 Section 3 applies to the kernel itself — this
+          does not make basis-core protocol-aware. Non-empty array when
+          present.
+
+  # Documented (not implemented) scope semantic contract a future
+  # basis-core evaluator must honor. This is a basis-schemas publication
+  # choice: ADR-0004 Section 3 states the principle ("a bundle outside its
+  # declared scope should not pretend to deny or allow a request; it should
+  # be semantically not applicable") without choosing a concrete field-level
+  # representation, so this contract adopts the minimal representation
+  # consistent with that principle.
+  scope_semantics:
+    absent_scope: globally_applicable          # no `scope` field (or explicit null) means the bundle applies everywhere
+    present_scope: applicable_if_all_populated_selectors_match  # every populated selector must match (AND); within one selector, any-of
+    non_matching_scope_outcome: not_applicable  # documentation only — evaluated by a future basis-core, per ADR-0002 Section 5
+    empty_scope_object: invalid                 # a present-but-entirely-empty scope object is ambiguous; use omission instead
+
+  # Reproduced from policy-rule.yaml (itself parity-tested against
+  # action-string / resource-identifier / operation-aware-decision-request)
+  # so scope validation stays exactly aligned with rule match validation.
+  action_pattern: "^[a-z][a-z0-9_-]*:[a-z][a-z0-9_-]*(:[a-z][a-z0-9_-]*)?$"
+  resource_type_pattern: "^[a-z][a-z0-9_-]*$"
+  open_identifier_pattern: "^[a-z][a-z0-9_-]*$"
+
+  constraints:
+    - bundle_id, bundle_version, schema_version, policy_owner, and rules
+      are required.
+    - bundle_id and policy_owner must be non-empty strings.
+    - bundle_version and schema_version must be non-empty strings matching
+      the semantic-version pattern (MAJOR.MINOR.PATCH), and are two
+      independent version concepts (see the bundle_version and
+      schema_version field descriptions above) — neither is the
+      basis-schemas package version.
+    - >-
+      scope, when present and non-null, must be an object matching
+      scope_shape, must reject unknown selector keys, and must contain at
+      least one populated selector (an entirely empty scope object, `{}`,
+      is invalid — use omission of the scope field instead to express
+      global applicability).
+    - Every populated selector array inside scope must be non-empty.
+    - scope.actions items must match action_pattern.
+    - scope.resource_types items must match resource_type_pattern.
+    - scope.device_classes, scope.environment_modes, scope.authority_modes,
+      and scope.protocols items must match open_identifier_pattern.
+    - >-
+      rules must be a non-empty array of policy-rule-shaped objects (parity
+      with policy-rule.yaml's own published field policy — reused, not
+      redefined).
+    - >-
+      rule_id values across this bundle's rules array must be unique. This
+      is BUNDLE-level validation: a cross-rule uniqueness concern a single
+      rule object's own schema cannot express or enforce; see
+      policy-rule.yaml.
+    - description, source_ref, approval_ref, compatibility_target, and
+      replaced_by, when present and non-null, must be non-empty strings.
+    - created_at and updated_at, when present and non-null, must be
+      timezone-aware ISO 8601 date-time strings.
+    - deprecated, when present, must be a boolean. This contract does not
+      require deprecated to be true when replaced_by is present, or
+      vice versa; that alignment is a producer responsibility, not
+      validated here.
+    - >-
+      This contract does NOT publish a validation_status field. Whether a
+      bundle is valid is derived by a future basis-core validator/runtime
+      process; a bundle cannot assert its own validity by declaring a
+      field. A validation_status key is therefore an unknown field and is
+      rejected.
+    - This contract defines no script, code, executable, command, shell,
+      python, javascript, rego, cedar, cel, wasm, sql, template, or
+      expression field, and no credential, password, private_key, api_key,
+      access_token, id_token, refresh_token, bearer_token,
+      authorization_header, cookie, session_secret, client_secret, or
+      device_secret field. Any such field is rejected as unknown.
+    - >-
+      Unknown / additional top-level fields are rejected (additional
+      properties are set to false), and unknown fields within scope_shape
+      are rejected the same way.
+    - >-
+      This contract does not implement policy loading, storage,
+      distribution, synchronization, signing, signature verification,
+      tamper-evident packaging, an approval workflow, an authoring UI, a
+      simulation UI, deployment behavior, multi-bundle hierarchy, policy
+      federation, tenant/site policy delegation, or runtime evaluation.
+      Every one of these remains explicitly deferred, per ADR-0004
+      Section 18.
+
+  # Where this shape is produced, consumed, and governed. Informative; it
+  # records boundary ownership already established in ADR-0004 Section 16,
+  # it adds no structure of its own.
+  composition:
+    authored_by: policy-authoring-process  # outside this contract's scope; not defined here
+    loaded_and_selected_by: basis-gateway  # future runtime config loading/selection; not implemented here
+    validated_by: basis-core               # future v0.2.0 policy validator determines shape + bundle-level validity
+    evaluated_by: basis-core               # future v0.2.0 kernel evaluates rules deterministically
+    visualized_by: basis-console           # may later display bundle/rule metadata; never authoritative
+    published_by: basis-schemas            # publishes the bundle shape only; implements none of the above
+
+  examples:
+    valid:
+      # 1. Small global bundle: no scope field, meaning globally applicable.
+      - bundle_id: baseline-read-only-telemetry
+        bundle_version: "1.0.0"
+        schema_version: "0.1.0"
+        policy_owner: platform-security-team
+        rules:
+          - rule_id: rule-operator-read-ahu-telemetry
+            effect: allow
+            match:
+              subject_roles:
+                - operator
+              actions:
+                - read:ahu
+            reason_code: allow_rule_matched
+      # 2. Site-scoped OT operations bundle.
+      - bundle_id: west-campus-hvac-operations
+        bundle_version: "2.3.1"
+        schema_version: "0.1.0"
+        policy_owner: west-campus-ot-team
+        description: HVAC operation rules scoped to the west campus site.
+        scope:
+          site_ids:
+            - west-campus
+          resource_types:
+            - hvac
+        rules:
+          - rule_id: rule-west-campus-hvac-allow
+            effect: allow
+            match:
+              subject_roles:
+                - operator
+              resource_types:
+                - hvac
+              operation_intents:
+                - state_changing
+            reason_code: allow_rule_matched
+          - rule_id: rule-west-campus-hvac-deny-interlock
+            effect: deny
+            match:
+              safety_modes:
+                - interlock-engaged
+              operation_intents:
+                - control_affecting
+            reason_code: deny_rule_matched
+      # 3. Bundle containing both allow and deny rules, with provenance
+      #    metadata.
+      - bundle_id: vendor-remote-access-baseline
+        bundle_version: "0.4.0"
+        schema_version: "0.1.0"
+        policy_owner: vendor-access-governance
+        source_ref: policy-authoring/vendor-remote-access-baseline
+        approval_ref: change-4821
+        created_at: "2026-05-01T00:00:00Z"
+        updated_at: "2026-06-15T09:30:00Z"
+        compatibility_target: basis-core>=0.2.0,<0.3.0
+        rules:
+          - rule_id: rule-allow-scoped-vendor-read
+            effect: allow
+            match:
+              subject_roles:
+                - vendor
+              actions:
+                - read:ahu
+              site_ids:
+                - west-campus
+            reason_code: allow_rule_matched
+          - rule_id: rule-deny-vendor-control-affecting
+            effect: deny
+            match:
+              subject_roles:
+                - vendor
+              operation_intents:
+                - control_affecting
+            reason_code: deny_rule_matched
+      # 4. Deprecated bundle, with an explicit replacement reference.
+      - bundle_id: legacy-hvac-baseline
+        bundle_version: "1.2.0"
+        schema_version: "0.1.0"
+        policy_owner: platform-security-team
+        deprecated: true
+        replaced_by: west-campus-hvac-operations
+        rules:
+          - rule_id: rule-legacy-operator-read-ahu
+            effect: allow
+            match:
+              subject_roles:
+                - operator
+              actions:
+                - read:ahu
+            reason_code: allow_rule_matched
+    invalid:
+      - reason: missing bundle ID
+        value:
+          bundle_version: "1.0.0"
+          schema_version: "0.1.0"
+          policy_owner: platform-security-team
+          rules:
+            - rule_id: rule-operator-read-ahu
+              effect: allow
+              match:
+                actions:
+                  - read:ahu
+      - reason: empty bundle ID
+        value:
+          bundle_id: ""
+          bundle_version: "1.0.0"
+          schema_version: "0.1.0"
+          policy_owner: platform-security-team
+          rules:
+            - rule_id: rule-operator-read-ahu
+              effect: allow
+              match:
+                actions:
+                  - read:ahu
+      - reason: invalid bundle version (not semver)
+        value:
+          bundle_id: baseline-read-only-telemetry
+          bundle_version: "v1"
+          schema_version: "0.1.0"
+          policy_owner: platform-security-team
+          rules:
+            - rule_id: rule-operator-read-ahu
+              effect: allow
+              match:
+                actions:
+                  - read:ahu
+      - reason: invalid schema version (not semver)
+        value:
+          bundle_id: baseline-read-only-telemetry
+          bundle_version: "1.0.0"
+          schema_version: "current"
+          policy_owner: platform-security-team
+          rules:
+            - rule_id: rule-operator-read-ahu
+              effect: allow
+              match:
+                actions:
+                  - read:ahu
+      - reason: missing owner
+        value:
+          bundle_id: baseline-read-only-telemetry
+          bundle_version: "1.0.0"
+          schema_version: "0.1.0"
+          rules:
+            - rule_id: rule-operator-read-ahu
+              effect: allow
+              match:
+                actions:
+                  - read:ahu
+      - reason: missing rules
+        value:
+          bundle_id: baseline-read-only-telemetry
+          bundle_version: "1.0.0"
+          schema_version: "0.1.0"
+          policy_owner: platform-security-team
+      - reason: empty rules array
+        value:
+          bundle_id: baseline-read-only-telemetry
+          bundle_version: "1.0.0"
+          schema_version: "0.1.0"
+          policy_owner: platform-security-team
+          rules: []
+      - reason: duplicate rule IDs within one bundle
+        value:
+          bundle_id: baseline-read-only-telemetry
+          bundle_version: "1.0.0"
+          schema_version: "0.1.0"
+          policy_owner: platform-security-team
+          rules:
+            - rule_id: rule-duplicate
+              effect: allow
+              match:
+                actions:
+                  - read:ahu
+            - rule_id: rule-duplicate
+              effect: deny
+              match:
+                actions:
+                  - write:ahu
+      - reason: malformed scope (unknown selector key)
+        value:
+          bundle_id: baseline-read-only-telemetry
+          bundle_version: "1.0.0"
+          schema_version: "0.1.0"
+          policy_owner: platform-security-team
+          scope:
+            country: not-a-published-selector
+          rules:
+            - rule_id: rule-operator-read-ahu
+              effect: allow
+              match:
+                actions:
+                  - read:ahu
+      - reason: malformed nested rule (invalid effect)
+        value:
+          bundle_id: baseline-read-only-telemetry
+          bundle_version: "1.0.0"
+          schema_version: "0.1.0"
+          policy_owner: platform-security-team
+          rules:
+            - rule_id: rule-invalid-effect
+              effect: permit
+              match:
+                actions:
+                  - read:ahu
+      - reason: unknown field rejected
+        value:
+          bundle_id: baseline-read-only-telemetry
+          bundle_version: "1.0.0"
+          schema_version: "0.1.0"
+          policy_owner: platform-security-team
+          validation_status: valid
+          rules:
+            - rule_id: rule-operator-read-ahu
+              effect: allow
+              match:
+                actions:
+                  - read:ahu
+      - reason: credential / private-key field rejected (unknown field)
+        value:
+          bundle_id: baseline-read-only-telemetry
+          bundle_version: "1.0.0"
+          schema_version: "0.1.0"
+          policy_owner: platform-security-team
+          private_key: "-----BEGIN PRIVATE KEY-----example-----END PRIVATE KEY-----"
+          rules:
+            - rule_id: rule-operator-read-ahu
+              effect: allow
+              match:
+                actions:
+                  - read:ahu
+      - reason: empty scope object rejected
+        value:
+          bundle_id: baseline-read-only-telemetry
+          bundle_version: "1.0.0"
+          schema_version: "0.1.0"
+          policy_owner: platform-security-team
+          scope: {}
+          rules:
+            - rule_id: rule-operator-read-ahu
+              effect: allow
+              match:
+                actions:
+                  - read:ahu

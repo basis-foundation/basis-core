@@ -1,0 +1,11 @@
+# Canonical compatibility fixture — scenario: not-applicable.
+
+request_id: req-compat-not-applicable-001
+evaluation_status: completed
+outcome: not_applicable
+failure_reason: null
+bundle_id: bundle-compat-hvac-scope
+bundle_version: "1.0.0"
+trace_id: trace-compat-not-applicable-001
+reason_code: no_applicable_bundle
+explanation: null

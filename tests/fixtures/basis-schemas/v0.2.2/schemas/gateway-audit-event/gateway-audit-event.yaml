@@ -1,0 +1,981 @@
+# BASIS Gateway Audit Event — published contract.
+#
+# This file PUBLISHES the bounded, gateway-emitted, enforcement-boundary
+# audit event shape decided in basis-architecture's operation-aware trace
+# and audit evidence model (ADR-0003,
+# docs/architecture/operation-aware-trace-audit-evidence.md, Section 2
+# "Trace vs Audit", Section 9 "Gateway Enforcement Evidence", and Section 14
+# "Audit Event Assembly Ownership") and sequenced for schema publication by
+# the operation-aware schema readiness plan (ADR-0005,
+# docs/architecture/operation-aware-schema-readiness-plan.md, "PR F — Audit
+# Evidence and GatewayAuditEvent"). It does not invent new audit semantics:
+# every field below formalizes a conceptual category ADR-0003 already
+# named. Architecture governs; schemas publish; implementations consume.
+#
+# CRITICAL BOUNDARY: A GATEWAY AUDIT EVENT IS NOT KERNEL AUDIT EVIDENCE, AND
+# IS NOT A TRACE. Per ADR-0003 Section 2: "Trace explains evaluation. Audit
+# records evidence. Gateway enforcement records what happened at runtime."
+# and Section 14: "basis-core: produces decision response, reason metadata,
+# evaluation trace, kernel-side audit evidence" while "basis-gateway:
+# assembles gateway audit event, combines kernel evidence with enforcement
+# facts, emits audit." This contract publishes the record basis-gateway
+# actually emits after enforcement: it references the kernel-produced
+# audit-evidence.yaml record by evidence_id rather than re-deriving or
+# embedding it, and it carries only the enforcement facts the kernel
+# structurally cannot know (ADR-0003 Section 9) — it is not a second
+# evaluation-trace, and it does not carry rule-level or condition-level
+# evidence, which remain exclusively on evaluation-trace and
+# trace-rule-evidence.
+#
+# CRITICAL COMPATIBILITY DECISION: THE FIRST-WAVE
+# schemas/audit-event/audit-event.yaml IS UNCHANGED. It is not renamed,
+# replaced, widened, or reinterpreted by this file: its version, required
+# fields, optional fields, event types, outcome values, trace
+# representation, schema version, examples, and validation behavior are all
+# identical to before this PR. It remains the published v0.1-era audit
+# contract, produced and consumed today by basis-core alone. This file is a
+# SEPARATE, ADDITIVE operation-aware contract, published alongside it and
+# alongside audit-evidence.yaml (also published by this PR), not
+# superseding either. See docs/gateway-audit-event.md, "Relationship to
+# first-wave AuditEvent".
+#
+# KERNEL EVALUATION STATE IS REUSED EXACTLY FROM PR E, NOT REDEFINED.
+# evaluation_status / outcome / failure_reason on this contract are the
+# identical closed vocabularies published by
+# operation-aware-decision-response.yaml, evaluation-trace.yaml, and
+# audit-evidence.yaml (parity-tested), with the identical required
+# invariant: outcome is null if and only if evaluation_status is "failed",
+# and failure_reason is non-null if and only if evaluation_status is
+# "failed". This contract never reinterprets an evaluator failure, or a
+# NOT_APPLICABLE result, as a policy deny — those remain kernel-side facts,
+# structurally distinct from this contract's own gateway-side
+# enforcement_action below.
+#
+# ENFORCEMENT ACTION IS INDEPENDENT OF KERNEL OUTCOME. enforcement_action
+# (allow / deny) records what the gateway actually did at the enforcement
+# boundary for this event. It is never mechanically derived from outcome by
+# this contract: a gateway may enforce a fail-closed deny on top of a
+# kernel outcome of not_applicable, or on top of evaluation_status: failed,
+# and neither of those is a kernel-level deny (ADR-0003 Section 9: "basis-
+# core decides. basis-gateway enforces and records enforcement facts.").
+# ADR-0003 Section 17 explicitly defers "final audit event schema" and
+# "gateway fail-open/fail-closed behavior on audit failure" — this contract
+# does not attempt to model a deployment-wide fail-open/fail-closed POLICY;
+# it represents only the bounded FACT of what the gateway did for this one
+# event, via enforcement_action and, when the gateway itself failed for a
+# gateway-local reason, the separate gateway_failure_reason field below.
+#
+# AUDIT EVIDENCE IS REFERENCED, NOT EMBEDDED. audit_evidence_id is a
+# required, stable reference to the evidence_id of the audit-evidence.yaml
+# record this event's enforcement facts were combined with (ADR-0003
+# Section 14). No embedded audit_evidence object is published by this
+# contract: per ADR-0003 Section 6's "avoid duplicating... when a stable
+# reference is sufficient" reasoning, applied here by analogy, a bounded
+# reference is preferred over a second, potentially-inconsistent copy of a
+# record this contract does not own. If a future PR finds embedding
+# justified, it must add matching cross-object invariant tests that an
+# embedded object's evidence_id equals audit_evidence_id, the way
+# operation-aware-decision-response.yaml already does for its own embedded
+# evaluation_trace.
+#
+# REQUEST ASSOCIATION AVOIDS DUPLICATING THE REQUEST. Per ADR-0003
+# Section 6: "Audit should usually avoid duplicating the full raw request
+# when a stable hash or reference is sufficient... A decision request
+# hash, paired with a request ID and correlation ID, is generally enough."
+# This contract carries request_id and optional correlation_id only — no
+# subject_id, action, resource, or resource_type field is published here,
+# mirroring the same bounded-reference decision audit-evidence.yaml already
+# makes for itself. A gateway that needs those values can recover them via
+# request_id from the evaluated request, or via audit_evidence_id from the
+# associated audit-evidence record.
+#
+# NO SEPARATE GATEWAY CORRELATION ID. Section 9 names "gateway correlation
+# ID" as an evidence category, but this contract reuses the existing
+# correlation_id (PR C/E) rather than introducing a second, gateway-scoped
+# correlation concept — adding one would be exactly the kind of field
+# published merely because it might be useful someday that this repository
+# avoids. If a genuinely distinct gateway-internal correlation concept is
+# needed, a future PR can add it additively once a real producer justifies
+# it.
+#
+# NO TOP-LEVEL redaction_classification FIELD IS PUBLISHED. Every value
+# this contract carries directly is already a safe identifier, a closed
+# vocabulary member, a reason code, or a reference to a record that already
+# carries its own redaction handling — the same reasoning
+# audit-evidence.yaml, evaluation-trace.yaml, and
+# operation-aware-decision-response.yaml already document for themselves.
+#
+# THIS CONTRACT DOES NOT IMPLEMENT PERSISTENCE, RETENTION, STORAGE, SIGNING,
+# TAMPER-EVIDENCE, SIEM/EXPORT INTEGRATION, OR HTTP/NETWORK-BOUNDARY
+# BEHAVIOR. "Emitted" describes the event's intended role once basis-gateway
+# actually produces and hands it to a producer-chosen sink — it is not a
+# claim this YAML shape makes true by itself. No signature,
+# signature_algorithm, hash_chain, previous_hash, merkle_root, storage_uri,
+# bucket_name, object_key, retention_policy, http_status, response_status,
+# or route/endpoint field is published. See docs/gateway-audit-event.md,
+# "Durability responsibility" (by reference to audit-evidence.md) and
+# "Scope boundaries".
+#
+# The `lifecycle` is `experimental`: this is the first publication of the
+# gateway audit event shape, ahead of any real consumer.
+
+contract:
+  name: gateway-audit-event
+  title: BASIS Gateway Audit Event
+  version: 0.1.0
+  lifecycle: experimental
+  governed_by: basis-architecture
+  published_by: basis-schemas
+  source: docs/architecture/operation-aware-schema-readiness-plan.md
+  description: >-
+    The bounded, gateway-emitted record of what happened at the
+    authorization enforcement boundary for one evaluated request: a stable
+    event identifier and closed event type, an emission timestamp distinct
+    from any kernel-side timestamp, the evaluated request's identity and
+    optional correlation association, the authoritative kernel evaluation
+    state (evaluation_status / outcome / failure_reason, reused unchanged
+    from operation-aware-decision-response, evaluation-trace, and
+    audit-evidence), optional policy provenance and trace association, a
+    required reference to the associated audit-evidence record, an optional
+    gateway instance reference, the gateway's own closed enforcement action
+    (independent of kernel outcome), an optional bounded gateway-local
+    failure reason distinct from kernel failure_reason, an optional
+    gateway-level reason code / safe explanation, and an optional
+    instance-level schema_version. Publishes the event *shape* only: this
+    contract does not implement gateway enforcement, audit persistence,
+    retention, signing, or tamper-evidence, and it is not itself the
+    kernel-side audit-evidence record it references — see audit-evidence,
+    published alongside it by this same PR.
+  # contract-metadata: this file's own contract: block follows the
+  # formalized pattern. operation-aware-decision-response / evaluation-
+  # trace: evaluation_status/outcome/failure_reason are reused unchanged
+  # (parity-tested); request_id/correlation_id/bundle_id/bundle_version/
+  # trace_id echo those contracts' identifiers. policy-bundle: bundle_id/
+  # bundle_version echo that contract's identity/version fields unchanged.
+  # audit-evidence: audit_evidence_id references that contract's own
+  # evidence_id, not redefined here. reason-code: the optional reason_code
+  # field reuses that contract's format unchanged. identity-evidence-
+  # reference / adapter-evidence-reference are deliberately NOT declared:
+  # this contract carries no identity or adapter evidence reference of its
+  # own — those remain exclusively on the referenced audit-evidence record.
+  # redaction-classification is deliberately NOT declared: this contract
+  # carries no field of its own needing a per-field classification (see
+  # file header).
+  depends_on:
+    - contract-metadata
+    - operation-aware-decision-response
+    - evaluation-trace
+    - policy-bundle
+    - audit-evidence
+    - reason-code
+
+gateway_audit_event:
+  # A gateway audit event is a single object. event_id, event_type,
+  # timestamp, request_id, evaluation_status, outcome, failure_reason,
+  # audit_evidence_id, and enforcement_action are always-present required
+  # keys (outcome and failure_reason may hold an explicit null — see the
+  # field-level descriptions and constraints below for exactly when).
+  # correlation_id, bundle_id, bundle_version, trace_id, gateway_id,
+  # gateway_failure_reason, reason_code, explanation, and schema_version
+  # are independently optional. Unknown fields are rejected.
+  required:
+    - event_id
+    - event_type
+    - timestamp
+    - request_id
+    - evaluation_status
+    - outcome
+    - failure_reason
+    - audit_evidence_id
+    - enforcement_action
+  optional:
+    - correlation_id
+    - bundle_id
+    - bundle_version
+    - trace_id
+    - gateway_id
+    - gateway_failure_reason
+    - reason_code
+    - explanation
+    - schema_version
+  additional_properties: false
+
+  fields:
+    - id: event_id
+      type: string
+      required: true
+      non_empty: true
+      description: >-
+        Stable identifier for this gateway audit event, unique to this
+        specific enforcement-boundary occurrence. Independent of array
+        position, storage location, or file path. No UUID requirement is
+        imposed by this contract, matching the identifier convention
+        already used by audit-evidence's evidence_id and by request_id,
+        trace_id, and bundle_id.
+    - id: event_type
+      type: string
+      required: true
+      enum:
+        - gateway_authorization
+      description: >-
+        Closed event-type category. This PR publishes a single value,
+        gateway_authorization, covering the enforcement-boundary event that
+        follows one kernel authorization evaluation — the smallest safe
+        representation pending a richer taxonomy, if basis-architecture
+        later defines one (ADR-0003 Section 17 explicitly defers "final
+        audit event schema"). No HTTP-status-shaped, vendor-specific, or
+        protocol-specific event type is published. Distinct from the
+        first-wave audit-event contract's own event_type enum
+        (authorization_decision / policy_change / identity_event /
+        emergency_override / adapter_event / system_event), which this
+        contract does not reuse, extend, or reinterpret.
+    - id: timestamp
+      type: string
+      required: true
+      format: date-time
+      pattern: "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|[+-]\\d{2}:\\d{2})$"
+      description: >-
+        Timezone-aware ISO 8601 timestamp of when basis-gateway emitted
+        this event (ADR-0003 Section 9's "audit emission timestamp") —
+        distinct from audit-evidence's own recorded_at (when the kernel-
+        side evidence was recorded), from operation-aware-decision-
+        request's evaluation_time (request-supplied context the evaluator
+        reasons about), and from any other request-side timestamp. This
+        contract carries a supplied or producer-assigned value only: no
+        runtime clock implementation, and no timezone database behavior,
+        is implemented here.
+    - id: request_id
+      type: string
+      required: true
+      non_empty: true
+      description: >-
+        The request_id of the operation-aware-decision-request/response
+        this event's enforcement facts relate to. Same meaning as
+        operation-aware-decision-response's and audit-evidence's own
+        request_id. Per ADR-0003 Section 6, this contract does not copy
+        the full request — only this identifier, plus the bounded kernel
+        evaluation state below. No subject_id, action, resource, or
+        resource_type field is published on this contract; a consumer
+        that needs those values recovers them via request_id from the
+        evaluated request, or via audit_evidence_id from the associated
+        audit-evidence record.
+    - id: correlation_id
+      type:
+        - string
+        - "null"
+      required: false
+      default: null
+      description: >-
+        Optional passthrough of the evaluated request's correlation_id,
+        reused unchanged from PR C/E, for cross-system correlation with a
+        broader end-to-end operation or workflow. No separate,
+        gateway-scoped correlation concept is published — see file header,
+        "No separate gateway correlation ID". No reconciliation behavior
+        beyond passthrough is implemented here.
+    - id: evaluation_status
+      type: string
+      required: true
+      enum:
+        - completed
+        - failed
+      description: >-
+        Whether the kernel completed evaluation and produced a valid
+        authorization outcome ("completed"), or could not ("failed") —
+        reused unchanged from operation-aware-decision-response,
+        evaluation-trace, and audit-evidence. A "failed" record never
+        carries a non-null outcome — see the required invariant on outcome
+        below. Distinct from this contract's own gateway_failure_reason
+        (below), which records a gateway-local failure, not a kernel
+        evaluation failure.
+    - id: outcome
+      type:
+        - string
+        - "null"
+      required: true
+      enum:
+        - allow
+        - deny
+        - not_applicable
+        - null
+      description: >-
+        The kernel authorization outcome, reused unchanged from
+        operation-aware-decision-response, evaluation-trace, and
+        audit-evidence: one of allow / deny / not_applicable when
+        evaluation_status is "completed". REQUIRED to be null when
+        evaluation_status is "failed" — an evaluation failure is never
+        reinterpreted as a policy deny or any other outcome. This is a
+        required key on every record (present, possibly null), matching
+        those three contracts' own required-key treatment. This field is
+        never rewritten to reflect what the gateway actually enforced —
+        see enforcement_action below for that fact.
+    - id: failure_reason
+      type:
+        - string
+        - "null"
+      required: true
+      enum:
+        - invalid_request
+        - unsupported_schema_version
+        - invalid_policy_bundle
+        - policy_validation_failure
+        - condition_evaluation_error
+        - internal_evaluation_error
+        - null
+      description: >-
+        The kernel evaluation-failure category, REQUIRED to be non-null
+        when evaluation_status is "failed" and REQUIRED to be null when
+        evaluation_status is "completed". Reproduces the identical
+        six-value evaluator-failure vocabulary published by
+        operation-aware-decision-response.yaml, evaluation-trace.yaml, and
+        audit-evidence.yaml (kept in parity by this repository's test
+        suite) — distinct from this contract's own gateway_failure_reason
+        (a gateway-local failure category, never the same field or the
+        same vocabulary) and from the existing first-wave audit-event
+        contract, which has no failure_reason field at all.
+    - id: bundle_id
+      type:
+        - string
+        - "null"
+      required: false
+      default: null
+      non_empty: true
+      governed_by: policy-bundle
+      description: >-
+        The bundle_id of the policy-bundle actually evaluated, when one
+        applied, echoed from the associated audit-evidence record for the
+        same "policy provenance" reasons documented there. Null or absent
+        when no bundle applied or when evaluation failed before a bundle
+        was identified. Reused unchanged from policy-bundle; this contract
+        does not redefine bundle identity, and does not embed the bundle's
+        rules, scope, or any other bundle content.
+    - id: bundle_version
+      type:
+        - string
+        - "null"
+      required: false
+      default: null
+      pattern: "^\\d+\\.\\d+\\.\\d+$"
+      governed_by: policy-bundle
+      description: >-
+        The bundle_version of the policy-bundle actually evaluated —
+        distinct from this record's own schema_version (the
+        gateway-audit-event instance format version, below) and from the
+        basis-schemas package version. Reused unchanged from
+        policy-bundle's semver pattern.
+    - id: trace_id
+      type:
+        - string
+        - "null"
+      required: false
+      default: null
+      non_empty: true
+      governed_by: evaluation-trace
+      description: >-
+        The trace_id of the evaluation-trace that explains the kernel
+        evaluation behind this event, when one was produced and the
+        producer chooses to reference it. Reference only: this contract
+        never embeds an evaluation-trace object. Kept for the same
+        "trace association" reasons audit-evidence.yaml already documents
+        for its own trace_id field.
+    - id: audit_evidence_id
+      type: string
+      required: true
+      non_empty: true
+      governed_by: audit-evidence
+      description: >-
+        Stable reference to the evidence_id of the audit-evidence record
+        this event's enforcement facts were combined with (ADR-0003
+        Section 14: basis-gateway "combines kernel evidence with
+        enforcement facts"). Required: a gateway audit event without an
+        associated kernel-side evidence record has nothing to combine with
+        enforcement facts. Reference only — this contract does not embed a
+        full audit_evidence object; see file header, "Audit evidence is
+        referenced, not embedded".
+    - id: gateway_id
+      type:
+        - string
+        - "null"
+      required: false
+      default: null
+      non_empty: true
+      description: >-
+        Optional stable reference to the gateway instance that emitted
+        this event (ADR-0003 Section 9's "gateway instance reference").
+        Not a credential, not a subject, not a policy-loader identity —
+        purely an instance label a deployment may use to distinguish which
+        gateway process or node handled this enforcement. No route,
+        endpoint, network address, or HTTP-layer detail is carried here or
+        anywhere else on this contract.
+    - id: enforcement_action
+      type: string
+      required: true
+      enum:
+        - allow
+        - deny
+      description: >-
+        The gateway's own closed enforcement action for this event —
+        what basis-gateway actually did at the enforcement boundary
+        (ADR-0003 Section 9: "basis-core decides. basis-gateway enforces
+        and records enforcement facts."). The smallest-safe placeholder
+        vocabulary pending a richer taxonomy, per ADR-0003 Section 17's
+        explicit deferral of "final audit event schema" — deliberately not
+        forward / block / permit / http-status-shaped or any
+        vendor/protocol-specific value. Structurally independent of the
+        kernel outcome field above: this contract does not mechanically
+        require enforcement_action to equal outcome. In particular,
+        enforcement_action: deny is valid and expected alongside
+        outcome: not_applicable or evaluation_status: failed (fail-closed
+        gateway behavior on a kernel result that was not itself a policy
+        deny) — see the cross-field invariants below and file header,
+        "Enforcement action is independent of kernel outcome". This
+        contract does not decide, or represent, a deployment-wide
+        fail-open/fail-closed POLICY — only the bounded fact of what
+        happened for this one event (ADR-0003 Section 15: audit-failure
+        deployment policy is explicitly deferred to later work).
+        RECORDS THE SELECTED ACTION ONLY, NOT AN EXECUTION RESULT: this
+        contract publishes no enforcement_status / enforcement_result
+        field (additional_properties: false rejects either as unknown).
+        enforcement_action is never a guarantee that the selected action
+        was successfully carried out end-to-end (for example, that a
+        downstream device actually received and complied with a deny) —
+        only that basis-gateway selected it for this event. Enforcement-
+        result / execution-success semantics are not defined by this PR
+        and remain deferred to future architecture work.
+    - id: gateway_failure_reason
+      type:
+        - string
+        - "null"
+      required: false
+      default: null
+      enum:
+        - gateway_timeout
+        - upstream_unavailable
+        - audit_assembly_failure
+        - internal_gateway_error
+        - null
+      description: >-
+        Closed, bounded category for a gateway-LOCAL failure — the gateway
+        itself failing to complete enforcement or audit assembly for this
+        event, for a gateway-side reason (ADR-0003 Section 9's
+        "timeout/error behavior"). Distinct in both name and meaning from
+        the kernel's own failure_reason above: a kernel evaluation failure
+        (evaluation_status: failed) means the kernel could not produce a
+        decision; a gateway-local failure means the gateway itself could
+        not complete its own enforcement/audit-assembly work, independent
+        of whether the kernel succeeded. Null when no gateway-local
+        failure occurred (the ordinary case). When non-null, this contract
+        requires enforcement_action to be deny — see the cross-field
+        invariants below. Kept deliberately small and closed rather than
+        an open-ended taxonomy, per ADR-0003 Section 17's explicit
+        deferral of "final audit event schema" and "gateway fail-open/
+        fail-closed behavior on audit failure": this field represents only
+        the smallest safe categorization the architecture doc's named
+        categories support.
+    - id: reason_code
+      type:
+        - string
+        - "null"
+      required: false
+      default: null
+      pattern: "^[a-z][a-z0-9]*(_[a-z0-9]+)*$"
+      governed_by: reason-code
+      description: >-
+        Optional stable, machine-readable reason code summarizing this
+        event's own gateway-level result, reusing the reason-code
+        contract's format unchanged. Explains the gateway's own action or
+        failure, and is not required to equal the associated
+        audit-evidence record's own reason_code — the two explain
+        different layers, mirroring the exact distinction
+        audit-evidence.yaml already documents for its own reason_code
+        field.
+    - id: explanation
+      type:
+        - string
+        - "null"
+      required: false
+      default: null
+      non_empty: true
+      description: >-
+        Optional static, non-empty, human-readable summary explanation of
+        this event's enforcement result. Descriptive rendering only — not
+        authoritative over the structured evaluation_status / outcome /
+        failure_reason / enforcement_action / gateway_failure_reason
+        fields (ADR-0003 Section 11). No template, variable-
+        interpolation, expression-evaluation, or script-execution
+        mechanism is defined. Producers are responsible for emitting only
+        safe, minimized explanation text; the schema constrains shape, not
+        semantic secret detection.
+    - id: schema_version
+      type: string
+      required: false
+      default: "0.1.0"
+      pattern: "^\\d+\\.\\d+\\.\\d+$"
+      description: >-
+        The gateway-audit-event INSTANCE format version this record was
+        produced against — distinct from this contract file's own
+        contract.version (the gateway-audit-event CONTRACT SHAPE version)
+        and from the basis-schemas package version, matching the
+        three-way distinction policy-bundle.yaml and audit-evidence.yaml
+        already draw for their own instance version fields. Mirrors
+        first-wave audit-event's own schema_version precedent (fields are
+        added, never removed or renamed, as this version advances, so
+        older records remain interpretable). This contract implements no
+        version negotiation.
+
+  # Reproduced from operation-aware-decision-response.yaml /
+  # evaluation-trace.yaml / audit-evidence.yaml / policy-bundle.yaml /
+  # reason-code.yaml so a consumer can validate without dereferencing
+  # them. Parity with the canonical files is enforced by this
+  # repository's test suite.
+  outcome_values:
+    - allow
+    - deny
+    - not_applicable
+  evaluation_status_values:
+    - completed
+    - failed
+  failure_reason_values:
+    - invalid_request
+    - unsupported_schema_version
+    - invalid_policy_bundle
+    - policy_validation_failure
+    - condition_evaluation_error
+    - internal_evaluation_error
+  event_type_values:
+    - gateway_authorization
+  enforcement_action_values:
+    - allow
+    - deny
+  gateway_failure_reason_values:
+    - gateway_timeout
+    - upstream_unavailable
+    - audit_assembly_failure
+    - internal_gateway_error
+  bundle_version_pattern: "^\\d+\\.\\d+\\.\\d+$"
+  reason_code_pattern: "^[a-z][a-z0-9]*(_[a-z0-9]+)*$"
+  timestamp_pattern: "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|[+-]\\d{2}:\\d{2})$"
+  schema_version_pattern: "^\\d+\\.\\d+\\.\\d+$"
+
+  constraints:
+    - event_id, event_type, timestamp, request_id, evaluation_status,
+      outcome, failure_reason, audit_evidence_id, and enforcement_action
+      are required keys on every record (outcome and failure_reason may
+      hold an explicit null; see below).
+    - event_id, request_id, and audit_evidence_id must be non-empty
+      strings.
+    - event_type must be one of event_type_values (a single value in this
+      PR — see field description).
+    - timestamp must be a non-empty, timezone-aware ISO 8601 string
+      matching timestamp_pattern.
+    - >-
+      correlation_id, when present, is passed through verbatim with no
+      format constraint beyond being a string or null (parity with
+      audit-evidence's own correlation_id treatment).
+    - evaluation_status must be one of completed or failed.
+    - >-
+      outcome is REQUIRED to be one of allow, deny, or not_applicable when
+      evaluation_status is completed, and REQUIRED to be null when
+      evaluation_status is failed. A failed evaluation must never
+      serialize a non-null outcome (parity with
+      operation-aware-decision-response, evaluation-trace, and
+      audit-evidence).
+    - >-
+      failure_reason is REQUIRED to be null when evaluation_status is
+      completed, and REQUIRED to be one of the six published
+      failure_reason_values when evaluation_status is failed.
+    - >-
+      enforcement_action must be one of enforcement_action_values (allow
+      or deny). It is not mechanically derived from outcome by this
+      contract: this contract does not require enforcement_action to
+      equal outcome, or to equal any function of outcome — that mapping
+      is a gateway/deployment behavior this document does not standardize.
+    - >-
+      enforcement_action: deny MUST be representable, and is valid,
+      alongside outcome: not_applicable (fail-closed gateway behavior on a
+      kernel result that was not itself a policy deny) and alongside
+      evaluation_status: failed / outcome: null (fail-closed gateway
+      behavior on a kernel evaluation failure). Neither combination may be
+      serialized, or reinterpreted by any rule in this contract, as a
+      kernel-level deny: outcome retains its own kernel value
+      (not_applicable, or null under failure) unchanged in both cases.
+    - >-
+      gateway_failure_reason, when non-null, is one of the four published
+      gateway_failure_reason_values, and REQUIRES enforcement_action to be
+      deny — a gateway-local failure must fail closed for this event. When
+      null (the ordinary case), enforcement_action may be either allow or
+      deny.
+    - bundle_id, when present and non-null, must be a non-empty string.
+    - bundle_version, when present and non-null, must match
+      bundle_version_pattern (parity with policy-bundle).
+    - trace_id, when present and non-null, must be a non-empty string.
+    - gateway_id, when present and non-null, must be a non-empty string.
+    - reason_code, when present and non-null, must match
+      reason_code_pattern (parity with the reason-code contract).
+    - explanation, when present and non-null, must be a non-empty string.
+    - schema_version, when present, must match schema_version_pattern.
+    - >-
+      This contract does not carry a full request snapshot, a full policy
+      bundle, raw identity evidence, raw adapter evidence, raw protocol
+      payloads, credentials, tokens, key material, a per-rule trace
+      object, condition-level evidence, an embedded audit_evidence object,
+      a subject_id, an action, a resource or resource_type, an HTTP status
+      or response status, a route or endpoint, storage configuration, or a
+      cryptographic signature. It does not define full_request,
+      request_snapshot, full_policy, policy_document, policy_source,
+      raw_claims, full_claim_set, raw_payload, raw_protocol_payload,
+      packet, frame, device_secret, access_token, id_token, refresh_token,
+      jwt, bearer_token, authorization_header, cookie, session_secret,
+      client_secret, password, private_key, api_key, credential, debug,
+      debug_data, exception, exception_object, stack, stack_trace,
+      traceback, internal_error_detail, implementation_detail,
+      rule_evidence, condition_results, subject_id, action, resource,
+      resource_type, http_status, response_status, route, endpoint,
+      audit_evidence, enforcement_status, enforcement_result, signature,
+      signature_algorithm, hash_chain, previous_hash, merkle_root,
+      storage_uri, bucket_name, object_key, or retention_policy fields
+      (enforcement_status / enforcement_result: this contract records only
+      the selected enforcement_action, never a separate execution-result
+      field — see the enforcement_action field description above). Any
+      such field is rejected as unknown.
+    - >-
+      Unknown / additional top-level fields are rejected (additional
+      properties are set to false).
+    - >-
+      This contract does not implement gateway enforcement, audit
+      persistence, retention, signing, or tamper-evidence. It is not
+      itself the kernel-side audit-evidence record — audit-evidence is a
+      separate, earlier-referenced contract (published alongside this one
+      by the same PR) that this record references by audit_evidence_id
+      rather than redefining.
+
+  # Where this shape is produced, consumed, and governed. Informative; it
+  # records boundary ownership already established in ADR-0003, it adds no
+  # structure of its own.
+  composition:
+    derived_from: audit-evidence, operation-aware-decision-response  # the kernel-produced evidence and result this event's enforcement facts are combined with
+    assembled_by: basis-gateway   # combines the referenced kernel-produced audit-evidence with its own enforcement facts (enforcement_action, gateway_id, gateway_failure_reason, timestamp) into this record (ADR-0003 Section 9, Section 14)
+    referenced_by: null  # this is the terminal, gateway-emitted record in this PR; no later contract embeds or references it
+    visualized_by: basis-console  # may display redacted event information; never authoritative
+    published_by: basis-schemas   # publishes the event shape only; implements none of the above
+
+  examples:
+    valid:
+      # 1. Completed ALLOW, gateway enforces allow: the ordinary path.
+      - event_id: gwae-0001-0000-0000-000000000001
+        event_type: gateway_authorization
+        timestamp: "2026-05-22T14:30:02Z"
+        request_id: oadr-0002-0000-0000-000000000002
+        evaluation_status: completed
+        outcome: allow
+        failure_reason: null
+        bundle_id: baseline-read-only-telemetry
+        bundle_version: "1.0.0"
+        audit_evidence_id: audev-0001-0000-0000-000000000001
+        gateway_id: gateway-west-campus-01
+        enforcement_action: allow
+        reason_code: allow_rule_matched
+      # 2. Completed DENY, gateway enforces deny: the ordinary path.
+      - event_id: gwae-0002-0000-0000-000000000002
+        event_type: gateway_authorization
+        timestamp: "2026-05-22T14:30:06Z"
+        request_id: oadr-0003-0000-0000-000000000003
+        correlation_id: corr-0003-0000-0000-000000000003
+        trace_id: trace-0002-0000-0000-000000000002
+        evaluation_status: completed
+        outcome: deny
+        failure_reason: null
+        bundle_id: west-campus-hvac-operations
+        bundle_version: "2.3.1"
+        audit_evidence_id: audev-0002-0000-0000-000000000002
+        gateway_id: gateway-west-campus-01
+        enforcement_action: deny
+        reason_code: deny_rule_matched
+        explanation: Deny precedence applied; gateway enforced the kernel deny.
+      # 3. Kernel NOT_APPLICABLE, gateway fails closed: not_applicable is
+      #    never rewritten as a kernel deny, but the gateway still denies.
+      - event_id: gwae-0003-0000-0000-000000000003
+        event_type: gateway_authorization
+        timestamp: "2026-05-22T14:30:03Z"
+        request_id: oadr-0001-0000-0000-000000000001
+        evaluation_status: completed
+        outcome: not_applicable
+        failure_reason: null
+        audit_evidence_id: audev-0003-0000-0000-000000000003
+        enforcement_action: deny
+        reason_code: no_allow_rule_matched
+        explanation: No applicable bundle; gateway fail-closed policy denied the request.
+      # 4. Kernel evaluation failure, gateway fails closed.
+      - event_id: gwae-0004-0000-0000-000000000004
+        event_type: gateway_authorization
+        timestamp: "2026-05-22T14:30:04Z"
+        request_id: oadr-1099-0000-0000-000000000099
+        evaluation_status: failed
+        outcome: null
+        failure_reason: unsupported_schema_version
+        audit_evidence_id: audev-0004-0000-0000-000000000004
+        enforcement_action: deny
+        explanation: Kernel evaluation failed; gateway fail-closed policy denied the request.
+      # 5. Gateway-local failure only: kernel completed with allow, but the
+      #    gateway itself failed to assemble audit and fails closed —
+      #    enforcement_action is independent of kernel outcome.
+      - event_id: gwae-0005-0000-0000-000000000005
+        event_type: gateway_authorization
+        timestamp: "2026-05-22T14:30:07Z"
+        request_id: oadr-0004-0000-0000-000000000004
+        evaluation_status: completed
+        outcome: allow
+        failure_reason: null
+        audit_evidence_id: audev-0005-0000-0000-000000000005
+        gateway_id: gateway-west-campus-01
+        enforcement_action: deny
+        gateway_failure_reason: audit_assembly_failure
+        explanation: Gateway could not complete audit assembly for an otherwise-allowed request; enforced fail-closed.
+      # 6. Minimal valid example: only required keys, with an explicit
+      #    schema_version.
+      - event_id: gwae-0006-0000-0000-000000000006
+        event_type: gateway_authorization
+        timestamp: "2026-05-22T14:30:08Z"
+        request_id: oadr-0006-0000-0000-000000000006
+        evaluation_status: completed
+        outcome: allow
+        failure_reason: null
+        audit_evidence_id: audev-0006-0000-0000-000000000006
+        enforcement_action: allow
+        schema_version: "0.1.0"
+    invalid:
+      - reason: missing required event ID
+        value:
+          event_type: gateway_authorization
+          timestamp: "2026-05-22T14:30:00Z"
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: completed
+          outcome: allow
+          failure_reason: null
+          audit_evidence_id: audev-0001-0000-0000-000000000001
+          enforcement_action: allow
+      - reason: empty event ID
+        value:
+          event_id: ""
+          event_type: gateway_authorization
+          timestamp: "2026-05-22T14:30:00Z"
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: completed
+          outcome: allow
+          failure_reason: null
+          audit_evidence_id: audev-0001-0000-0000-000000000001
+          enforcement_action: allow
+      - reason: invalid event type
+        value:
+          event_id: gwae-1001-0000-0000-000000000001
+          event_type: http_request
+          timestamp: "2026-05-22T14:30:00Z"
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: completed
+          outcome: allow
+          failure_reason: null
+          audit_evidence_id: audev-0001-0000-0000-000000000001
+          enforcement_action: allow
+      - reason: malformed timestamp (timezone-naive, no offset)
+        value:
+          event_id: gwae-1002-0000-0000-000000000002
+          event_type: gateway_authorization
+          timestamp: "2026-05-22T14:30:00"
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: completed
+          outcome: allow
+          failure_reason: null
+          audit_evidence_id: audev-0001-0000-0000-000000000001
+          enforcement_action: allow
+      - reason: missing required request ID
+        value:
+          event_id: gwae-1003-0000-0000-000000000003
+          event_type: gateway_authorization
+          timestamp: "2026-05-22T14:30:00Z"
+          evaluation_status: completed
+          outcome: allow
+          failure_reason: null
+          audit_evidence_id: audev-0001-0000-0000-000000000001
+          enforcement_action: allow
+      - reason: malformed kernel evaluation state (invalid evaluation_status)
+        value:
+          event_id: gwae-1004-0000-0000-000000000004
+          event_type: gateway_authorization
+          timestamp: "2026-05-22T14:30:00Z"
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: COMPLETED
+          outcome: allow
+          failure_reason: null
+          audit_evidence_id: audev-0001-0000-0000-000000000001
+          enforcement_action: allow
+      - reason: kernel failed represented with non-null ALLOW outcome (invariant violation)
+        value:
+          event_id: gwae-1005-0000-0000-000000000005
+          event_type: gateway_authorization
+          timestamp: "2026-05-22T14:30:00Z"
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: failed
+          outcome: allow
+          failure_reason: internal_evaluation_error
+          audit_evidence_id: audev-0001-0000-0000-000000000001
+          enforcement_action: deny
+      - reason: completed with null outcome (invariant violation)
+        value:
+          event_id: gwae-1006-0000-0000-000000000006
+          event_type: gateway_authorization
+          timestamp: "2026-05-22T14:30:00Z"
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: completed
+          outcome: null
+          failure_reason: null
+          audit_evidence_id: audev-0001-0000-0000-000000000001
+          enforcement_action: allow
+      - reason: failed without failure reason (invariant violation)
+        value:
+          event_id: gwae-1007-0000-0000-000000000007
+          event_type: gateway_authorization
+          timestamp: "2026-05-22T14:30:00Z"
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: failed
+          outcome: null
+          failure_reason: null
+          audit_evidence_id: audev-0001-0000-0000-000000000001
+          enforcement_action: deny
+      - reason: completed with non-null failure reason (invariant violation)
+        value:
+          event_id: gwae-1008-0000-0000-000000000008
+          event_type: gateway_authorization
+          timestamp: "2026-05-22T14:30:00Z"
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: completed
+          outcome: allow
+          failure_reason: internal_evaluation_error
+          audit_evidence_id: audev-0001-0000-0000-000000000001
+          enforcement_action: allow
+      - reason: missing required audit evidence reference
+        value:
+          event_id: gwae-1009-0000-0000-000000000009
+          event_type: gateway_authorization
+          timestamp: "2026-05-22T14:30:00Z"
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: completed
+          outcome: allow
+          failure_reason: null
+          enforcement_action: allow
+      - reason: empty audit evidence reference
+        value:
+          event_id: gwae-1010-0000-0000-000000000010
+          event_type: gateway_authorization
+          timestamp: "2026-05-22T14:30:00Z"
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: completed
+          outcome: allow
+          failure_reason: null
+          audit_evidence_id: ""
+          enforcement_action: allow
+      - reason: invalid enforcement action
+        value:
+          event_id: gwae-1011-0000-0000-000000000011
+          event_type: gateway_authorization
+          timestamp: "2026-05-22T14:30:00Z"
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: completed
+          outcome: deny
+          failure_reason: null
+          audit_evidence_id: audev-0001-0000-0000-000000000001
+          enforcement_action: forward
+      - reason: missing required enforcement action
+        value:
+          event_id: gwae-1012-0000-0000-000000000012
+          event_type: gateway_authorization
+          timestamp: "2026-05-22T14:30:00Z"
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: completed
+          outcome: allow
+          failure_reason: null
+          audit_evidence_id: audev-0001-0000-0000-000000000001
+      - reason: gateway-local failure reason set while enforcement action is allow (invariant violation)
+        value:
+          event_id: gwae-1013-0000-0000-000000000013
+          event_type: gateway_authorization
+          timestamp: "2026-05-22T14:30:00Z"
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: completed
+          outcome: allow
+          failure_reason: null
+          audit_evidence_id: audev-0001-0000-0000-000000000001
+          enforcement_action: allow
+          gateway_failure_reason: gateway_timeout
+      - reason: malformed reason code
+        value:
+          event_id: gwae-1014-0000-0000-000000000014
+          event_type: gateway_authorization
+          timestamp: "2026-05-22T14:30:00Z"
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: completed
+          outcome: allow
+          failure_reason: null
+          audit_evidence_id: audev-0001-0000-0000-000000000001
+          enforcement_action: allow
+          reason_code: ALLOW_RULE_MATCHED
+      - reason: malformed policy provenance (invalid bundle_version semver)
+        value:
+          event_id: gwae-1015-0000-0000-000000000015
+          event_type: gateway_authorization
+          timestamp: "2026-05-22T14:30:00Z"
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: completed
+          outcome: allow
+          failure_reason: null
+          bundle_id: baseline-read-only-telemetry
+          bundle_version: "v1"
+          audit_evidence_id: audev-0001-0000-0000-000000000001
+          enforcement_action: allow
+      - reason: raw request field rejected (unknown field)
+        value:
+          event_id: gwae-1016-0000-0000-000000000016
+          event_type: gateway_authorization
+          timestamp: "2026-05-22T14:30:00Z"
+          request_id: oadr-0001-0000-0000-000000000001
+          subject_id: alice
+          evaluation_status: completed
+          outcome: allow
+          failure_reason: null
+          audit_evidence_id: audev-0001-0000-0000-000000000001
+          enforcement_action: allow
+      - reason: raw evidence field rejected (unknown field)
+        value:
+          event_id: gwae-1017-0000-0000-000000000017
+          event_type: gateway_authorization
+          timestamp: "2026-05-22T14:30:00Z"
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: completed
+          outcome: allow
+          failure_reason: null
+          audit_evidence_id: audev-0001-0000-0000-000000000001
+          enforcement_action: allow
+          raw_claims:
+            sub: alice
+      - reason: gateway secret field rejected (unknown field)
+        value:
+          event_id: gwae-1018-0000-0000-000000000018
+          event_type: gateway_authorization
+          timestamp: "2026-05-22T14:30:00Z"
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: completed
+          outcome: allow
+          failure_reason: null
+          audit_evidence_id: audev-0001-0000-0000-000000000001
+          enforcement_action: allow
+          gateway_api_key: sk-example-not-a-real-key
+      - reason: unknown field rejected
+        value:
+          event_id: gwae-1019-0000-0000-000000000019
+          event_type: gateway_authorization
+          timestamp: "2026-05-22T14:30:00Z"
+          request_id: oadr-0001-0000-0000-000000000001
+          evaluation_status: completed
+          outcome: allow
+          failure_reason: null
+          audit_evidence_id: audev-0001-0000-0000-000000000001
+          enforcement_action: allow
+          confidence: 0.97

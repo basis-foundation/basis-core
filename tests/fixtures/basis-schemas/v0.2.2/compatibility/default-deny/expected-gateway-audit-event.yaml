@@ -1,0 +1,16 @@
+# Canonical compatibility fixture — scenario: default-deny.
+
+event_id: gateway-event-compat-default-deny-001
+event_type: gateway_authorization
+timestamp: "2026-07-09T09:10:02Z"
+request_id: req-compat-default-deny-001
+evaluation_status: completed
+outcome: deny
+failure_reason: null
+bundle_id: bundle-compat-default-deny
+bundle_version: "1.0.0"
+trace_id: trace-compat-default-deny-001
+audit_evidence_id: audit-compat-default-deny-001
+enforcement_action: deny
+reason_code: no_allow_rule_matched
+explanation: null

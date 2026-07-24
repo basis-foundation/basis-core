@@ -1,6 +1,6 @@
 """
 tests/test_basis_schemas_snapshot_integrity.py — manifest and hash integrity
-tests for the vendored `basis-schemas` snapshot (currently `v0.2.1`, per
+tests for the vendored `basis-schemas` snapshot (currently `v0.2.2`, per
 `tests/helpers/basis_schemas_snapshot.py`'s `SNAPSHOT_RELEASE`).
 
 These tests protect the vendored snapshot from silent drift or accidental
@@ -11,7 +11,7 @@ symlinks.
 
 Cross-references
 ─────────────────
-tests/fixtures/basis-schemas/v0.2.1/manifest.json — the manifest under test.
+tests/fixtures/basis-schemas/v0.2.2/manifest.json — the manifest under test.
 tests/helpers/basis_schemas_snapshot.py           — loading helpers.
 scripts/update_basis_schemas_snapshot.py          — the tool that writes it.
 """

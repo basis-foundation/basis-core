@@ -8,16 +8,23 @@ are present and non-empty. `v0.2.0`'s values were independently confirmed at
 plan-authoring time against the actual `basis-schemas` `v0.2.0` git tag (see
 `docs/implementation/basis-core-v0.2-operation-aware-plan.md`, Section 4,
 which records the same commit SHA) and cross-checked directly against the
-`v0.2.0` tag in the `basis-schemas` repository during that PR.
+`v0.2.0` tag in the `basis-schemas` repository during that PR. `v0.2.1`'s
+values were independently confirmed both against a local sibling
+`basis-schemas` clone's `v0.2.1` tag and via `git ls-remote` against the
+upstream GitHub repository during that PR; both resolved to the same
+commit.
 
-This test now asserts the `v0.2.1` values instead: `v0.2.1` is a deliberate,
-reviewed re-vendoring PR (see `tests/fixtures/basis-schemas/v0.2.1/README.md`
+This test now asserts the `v0.2.2` values instead: `v0.2.2` is a deliberate,
+reviewed re-vendoring PR (see `tests/fixtures/basis-schemas/v0.2.2/README.md`
 and `v0.2.0/README.md`'s "Refreshing this snapshot" section) that corrects
-the `invalid-policy-bundle` scenario's `failure_reason`/`reason_code` from
-upstream `basis-schemas` `v0.2.1`. The `v0.2.1` commit was independently
-confirmed both against a local sibling `basis-schemas` clone's `v0.2.1` tag
-and via `git ls-remote` against the upstream GitHub repository during this
-PR; both resolved to the same commit.
+three evidence-provenance disagreements — synthesized top-level explanation,
+inconsistent per-rule authored-rationale projection, and missing bundle
+identity on `NOT_APPLICABLE`/typed-validation-failure evaluations — from
+upstream `basis-schemas` `v0.2.2`. The `v0.2.2` commit was independently
+confirmed both against a local sibling `basis-schemas` clone's `v0.2.2` tag
+(`git rev-parse 'v0.2.2^{commit}'`) and via `git ls-remote` against the
+upstream GitHub repository during this PR; both resolved to the same
+commit, and the tag's peeled ref (`refs/tags/v0.2.2^{}`) matches exactly.
 
 If this test ever needs to change again, it means the snapshot is being
 re-vendored against a new release — which must be a deliberate, reviewed PR
@@ -32,8 +39,8 @@ import re
 from tests.helpers.basis_schemas_snapshot import load_snapshot_manifest
 
 EXPECTED_SOURCE_REPOSITORY = "basis-foundation/basis-schemas"
-EXPECTED_SOURCE_RELEASE = "v0.2.1"
-EXPECTED_SOURCE_COMMIT = "945acd107016bcbcb114f440474df204ead3f8f3"
+EXPECTED_SOURCE_RELEASE = "v0.2.2"
+EXPECTED_SOURCE_COMMIT = "da7832972dad36dea6ef2796161a1990fbbe6a05"
 
 _ISO8601_UTC_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
 

@@ -1,0 +1,141 @@
+{
+  "captured_at": "2026-07-23T02:06:25Z",
+  "files": {
+    "compatibility/allow-basic/expected-audit-evidence.yaml": {
+      "sha256": "d8a6f94085d21b786f7223bb40acd2dd066b46d56d5e8cea234da47332e985ba"
+    },
+    "compatibility/allow-basic/expected-evaluation-trace.yaml": {
+      "sha256": "0dd772093573c9d032a4c40fb11a3a8865b1971e4ed4388959f7ac4d0560eaf9"
+    },
+    "compatibility/allow-basic/expected-gateway-audit-event.yaml": {
+      "sha256": "48aecdb77cc71cfff95be090a4261cc4596619793667393085ef8170d8a8243e"
+    },
+    "compatibility/allow-basic/expected-operation-aware-decision-response.yaml": {
+      "sha256": "eb44913e0e37f50cd9dcc886d244f17b9d1949b55d4d22563d905d250f1efe21"
+    },
+    "compatibility/allow-basic/operation-aware-decision-request.yaml": {
+      "sha256": "0bf3aae72018ca41bcc9b6edd5b3c6180e0e87c2ecf80573bb60dd03cc538774"
+    },
+    "compatibility/allow-basic/policy-bundle.yaml": {
+      "sha256": "5aa7eb961c9ba31445eaa79daa3a45cd5f170256bbcbbc324fa255d3611d5c53"
+    },
+    "compatibility/default-deny/expected-audit-evidence.yaml": {
+      "sha256": "aca765337270b105aa5e411767e2dca1dbccb6315d5f62e0a0727a6af9dfff32"
+    },
+    "compatibility/default-deny/expected-evaluation-trace.yaml": {
+      "sha256": "6f7ef9b2f03ab27a7a4d35f049109ace43ffb5e6574b5c9424173fe1d3c717ba"
+    },
+    "compatibility/default-deny/expected-gateway-audit-event.yaml": {
+      "sha256": "4eee2bca039296609e2f69c629b8435f72e4942cae44a8b2b12f1a2850649e0f"
+    },
+    "compatibility/default-deny/expected-operation-aware-decision-response.yaml": {
+      "sha256": "dade84a39f3077a1e350df99c6face91a95c2420aec8d5f532ba8019781310c3"
+    },
+    "compatibility/default-deny/operation-aware-decision-request.yaml": {
+      "sha256": "5e81bbc236155a67dd03a133fcf0d73e839ef50074426696bb1d4a15303df8f8"
+    },
+    "compatibility/default-deny/policy-bundle.yaml": {
+      "sha256": "0cfd23f13da350836febe5b909e7ecf498990196cd68ff6ee5d67053706cecbe"
+    },
+    "compatibility/deny-precedence/expected-audit-evidence.yaml": {
+      "sha256": "4f77f1e70934bfbe13bd8f2cfaef5ba59e070f56d0e68a72f334aac374be3b20"
+    },
+    "compatibility/deny-precedence/expected-evaluation-trace.yaml": {
+      "sha256": "e3bf540920b558c3795d11b49a1afadfa11912aa6b8717701aadd646062d38bd"
+    },
+    "compatibility/deny-precedence/expected-gateway-audit-event.yaml": {
+      "sha256": "4b44b3addbedba26040adab38dbc9d86961da777ce6a24f3daff3fca48f612c5"
+    },
+    "compatibility/deny-precedence/expected-operation-aware-decision-response.yaml": {
+      "sha256": "d5b8337230f0a92eeed078e8eaf3b9cafbae32868673f9f5ee07174061a13114"
+    },
+    "compatibility/deny-precedence/operation-aware-decision-request.yaml": {
+      "sha256": "a283bd99d1175dbe395a990632111b5a09514dcebf6ccf576515a722c3cd6e84"
+    },
+    "compatibility/deny-precedence/policy-bundle.yaml": {
+      "sha256": "8716d48f538fe64395d8b1969de82333bc74d72a8fbb7ba2b08f12c67ba6642e"
+    },
+    "compatibility/invalid-policy-bundle/expected-audit-evidence.yaml": {
+      "sha256": "adb3902eb07808d491badc7bde2e473e10af008b5de5710351f70de1d65ca772"
+    },
+    "compatibility/invalid-policy-bundle/expected-evaluation-trace.yaml": {
+      "sha256": "5cb580cabca10c95d9dc2d459727501c58ce8ae9587d8ff7e1923d5712e06a46"
+    },
+    "compatibility/invalid-policy-bundle/expected-gateway-audit-event.yaml": {
+      "sha256": "a65aea8b4e16bded5523b17322f0d14aa24acc08c9dbb3e1a088cb45954814fa"
+    },
+    "compatibility/invalid-policy-bundle/expected-operation-aware-decision-response.yaml": {
+      "sha256": "543671d4d4ac6e30f3a04261982c9d35515aaf4fdbf0fad243866d7836c0b5b3"
+    },
+    "compatibility/invalid-policy-bundle/invalid-policy-bundle.yaml": {
+      "sha256": "cd0fda7f62b8ede860717cc36f46b40cf507f81a70ba4e10b38c78ada22cdfcc"
+    },
+    "compatibility/invalid-policy-bundle/operation-aware-decision-request.yaml": {
+      "sha256": "66f3529366ca8ddaa4997fce5b7a713f59f0276ba3a04126ccd81b5ae46563ef"
+    },
+    "compatibility/not-applicable/expected-audit-evidence.yaml": {
+      "sha256": "0c0bc79f70c90fd9e5118c304b5837b3aa60a5ade967dfa17203c6885ccb1927"
+    },
+    "compatibility/not-applicable/expected-evaluation-trace.yaml": {
+      "sha256": "227aca8f0b1c808bbbd966f873b41f178fb8b5c2d29c6c302396b0177610301f"
+    },
+    "compatibility/not-applicable/expected-gateway-audit-event.yaml": {
+      "sha256": "c3ccb874379ec6ad0def80cbccf9b147e4d1587a8d898f138ca9f085a73846a4"
+    },
+    "compatibility/not-applicable/expected-operation-aware-decision-response.yaml": {
+      "sha256": "db7b59f4600ff667f7c688132e04b187c7c4ca4fed6be3457f2594c431ac2be1"
+    },
+    "compatibility/not-applicable/operation-aware-decision-request.yaml": {
+      "sha256": "8f76a51416e87eb368a7a317c7fee7ad36b7c84e61ea0770c75099cc5228ee0c"
+    },
+    "compatibility/not-applicable/policy-bundle.yaml": {
+      "sha256": "9a418736ba8e4f10deef359e606586c632efbb09388c85f79f407868af575348"
+    },
+    "schemas/adapter-evidence-reference/adapter-evidence-reference.yaml": {
+      "sha256": "c4c890994979dd1b71b9dbb34a906b5a7a3539e17ec1fad969445bc07ac27de8"
+    },
+    "schemas/audit-evidence/audit-evidence.yaml": {
+      "sha256": "e71087c43047ba730d7521d94a44601771fb34dfceb12869cd8228f6eeecf0dd"
+    },
+    "schemas/contract-metadata/contract-metadata.yaml": {
+      "sha256": "82b4e5a5c31e084d589433a58ddd07ff0f656d2af5d066dbcdd1f27a80036b40"
+    },
+    "schemas/evaluation-trace/evaluation-trace.yaml": {
+      "sha256": "9a75e2e7f60a441151be01b55f2a1e2c9471e12420e8c25c56cb1d615c1924cd"
+    },
+    "schemas/gateway-audit-event/gateway-audit-event.yaml": {
+      "sha256": "67e0d96e022f8f54626e83ab5fad88502327b961a73d02b2b88383c2924bdaa2"
+    },
+    "schemas/identity-evidence-reference/identity-evidence-reference.yaml": {
+      "sha256": "13a88df908b46b396586837c286d916dde27c46b6aa743f578168983e0cb32a4"
+    },
+    "schemas/operation-aware-decision-request/operation-aware-decision-request.yaml": {
+      "sha256": "4f580245c3960b7a78a9e0d65b37b3ce469f0c70dc80dcd5a21d65ffe2011aa2"
+    },
+    "schemas/operation-aware-decision-response/operation-aware-decision-response.yaml": {
+      "sha256": "b5c6624ad15a267b167e1a323921d22e078db38f154f8c8e5fcf1f7f608c159e"
+    },
+    "schemas/policy-bundle/policy-bundle.yaml": {
+      "sha256": "682e55e71d969097a42ecc717e2b86f69a944386930a8c2eb3ea0c1d5939386a"
+    },
+    "schemas/policy-condition/policy-condition.yaml": {
+      "sha256": "dbb6edee0cc7b5c8ea9ba76a939044d54eb7f0080f50c535ffa762d8fa97c0ff"
+    },
+    "schemas/policy-rule/policy-rule.yaml": {
+      "sha256": "56790fdb9975f0ab4514117388eb80d5a36b2c8be03371ff1aa6de52e2bdf270"
+    },
+    "schemas/reason-code/reason-code.yaml": {
+      "sha256": "b893d94d0742a07a6308103ca77d554e8607b790f844ee8ccc0ac9d4354373a7"
+    },
+    "schemas/redaction-classification/redaction-classification.yaml": {
+      "sha256": "7843db1b41dcab09b9ae3bf791fce8df63e98136889abce49f53c10d48a4bb43"
+    },
+    "schemas/trace-rule-evidence/trace-rule-evidence.yaml": {
+      "sha256": "2d3d305927608174490142b3a63c8a7c01d7d7025df592f6293aae97d4d1a728"
+    }
+  },
+  "purpose": "basis-core operation-aware contract and compatibility test snapshot",
+  "source_commit": "da7832972dad36dea6ef2796161a1990fbbe6a05",
+  "source_release": "v0.2.2",
+  "source_repository": "basis-foundation/basis-schemas"
+}
