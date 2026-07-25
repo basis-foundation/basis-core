@@ -508,3 +508,194 @@ class TestFixtureInventory:
             assert isinstance(fixture, dict), (
                 f"Fixture {name!r} did not parse as a JSON object (dict)."
             )
+
+
+# ---------------------------------------------------------------------------
+# Post-operation-aware regression checkpoint (PR 39)
+# ---------------------------------------------------------------------------
+
+
+class TestV01ContractSnapshotsAfterOperationAwareAdditions:
+    """
+    Explicit "no drift" checkpoint for the v0.1.0 contract-snapshot surface,
+    added after Milestones 1-12 (the additive operation-aware model family)
+    landed on `main`.
+
+    This class does not test operation-aware behavior — that is covered by
+    `tests/operation_aware/test_contract_snapshots.py`, which documents its
+    own, deliberately separate fixture family (see that module's "Deliberately
+    separate from the v0.1.0 snapshot fixtures" docstring section). This
+    class exists solely to make the v0.1.0-versus-operation-aware boundary,
+    and the "nothing in this file has drifted" guarantee, an explicit and
+    independently re-checkable assertion rather than an implicit byproduct of
+    the per-scenario tests above happening to still pass.
+    """
+
+    def test_v01_contract_snapshot_inventory_is_complete_after_operation_aware_additions(
+        self,
+    ) -> None:
+        """
+        `tests/fixtures/contracts/` contains exactly the nine governed
+        v0.1.0 fixtures — the same set `TestFixtureInventory` above
+        protects — independent of anything added under
+        `tests/fixtures/contracts/operation_aware/` since Milestone 3.
+        """
+        actual = frozenset(fixture_names())
+        expected = TestFixtureInventory.EXPECTED_FIXTURES
+        assert actual == expected, (
+            "The v0.1.0 fixture inventory has changed since the operation-aware "
+            f"additions landed.\n  Added:   {actual - expected}\n"
+            f"  Removed: {expected - actual}"
+        )
+
+    def test_v01_contract_snapshots_remain_byte_for_byte_equivalent(self) -> None:
+        """
+        Every governed v0.1.0 model, freshly constructed from the same
+        deterministic values used by the per-scenario tests above, still
+        serializes to exactly its stored fixture — re-asserted in one
+        consolidated, explicitly-named checkpoint after Milestones 1-12.
+
+        This constructs each model directly from production code rather
+        than delegating to the test methods above, so it independently
+        re-detects any drift they would also catch, in a single place a
+        future reviewer can read as "the v0.1.0 regression gate".
+        """
+        checkpoint = {
+            "decision_request.allow": DecisionRequest(
+                request_id=_ALLOW_REQUEST_ID,
+                subject_id=_SUBJECT_ID,
+                subject_roles=["operator"],
+                subject_attrs={},
+                resource_id="hvac:zone-a",
+                action="write:hvac:setpoint",
+                context={},
+                timestamp=_TS,
+            ),
+            "decision_request.deny": DecisionRequest(
+                request_id=_DENY_REQUEST_ID,
+                subject_id=_SUBJECT_ID,
+                subject_roles=["viewer"],
+                subject_attrs={},
+                resource_id="hvac:zone-a",
+                action="write:hvac:setpoint",
+                context={},
+                timestamp=_TS,
+            ),
+            "decision_response.allow": DecisionResponse(
+                request_id=_ALLOW_REQUEST_ID,
+                outcome=DecisionOutcome.ALLOW,
+                reason="Subject holds a role permitted for 'write:hvac:setpoint'.",
+                evaluated_by="RolePolicyRule",
+                policy_version="v1.0.0",
+                failure_reason=None,
+                timestamp=_TS,
+            ),
+            "decision_response.deny": DecisionResponse(
+                request_id=_DENY_REQUEST_ID,
+                outcome=DecisionOutcome.DENY,
+                reason="Subject role 'viewer' is not permitted to perform 'write:hvac:setpoint'.",
+                evaluated_by="RolePolicyRule",
+                policy_version="v1.0.0",
+                failure_reason=None,
+                timestamp=_TS,
+            ),
+            "decision_response.fail_closed": DecisionResponse(
+                request_id=_DENY_REQUEST_ID,
+                outcome=DecisionOutcome.DENY,
+                reason="Policy evaluation failed due to an internal rule error. Access denied.",
+                evaluated_by="PolicyEngine",
+                policy_version="v1.0.0",
+                failure_reason=FailureReason.POLICY_ERROR,
+                timestamp=_TS,
+            ),
+            "audit_event.allow": AuditEvent(
+                event_id=_ALLOW_EVENT_ID,
+                event_type=AuditEventType.AUTHORIZATION_DECISION,
+                timestamp=_TS,
+                schema_version="1.1",
+                request_id=_ALLOW_REQUEST_ID,
+                decision_id=None,
+                correlation_id=None,
+                subject_id=_SUBJECT_ID,
+                subject_name=None,
+                subject_type="human",
+                subject_roles=["operator"],
+                action="write:hvac:setpoint",
+                resource_id="hvac:zone-a",
+                resource_type="hvac",
+                outcome=AuditOutcome.ALLOWED,
+                reason="Subject holds a role permitted for 'write:hvac:setpoint'.",
+                evaluated_by="RolePolicyRule",
+                policy_version="v1.0.0",
+                matched_rules=["RolePolicyRule"],
+                trace=_allow_trace(),
+                detail={},
+            ),
+            "audit_event.deny": AuditEvent(
+                event_id=_DENY_EVENT_ID,
+                event_type=AuditEventType.AUTHORIZATION_DECISION,
+                timestamp=_TS,
+                schema_version="1.1",
+                request_id=_DENY_REQUEST_ID,
+                decision_id=None,
+                correlation_id=None,
+                subject_id=_SUBJECT_ID,
+                subject_name=None,
+                subject_type="human",
+                subject_roles=["viewer"],
+                action="write:hvac:setpoint",
+                resource_id="hvac:zone-a",
+                resource_type="hvac",
+                outcome=AuditOutcome.DENIED,
+                reason="Subject role 'viewer' is not permitted to perform 'write:hvac:setpoint'.",
+                evaluated_by="RolePolicyRule",
+                policy_version="v1.0.0",
+                matched_rules=["RolePolicyRule"],
+                trace=_deny_trace(),
+                detail={},
+            ),
+            "evaluation_trace.allow": _allow_trace(),
+            "evaluation_trace.deny": _deny_trace(),
+        }
+
+        assert frozenset(checkpoint) == TestFixtureInventory.EXPECTED_FIXTURES, (
+            "This checkpoint's model table has drifted from the governed fixture "
+            "inventory; update both together."
+        )
+        for fixture_name, model in checkpoint.items():
+            assert_matches_fixture(
+                model,
+                fixture_name,
+                msg=(
+                    "Detected by the post-operation-aware regression checkpoint "
+                    "(PR 39) — see docs/breaking-change-discipline.md before "
+                    "updating this fixture."
+                ),
+            )
+
+    def test_operation_aware_fixtures_are_excluded_from_v01_snapshot_inventory(self) -> None:
+        """
+        `tests/fixtures/contracts/operation_aware/` exists and is non-empty
+        (Milestone 3+) but must never be swept into the v0.1.0 fixture
+        inventory `fixture_names()` returns, and must never be reachable
+        through v0.1.0's `load_fixture()` under its own stem.
+        """
+        import pytest
+
+        from tests.helpers.contracts import FIXTURES_DIR, load_fixture
+
+        oa_dir = FIXTURES_DIR / "operation_aware"
+        assert oa_dir.is_dir(), (
+            "expected the operation-aware fixture family to exist alongside v0.1.0"
+        )
+        oa_stems = frozenset(p.stem for p in oa_dir.glob("*.json"))
+        assert oa_stems, "operation-aware fixture family is unexpectedly empty"
+
+        v01_stems = frozenset(fixture_names())
+        assert oa_stems.isdisjoint(v01_stems), (
+            f"operation-aware fixtures leaked into the v0.1.0 inventory: {oa_stems & v01_stems}"
+        )
+
+        for stem in oa_stems:
+            with pytest.raises(FileNotFoundError):
+                load_fixture(stem)

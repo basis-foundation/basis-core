@@ -396,3 +396,131 @@ class TestDecisionModelsMutability:
         # Should not raise.
         resp.policy_version = "v2.0.0"
         assert resp.policy_version == "v2.0.0"
+
+
+# ---------------------------------------------------------------------------
+# Post-operation-aware regression checkpoint (PR 39)
+# ---------------------------------------------------------------------------
+
+
+class TestV01BackwardCompatibilitySurfaceRemainsUnchanged:
+    """
+    Explicit "no drift" checkpoint, added after Milestones 1-12 (the
+    additive operation-aware model family: `basis_core.decisions.operation_aware`,
+    `basis_core.policy.operation_aware`, `basis_core.audit.operation_aware`,
+    the operation-aware `basis_core.enforcement` additions, and the internal
+    `basis_core.evaluation` orchestration package) landed on `main`.
+
+    This class introduces no new v0.1.0 guarantee beyond what this module's
+    header docstring already documents (schema validity, model
+    deserialization, round-trip stability for the fixtures listed there). It
+    exists to make "the operation-aware additions did not change any of
+    this" an explicit, independently re-checkable assertion rather than an
+    implicit byproduct of the per-fixture tests above happening to still
+    pass. It does not test operation-aware behavior; that is out of scope
+    here (see `tests/operation_aware/`).
+    """
+
+    _V01_FIXTURE_NAMES = (
+        "decision_request.allow",
+        "decision_request.deny",
+        "decision_response.allow",
+        "decision_response.deny",
+        "decision_response.fail_closed",
+        "audit_event.allow",
+        "audit_event.deny",
+        "evaluation_trace.allow",
+        "evaluation_trace.deny",
+    )
+
+    def test_v01_fixture_inventory_matches_contract_snapshot_inventory(self) -> None:
+        """
+        The fixture set this module exercises must exactly match the fixture
+        set `test_contract_snapshots.py::TestFixtureInventory` protects.
+
+        The two modules test complementary directions ("old records still
+        load" vs. "new output still matches") over what must be the same
+        v0.1.0 surface. If the operation-aware expansion ever caused one
+        module's checklist to drift from the other's — a fixture added to
+        one but not the other — this is the first place it would surface.
+        """
+        from tests.helpers.contracts import fixture_names
+
+        assert frozenset(self._V01_FIXTURE_NAMES) == frozenset(fixture_names()), (
+            "test_backward_compatibility.py's governed fixture inventory has "
+            "diverged from the actual contents of tests/fixtures/contracts/."
+        )
+
+    def test_v01_fixture_field_sets_are_stable_within_each_model_family(self) -> None:
+        """
+        Every scenario fixture for the same model family exposes exactly the
+        same field names as every sibling scenario for that family (e.g.
+        decision_request.allow and decision_request.deny). If an
+        operation-aware change ever caused one scenario to silently gain or
+        lose a field relative to its siblings, this is where it would show
+        up, independent of whether EXPECTED_FIELDS assertions elsewhere
+        happen to catch it for any single scenario.
+        """
+        families = {
+            "decision_request": ("decision_request.allow", "decision_request.deny"),
+            "decision_response": (
+                "decision_response.allow",
+                "decision_response.deny",
+                "decision_response.fail_closed",
+            ),
+            "audit_event": ("audit_event.allow", "audit_event.deny"),
+            "evaluation_trace": ("evaluation_trace.allow", "evaluation_trace.deny"),
+        }
+        for family, names in families.items():
+            field_sets = {name: frozenset(load_fixture(name).keys()) for name in names}
+            distinct = set(field_sets.values())
+            assert len(distinct) == 1, (
+                f"Fixtures in the {family!r} family disagree on field names: {field_sets}"
+            )
+
+    def test_v01_nullable_fields_remain_present_and_null_not_omitted(self) -> None:
+        """
+        Optional/nullable v0.1.0 fields must serialize as explicit `null`,
+        never be omitted from the fixture entirely. A model change that
+        started excluding unset/None fields (e.g. an `exclude_none=True`
+        serialization default) would silently drop these keys instead of
+        nulling them — a breaking change for any consumer that depends on
+        key presence, per docs/breaking-change-discipline.md.
+        """
+        allow_event = load_fixture("audit_event.allow")
+        for field in ("decision_id", "correlation_id", "subject_name"):
+            assert field in allow_event, (
+                f"{field!r} must be present (as null) in audit_event.allow, not omitted"
+            )
+            assert allow_event[field] is None
+
+        deny_response = load_fixture("decision_response.deny")
+        assert "failure_reason" in deny_response, (
+            "'failure_reason' must be present (as null) in decision_response.deny, not omitted"
+        )
+        assert deny_response["failure_reason"] is None
+
+    def test_v01_fixtures_and_operation_aware_fixtures_are_disjoint_families(self) -> None:
+        """
+        `tests/fixtures/contracts/operation_aware/` exists (Milestone 3+)
+        alongside the v0.1.0 fixtures this module governs, but must never be
+        swept into this module's inventory. `load_fixture`/`fixture_names`
+        in `tests/helpers/contracts.py` resolve against
+        `tests/fixtures/contracts/` using a non-recursive glob, so the
+        nested `operation_aware/` subdirectory is never matched — this test
+        makes that boundary an explicit, durable assertion rather than an
+        accidental property of `Path.glob`'s default behavior.
+        """
+        from tests.helpers.contracts import FIXTURES_DIR, fixture_names
+
+        oa_dir = FIXTURES_DIR / "operation_aware"
+        assert oa_dir.is_dir(), (
+            "expected the operation-aware fixture family to exist alongside v0.1.0"
+        )
+        oa_names = frozenset(p.stem for p in oa_dir.glob("*.json"))
+        assert oa_names, "operation-aware fixture family is unexpectedly empty"
+
+        v01_names = frozenset(fixture_names())
+        assert oa_names.isdisjoint(v01_names), (
+            f"operation-aware fixtures leaked into the v0.1.0 inventory: {oa_names & v01_names}"
+        )
