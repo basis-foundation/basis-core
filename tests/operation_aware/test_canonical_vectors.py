@@ -40,9 +40,9 @@ rule-ID list, failure reason, bundle identity, or trace-evidence
 entry — every expected value below is loaded from a vendored fixture, never
 hand-authored. It does not load, construct, or assert against the
 gateway-only expected event fixture or its corresponding gateway-owned
-production type — that artifact sits outside this repository's kernel
-boundary, and documenting the exclusion explicitly is PR 38's dedicated
-scope, not this PR's.
+production type — see `_EXPECTED_KERNEL_ARTIFACTS`'s comment below
+("Gateway audit event exclusion (PR 38)") for the full statement of that
+boundary and why this suite does not cross it.
 
 Active snapshot
 ────────────────
@@ -146,9 +146,41 @@ CANONICAL_SCENARIOS: tuple[str, ...] = (
 )
 
 #: The five logical, kernel-owned artifacts every canonical scenario
-#: publishes. Deliberately excludes `expected_gateway_audit_event` — see
-#: this module's docstring, "Scope," and `GATEWAY_ONLY_SCENARIO_ARTIFACTS`
-#: in `tests.helpers.basis_schemas_snapshot`.
+#: publishes and this suite compares against.
+#:
+#: Gateway audit event exclusion (PR 38)
+#: ──────────────────────────────────────
+#: Every canonical scenario directory also vendors a sixth artifact,
+#: `expected-gateway-audit-event.yaml` (logical name
+#: `expected_gateway_audit_event`) — it belongs to the same complete
+#: canonical compatibility scenario the five artifacts above do; it is
+#: not a stray or optional file. `tests.helpers.basis_schemas_snapshot`'s
+#: `ALL_SCENARIO_ARTIFACTS` / `list_scenario_artifacts()` inventory it
+#: alongside the five kernel artifacts, and
+#: `tests/test_basis_schemas_snapshot.py` /
+#: `tests/operation_aware/test_compatibility_fixture_loading.py` already
+#: resolve and parse it as YAML — so the suite as a whole can recognize
+#: and load the complete cross-repository fixture set for each scenario.
+#:
+#: This module's own conformance suite (`TestCanonicalConformance` below)
+#: intentionally never loads, constructs, or asserts equality against
+#: that artifact, and never against any `GatewayAuditEvent` production
+#: type — no such type exists in `basis_core`. This is an architectural
+#: boundary, not a missing test (`basis-architecture` ADR-0003 §9 and
+#: §14; Section 3 of
+#: `docs/implementation/basis-core-v0.2-operation-aware-plan.md`):
+#: `basis-core`'s authorization kernel owns conformance for
+#: `OperationAwareDecisionResponse`, `EvaluationTrace`, and
+#: `AuditEvidence` only. `basis-gateway` owns creating `GatewayAuditEvent`
+#: by combining the kernel's `AuditEvidence` with gateway
+#: enforcement-boundary facts the kernel structurally cannot know — route
+#: information, token/authentication facts, gateway enforcement actions,
+#: HTTP status and the caller-facing response, gateway reason-code
+#: mapping, transport-boundary correlation behavior, and
+#: `GatewayAuditEvent` persistence/emission itself. See
+#: `GATEWAY_ONLY_SCENARIO_ARTIFACTS` in
+#: `tests.helpers.basis_schemas_snapshot` for the corresponding
+#: discovery-layer boundary.
 _EXPECTED_KERNEL_ARTIFACTS: frozenset[str] = frozenset(
     {
         "request",

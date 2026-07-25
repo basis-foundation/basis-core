@@ -2966,6 +2966,29 @@ vectors do, per Section 10's phase table, so this milestone is fully
 unblocked regardless of Milestone 7's status).
 
 **PR 38 — Document gateway-audit-event exclusion.**
+**Status: complete at the implementation level, pending review/merge**
+(`docs/gateway-audit-event-conformance-boundary`). Consolidated the
+scattered partial mentions of the gateway-audit-event exclusion in
+`tests/operation_aware/test_canonical_vectors.py` into one explicit
+clarification, placed on `_EXPECTED_KERNEL_ARTIFACTS` — the fixture
+inventory a future contributor is most likely to read alongside the
+loading logic — stating that `expected-gateway-audit-event.yaml` belongs
+to each complete canonical scenario and is already loaded/inventoried
+elsewhere in the suite (`tests/test_basis_schemas_snapshot.py`,
+`tests/operation_aware/test_compatibility_fixture_loading.py`) for
+completeness, but is intentionally never asserted against by this
+repository's kernel conformance suite: `basis-core` owns conformance for
+`OperationAwareDecisionResponse`, `EvaluationTrace`, and `AuditEvidence`
+only, while `basis-gateway` owns assembling `GatewayAuditEvent` from
+kernel-produced `AuditEvidence` plus gateway enforcement-boundary facts
+(ADR-0003 §9, §14). The module's top-of-file docstring was updated to
+point at that clarification instead of forward-referencing this PR. No
+production code, fixture, or test assertion changed. The focused
+canonical-vector run (16/16), the full `tests/operation_aware` suite
+(3098 passed, 86 pre-existing unrelated skips), and the full repository
+suite (3930 passed, 86 skipped) all pass; `ruff check`, `ruff format
+--check` (on the touched files), `mypy --strict`, and `git diff --check`
+all pass clean.
 Objective: a short, explicit docstring/comment in PR 37's test module (and a
 cross-reference in this plan, already present in Section 3) stating that
 `expected-gateway-audit-event.yaml` is loaded for completeness but never
