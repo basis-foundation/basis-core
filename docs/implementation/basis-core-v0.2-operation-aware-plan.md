@@ -3006,6 +3006,59 @@ Blocked by architecture decision: no.
 ### Milestone 13 — Regression and backward compatibility
 
 **PR 39 — v0.1 regression fixture pass.**
+**Status: complete at the implementation level, pending review/merge**
+(`test/v01-regression-fixture-pass`). Extended both existing compatibility
+modules with an explicit, independently re-checkable "no drift after the
+operation-aware additions" checkpoint, rather than relying on the
+per-scenario tests above happening to still pass as implicit proof.
+`tests/test_backward_compatibility.py` gained
+`TestV01BackwardCompatibilitySurfaceRemainsUnchanged`, asserting: this
+module's nine-fixture inventory (`decision_request.{allow,deny}`,
+`decision_response.{allow,deny,fail_closed}`, `audit_event.{allow,deny}`,
+`evaluation_trace.{allow,deny}`) exactly matches
+`test_contract_snapshots.py::TestFixtureInventory.EXPECTED_FIXTURES`; every
+scenario fixture within a model family (e.g. `decision_request.allow` vs.
+`.deny`) shares an identical field-name set with its siblings; the nullable
+`AuditEvent` fields (`decision_id`, `correlation_id`, `subject_name`) and
+`DecisionResponse.failure_reason` remain present as explicit `null` rather
+than omitted; and `tests/fixtures/contracts/operation_aware/` is disjoint
+from this module's fixture inventory. `tests/test_contract_snapshots.py`
+gained `TestV01ContractSnapshotsAfterOperationAwareAdditions`, asserting:
+the same nine-fixture inventory is complete after Milestones 1-12; every
+governed v0.1.0 model, freshly constructed from the same deterministic
+values used by the per-scenario tests above, still serializes
+byte-for-byte to its stored fixture (one consolidated checkpoint, built
+directly from production model code, independent of the per-scenario
+tests); and the operation-aware fixture family is both absent from
+`fixture_names()` and unreachable through `load_fixture()` under its own
+stem (asserted via `pytest.raises(FileNotFoundError)`), proving the
+`operation_aware/` subdirectory's exclusion is a durable, tested property
+rather than an accidental byproduct of `Path.glob`'s non-recursive default.
+No new v0.1.0 guarantee was invented beyond what each module's existing
+header docstring already documents; no `src/`, fixture, snapshot, or
+operation-aware test file was touched.
+
+Baseline (pre-edit) full-suite run confirmed zero pre-existing drift:
+3930 passed, 86 skipped — identical to PR 38's reported baseline. After
+these additions: the focused run
+(`test_backward_compatibility.py`+`test_contract_snapshots.py`) is 64/64
+passed (55 pre-existing + 9 new); the inspected v0.1.0 regression suites
+(`test_models.py`, `test_policy_engine.py`, `test_enforcement_point.py`,
+`test_extension_contracts.py`, `test_evaluation_semantics.py`,
+`test_public_api.py`, `test_schema_validation.py`, `test_audit.py`,
+`test_policy_rules.py`) are 528/528 passed; the full `tests/operation_aware`
+suite is 3098 passed, 86 skipped (unchanged); and the full repository suite
+is 3937 passed, 86 skipped — exactly baseline plus the 7 new tests, with no
+skip-count change. `ruff check .` and `ruff format --check src tests` both
+pass clean; `mypy --cache-dir=<fresh> src` is `Success: no issues found in
+44 source files` (an initially-reused, stale prior-session mypy cache
+produced an unrelated internal error — resolved by pointing at a fresh
+cache directory, confirming the failure was environmental, not a
+regression); `git diff --check` passes clean. The only files touched are
+`tests/test_backward_compatibility.py`, `tests/test_contract_snapshots.py`,
+and this roadmap document — no production `src`, fixture, snapshot,
+operation-aware test, or public API changed. No v0.1.0 drift was
+discovered; this PR's checkpoint is a proof of continuity, not a repair.
 Objective: extend `test_backward_compatibility.py` and
 `test_contract_snapshots.py` with an explicit "no drift after operation-aware
 additions" checkpoint — re-running every existing v0.1.0 fixture and
