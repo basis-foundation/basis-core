@@ -131,3 +131,95 @@ class TestCrossReferences:
             "docs/schema-versioning.md must reference docs/breaking-change-discipline.md. "
             "Add the cross-reference to the Cross-references paragraph at the top."
         )
+
+
+class TestOperationAwareGovernance:
+    """
+    The operation-aware (v0.2.0) surfaces must be explicitly named as
+    governed compatibility surfaces in the two governance documents, and the
+    gateway-audit-event boundary (basis-core does not own GatewayAuditEvent)
+    must be preserved in both.
+
+    Like the rest of this module, these are structural tests: stable
+    section-heading and required-term checks, not content or prose checks.
+    A failing test here means an operation-aware governance cross-reference
+    or boundary statement was accidentally removed or reworded away from its
+    load-bearing meaning.
+    """
+
+    def test_breaking_change_discipline_has_operation_aware_section(self) -> None:
+        content = _read("docs/breaking-change-discipline.md")
+        assert "## Operation-Aware Governed Surfaces (v0.2.0)" in content, (
+            "docs/breaking-change-discipline.md is missing the "
+            "'## Operation-Aware Governed Surfaces (v0.2.0)' section."
+        )
+
+    def test_breaking_change_discipline_classifies_fourteen_upstream_contracts(self) -> None:
+        content = _read("docs/breaking-change-discipline.md")
+        assert "### Classification of the fourteen upstream contract surfaces" in content, (
+            "docs/breaking-change-discipline.md is missing the upstream contract "
+            "classification subsection."
+        )
+        for contract in ("contract-metadata", "gateway-audit-event"):
+            assert contract in content, (
+                f"docs/breaking-change-discipline.md must classify the '{contract}' "
+                "upstream contract explicitly."
+            )
+
+    def test_breaking_change_discipline_preserves_gateway_boundary(self) -> None:
+        content = _read("docs/breaking-change-discipline.md")
+        assert "GatewayAuditEvent" in content, (
+            "docs/breaking-change-discipline.md must discuss GatewayAuditEvent's "
+            "ownership boundary."
+        )
+        assert "is not implemented in `basis-core`" in content, (
+            "docs/breaking-change-discipline.md must state that GatewayAuditEvent "
+            "is not implemented in basis-core — do not describe it as kernel-produced."
+        )
+
+    def test_breaking_change_discipline_cross_references_operation_aware_docs(self) -> None:
+        content = _read("docs/breaking-change-discipline.md")
+        for doc in ("operation-aware-model.md", "operation-aware-evaluation-semantics.md"):
+            assert doc in content, (
+                f"docs/breaking-change-discipline.md must cross-reference docs/{doc}."
+            )
+
+    def test_schema_versioning_has_operation_aware_section(self) -> None:
+        content = _read("docs/schema-versioning.md")
+        assert "## Operation-Aware Contract Families (v0.2.0)" in content, (
+            "docs/schema-versioning.md is missing the "
+            "'## Operation-Aware Contract Families (v0.2.0)' section."
+        )
+
+    def test_schema_versioning_distinguishes_snapshot_from_package_version(self) -> None:
+        content = _read("docs/schema-versioning.md")
+        assert "### Upstream snapshot version versus runtime version" in content, (
+            "docs/schema-versioning.md is missing the section distinguishing the "
+            "vendored basis-schemas snapshot version from the basis-core package version."
+        )
+        assert "basis-core` package version" in content, (
+            "docs/schema-versioning.md must explicitly name the basis-core package "
+            "version as a distinct version domain from the vendored schema snapshot."
+        )
+
+    def test_schema_versioning_addresses_required_nullable_fields(self) -> None:
+        content = _read("docs/schema-versioning.md")
+        assert "### Required-Nullable Fields" in content, (
+            "docs/schema-versioning.md is missing the 'Required-Nullable Fields' "
+            "section for the operation-aware response/trace/audit-evidence models."
+        )
+
+    def test_schema_versioning_preserves_gateway_boundary(self) -> None:
+        content = _read("docs/schema-versioning.md")
+        assert "### Gateway Audit Event Boundary" in content, (
+            "docs/schema-versioning.md is missing the 'Gateway Audit Event Boundary' section."
+        )
+        assert "not a `basis-core` runtime schema" in content, (
+            "docs/schema-versioning.md must state GatewayAuditEvent is not a basis-core "
+            "runtime schema — do not list it as a kernel-produced schema."
+        )
+
+    def test_schema_versioning_cross_references_operation_aware_docs(self) -> None:
+        content = _read("docs/schema-versioning.md")
+        for doc in ("operation-aware-model.md", "operation-aware-evaluation-semantics.md"):
+            assert doc in content, f"docs/schema-versioning.md must cross-reference docs/{doc}."
