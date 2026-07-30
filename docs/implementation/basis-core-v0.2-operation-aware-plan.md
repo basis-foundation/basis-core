@@ -3225,6 +3225,95 @@ Blocked by architecture decision: no.
 ### Milestone 14 — Documentation, hardening, and release readiness
 
 **PR 41 — Operation-aware model and evaluation-semantics documentation.**
+**Status: complete at the implementation level, pending review/merge**
+(`docs/operation-aware-model-semantics`). Delivers exactly the two roadmap-
+specified documents and the `README.md` index update — no third document
+was added; `docs/operation-aware-policy-model.md` (floated as a possible
+companion in Section 14) was folded into `docs/operation-aware-model.md`'s
+own Section 4, per this PR's own "default to the two roadmap-specified
+documents" instruction, since nothing in the current repository or roadmap
+had already established the third document as an expected PR 41
+deliverable.
+
+`docs/operation-aware-model.md` was written after direct inspection of
+every merged operation-aware module (`domain/`, `decisions/
+operation_aware.py`, all nine `policy/operation_aware/*.py` modules, all
+three `audit/operation_aware/*.py` modules, all four `evaluation/
+operation_aware/*.py` modules, `enforcement/operation_aware.py`) and every
+package `__init__.py`'s `__all__` — not from the roadmap's historical
+sketches. It mirrors `docs/core-domain.md`'s prose-first style and covers:
+overview/coexistence with v0.1; a model map by family (request vocabulary,
+policy data model, trace/audit evidence, enforcement result); request
+context categories; the policy bundle model, including the explicit
+exact-match-only scope-matching limitation; public-versus-internal
+symbols (cross-checked against `docs/public-api.md`'s "Operation-aware
+public API (v0.2.0)" section); a minimal, executed usage example; a
+v0.1 compatibility table; kernel boundary non-goals; and an adoption
+(not migration) section.
+
+`docs/operation-aware-evaluation-semantics.md` is the implementation-level
+companion to `basis-architecture` ADR-0002 (evaluation semantics) and
+ADR-0003 (trace/audit evidence), both read in full from the local
+`basis-architecture` checkout, plus ADR-0006 (evaluation orchestration)
+for the `policy`/`evaluation`/`enforcement` layer-ownership split. It
+documents the actual merged pipeline as implemented in `engine.py`
+(nine engine-owned stages) plus the two enforcement-owned stages
+(response assembly, `AuditEvidence` assembly) and disposition mapping —
+not the roadmap's historical sixteen-stage sketch verbatim. It documents
+the real ten-operator condition registry (`SUPPORTED_OPERATORS`), the
+exact four reason codes `aggregate_policy_outcome` currently constructs
+(verified by `grep -rn 'ReasonCode("' src/`), and which three of the six
+`OperationAwareFailureReason` members are currently reachable through
+this evaluator (`policy_validation_failure`, `condition_evaluation_error`,
+`internal_evaluation_error`) versus which three are defined in the
+vocabulary but not currently constructed anywhere in the merged kernel
+(`invalid_request`, `unsupported_schema_version`, `invalid_policy_bundle`
+— each a request-shape/structural concern resolved upstream of this
+evaluator's typed entry point). It documents the governed rule-evidence
+rationale projection, bundle-identity preservation on the not-applicable
+and typed-semantic-validation-failure paths, the narrow four-clause
+response/trace agreement subset `OperationAwareDecisionResponse` actually
+enforces (versus the four clauses deliberately left to a later PR), and
+the canonical-conformance/gateway-audit-event-exclusion boundary already
+established by PR 38.
+
+The minimal usage example in `docs/operation-aware-model.md` Section 6 was
+executed against this checkout as a temporary script
+(`PYTHONPATH=src`, the repository's existing venv-under-`/tmp` workaround
+for this sandbox's `/sessions` disk-space constraint) before being copied
+into the document verbatim; the temporary script was deleted after the
+run. It constructs a minimal `OperationAwareDecisionRequest`, a minimal
+`PolicyBundle` with one allow rule, an `OperationAwareEnforcementPoint`,
+and asserts `disposition=allow`, `response.outcome=allow`,
+`response.trace_id="trace-0001"`, and
+`audit_evidence.matched_rule_ids=["allow-operator-hvac-write"]` — all
+confirmed to hold.
+
+`tests/test_governance_docs.py` and `tests/test_readiness.py` were
+inspected and left unmodified. Neither test's existing pattern naturally
+extends to the two new documents: `test_governance_docs.py`'s
+`TestCrossReferences` class asserts that specific existing governance
+documents (`kernel-constitution.md`, `public-api.md`,
+`compatibility-testing.md`, `schema-versioning.md`) reference
+`breaking-change-discipline.md` — a different cross-reference relationship
+than "the new docs exist and are indexed," which this PR instead verifies
+manually via the `README.md` diff. `test_readiness.py` is a packaging/
+import smoke-test suite unrelated to documentation content. No brittle new
+test was written to assert exact prose.
+
+Validation: focused `tests/test_governance_docs.py tests/test_readiness.py`
+is 27/27 passed. `tests/operation_aware` is 3098 passed, 86 skipped
+(unchanged from PR 40's reported baseline). The full repository suite is
+3944 passed, 86 skipped (unchanged from PR 40's reported baseline — this
+PR adds no test and changes no runtime behavior). `ruff check .` passes
+clean. `ruff format --check src tests` reports 111 files already
+formatted, clean. `mypy --cache-dir=/dev/null src`: `Success: no issues
+found in 44 source files`. `git diff --check` passes clean. Files touched:
+`docs/operation-aware-model.md` (new), `docs/operation-aware-evaluation-
+semantics.md` (new), `README.md` (documentation-index update only), and
+this roadmap document's own status note. No `src/`, fixture, snapshot,
+public API, dependency, or runtime-behavior change.
+
 Objective: `docs/operation-aware-model.md` (public overview, mirroring
 `docs/core-domain.md`'s style) and `docs/operation-aware-evaluation-semantics.md`
 (implementation-level mirror of ADR-0002, in this repository's own

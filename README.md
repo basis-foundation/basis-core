@@ -85,6 +85,8 @@ Key documents in `docs/`:
 - [`docs/kernel-constitution.md`](docs/kernel-constitution.md) — non-negotiable kernel invariants
 - [`docs/breaking-change-discipline.md`](docs/breaking-change-discipline.md) — governance process for public contract changes
 - [`docs/implementation/basis-core-v0.2-operation-aware-plan.md`](docs/implementation/basis-core-v0.2-operation-aware-plan.md) — planning-only roadmap for the v0.2.0 operation-aware authorization expansion
+- [`docs/operation-aware-model.md`](docs/operation-aware-model.md) — public overview of the operation-aware model: request/policy/trace/audit-evidence families, public vs. internal surface, a minimal usage example
+- [`docs/operation-aware-evaluation-semantics.md`](docs/operation-aware-evaluation-semantics.md) — implementation-level companion to `basis-architecture`'s operation-aware evaluation semantics: pipeline stages, aggregation, failure handling, trace provenance
 - [`docs/compatibility-testing.md`](docs/compatibility-testing.md) — backward-compatibility/contract-snapshot harness, including the vendored `basis-schemas` v0.2.0 fixture snapshot used by future operation-aware test work
 
 ## Development
