@@ -3077,6 +3077,109 @@ Blocked by architecture decision: no.
 
 **PR 40 — Import-boundary and kernel-constitution regression tests for new
 subpackages.**
+**Status: complete at the implementation level, pending review/merge**
+(`test/operation-aware-boundary-regression`). Confirmed by direct inventory
+that all three recursive `operation_aware/` guards named below already
+existed and needed no change: `test_policy_operation_aware_does_not_import_
+a_forbidden_layer` (policy), `test_audit_operation_aware_does_not_import_
+from_policy_enforcement_or_adapters` (audit), and
+`test_evaluation_operation_aware_does_not_import_from_adapters_or_
+enforcement` (evaluation) all still pass unmodified and still cover every
+current module under their respective `operation_aware/` subtree (`aggregation.py`,
+`applicability.py`, `bundle.py`, `condition.py`, `condition_eval.py`,
+`operators.py`, `rule.py`, `selector.py`, `validation.py` for policy;
+`audit_evidence.py`, `evaluation_trace.py`, `trace_rule_evidence.py` for
+audit; `engine.py`, `response.py`, `response_assembly.py`, `trace_assembly.py`
+for evaluation — plus `enforcement/operation_aware.py`, `domain/
+operation_aware.py`, `domain/operation_aware_vocabulary.py`, and `decisions/
+operation_aware.py`, all inspected directly).
+
+Direct inventory (`ast`-based, not filenames/test-names from the roadmap)
+also found three real gaps in the *existing* permission-matrix coverage —
+none involving operation-aware modules, all pre-dating this PR and none a
+regression it introduces — and closed each with a new, narrowly-scoped test
+rather than duplicating or weakening anything already passing:
+`decisions/` had no test at all for the policy/audit/evaluation/adapters
+edges of its own permission-matrix row (only the enforcement/ edge was
+previously covered); the non-recursive legacy `policy/` subtree
+(`engine.py`, `rules.py`, `__init__.py`) had no test for the evaluation/
+edge (audit/enforcement/adapters were already covered); the non-recursive
+legacy `audit/` subtree (`events.py`, `trace.py`, `writer.py`, `__init__.py`)
+had no test for the evaluation/ edge (policy/enforcement/adapters were
+already covered). `docs/import-boundaries.md` line 107's statement that "a
+matching recursive guard for `policy/operation_aware/` does not yet exist"
+was itself stale — the guard has existed since PR 27/Milestone 9, exactly
+as this roadmap document's own PR 40 entry below already states. This was
+first reported without editing the document, per this PR's own
+non-goals; a follow-up amendment then corrected exactly that one sentence
+in `docs/import-boundaries.md` (replacing "does not yet exist" wording
+with a statement of the guard's actual current existence, naming
+`test_policy_operation_aware_does_not_import_a_forbidden_layer`
+explicitly) — a factual status correction, not a new architectural
+decision. The surrounding architectural rule, the permission matrix, and
+every other sentence in that document are unchanged; no allowed
+dependency was added or removed.
+
+Four new whole-tree tests were added beyond the three gap-closing tests:
+`test_every_kernel_module_is_classified_by_a_boundary_rule` (inventory
+completeness — every `.py` module under `src/basis_core/` must resolve to a
+known classification bucket, including `src/basis_core/__init__.py` itself
+as `"package_root"`; fails loudly, without a hard-coded module count, if a
+future module lands under an unclassified top-level package);
+`test_lower_kernel_layers_never_import_enforcement` (one consolidated
+whole-tree sweep proving Invariant 10 for every file outside
+`enforcement/`, not just the packages the narrower pairwise tests already
+cover); `test_kernel_does_not_import_higher_level_basis_components` (a new
+whole-tree sweep for `basis_gateway`/`basis_console`/`basis_identity`/
+`basis_deploy` — previously checked only per-module in
+`tests/operation_aware/test_vocabulary_boundaries.py` and
+`test_context_boundaries.py`, never across the whole tree); and
+`test_operation_aware_import_graph_preserves_kernel_constitution` (the
+required kernel-constitution cross-check — maps each of the ten invariants
+to the test(s) that statically enforce it, states plainly which invariants
+are behavioral and therefore out of this file's reach, and performs one new
+direct assertion of its own: the `pyproject.toml` runtime `dependencies`
+block contains only `pydantic` and no `basis-schemas`/`basis_gateway`/
+`basis_identity`/`basis_console` entry, per Invariant 9/Invariant 1).
+
+Relative-import resolution: no change to `collect_imports()`'s AST
+methodology was needed — every current kernel module uses absolute
+`basis_core.` imports (`ast.ImportFrom.module`), not `from ...audit import
+X`-style relative imports, so the existing `node.module`-based collection
+already resolves every case actually present in the tree; this was verified
+by direct inspection of every import statement in `src/basis_core/`
+(recorded via a one-off AST dump during PR 40 inspection, not committed),
+not assumed from the roadmap's example syntax.
+
+No boundary violation, undocumented dependency edge, or drift was
+discovered anywhere in `src/`. Validation: focused
+`tests/test_import_boundaries.py` is 25/25 passed (18 pre-existing + 7 new:
+the 3 gap-closers plus `test_every_kernel_module_is_classified_by_a_
+boundary_rule`, `test_lower_kernel_layers_never_import_enforcement`,
+`test_kernel_does_not_import_higher_level_basis_components`, and
+`test_operation_aware_import_graph_preserves_kernel_constitution`); related
+governance tests (`test_models.py`, `test_public_api.py`,
+`test_extension_contracts.py`, `test_governance_docs.py`,
+`test_readiness.py`) are 289/289 passed; `tests/operation_aware` is 3098
+passed, 86 skipped (unchanged from PR 39's reported baseline); the full
+repository suite is 3944 passed, 86 skipped (PR 39's reported baseline of
+3937 passed, 86 skipped, plus exactly these 7 new tests, no skip-count
+change). `ruff check .` and `ruff format --check src tests` both pass clean (after
+`ruff format` auto-wrapped three over-length lines in the new code — no
+logic changed by that reformat). `mypy --cache-dir=<initial> src` reproduced
+the same environmental internal error PR 39 already reported
+(`sqlite3.OperationalError: disk I/O error`, from the `/sessions` mount
+being at 100% capacity — unrelated to this PR's diff); a fresh cache
+directory reproduced the identical error for the same underlying reason, so
+`--cache-dir=/dev/null` (bypassing the sqlite cache file entirely) was used
+for the clean, definitive run: `Success: no issues found in 44 source
+files`. `git diff --check` passes clean. Three files are touched in total:
+`tests/test_import_boundaries.py` (the new tests), `docs/import-
+boundaries.md` (the one-sentence factual status correction described
+above — no rule, matrix, or permission change), and this roadmap
+document's status note. No production `src/`, fixture, snapshot, public
+API, or `docs/kernel-constitution.md` change.
+
 Objective: extend `test_import_boundaries.py` to statically verify every new
 `operation_aware/` module obeys the same layering rules as its
 non-operation-aware sibling package (Section 5's dependency-graph diagram),
