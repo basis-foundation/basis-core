@@ -3332,6 +3332,97 @@ Compatibility risk: none.
 Blocked by architecture decision: no.
 
 **PR 42 — Governance doc cross-references.**
+**Status: complete at the implementation level, pending review/merge**
+(`docs/operation-aware-governance-cross-references`). Extends
+`docs/breaking-change-discipline.md` with a new "Operation-Aware Governed
+Surfaces (v0.2.0)" section (shared vocabulary/evidence references,
+request/context models, structured policy data model, trace/evidence
+artifacts, response/enforcement surface, canonical scenarios, the
+fourteen-upstream-contract classification, and a required-review-path
+subsection), plus operation-aware examples appended to the existing
+"Breaking changes" and "Additive changes" sections, two new rows in the
+"Signals that a breaking change occurred" table, and cross-references to
+`docs/operation-aware-model.md`/`docs/operation-aware-evaluation-semantics.md`
+added to the top-of-document cross-reference paragraph and the closing
+"Relationship to other documents" table. Extends `docs/schema-versioning.md`
+with a new "Operation-Aware Contract Families (v0.2.0)" section covering:
+the governed serialized families mapped to actual current models; a table
+of which models carry an explicit `schema_version` field (only
+`PolicyBundle`, required, `MAJOR.MINOR.PATCH`; and `AuditEvidence`, defaults
+to `AUDIT_EVIDENCE_SCHEMA_VERSION = "0.1.0"` — every other operation-aware
+model relies on model/package compatibility, not an instance-level version
+field); the five distinct version domains (vendored `basis-schemas`
+snapshot, per-contract YAML version, model-level `schema_version`,
+`basis-core` package version, v0.1 `AuditEvent.schema_version`) and
+confirmation that vendoring `basis-schemas` v0.2.2 changed none of the
+other four; vendored-snapshot governance (cross-referencing
+`docs/compatibility-testing.md` rather than duplicating it); additive/
+breaking shape-change rules applied to the operation-aware models; a
+Required-Nullable Fields section (the `outcome`/`failure_reason` pair and
+the governed rationale-projection rule on `TraceRuleEvidence`); a closed-
+vs-open-vocabulary inventory (eleven closed enums confirmed directly
+against `(str, Enum)` class definitions in the merged source, plus six open
+validated-format fields confirmed against their `field_validator`
+implementations); a Semantic-Versioning-and-Package-Release note stating
+this PR performs no version bump (PR 44 owns that) and writes no release
+notes; and a Gateway Audit Event Boundary section restating that
+`GatewayAuditEvent` is not a `basis-core` runtime schema.
+
+Both new sections were written after direct inspection of the merged
+operation-aware source (`domain/operation_aware_vocabulary.py`,
+`domain/operation_aware.py`, `domain/evidence.py`,
+`decisions/operation_aware.py`, all `policy/operation_aware/*.py` modules,
+all `audit/operation_aware/*.py` modules,
+`evaluation/operation_aware/response.py`,
+`enforcement/operation_aware.py`, and every package `__init__.py`'s
+`__all__`) plus the two PR 41 documents
+(`docs/operation-aware-model.md`, `docs/operation-aware-evaluation-semantics.md`)
+and `docs/extension-contracts.md`'s "Operation-aware policy is structured
+data" section and `docs/import-boundaries.md` — not from this roadmap
+document's own historical field/enum sketches, per this PR's own
+instruction to confirm current behavior against code rather than copying
+historical descriptions. No discrepancy between the roadmap's historical
+description and the merged implementation was found that required
+reporting as a stop-and-report conflict; the vendored-snapshot pointer
+(`v0.2.2`, not this roadmap document's original `v0.2.0` framing) was the
+one place current state had already moved past an earlier section of this
+document, and the new governance sections were written against the current
+`v0.2.2` state, cross-referencing `docs/compatibility-testing.md` as the
+owning document for the snapshot-history narrative rather than duplicating
+it here.
+
+`tests/test_governance_docs.py` was extended: the existing structural,
+substring/heading-assertion methodology (no full-document snapshotting, no
+exact-paragraph assertions) naturally extended to operation-aware coverage,
+so a new `TestOperationAwareGovernance` class was added with nine tests
+asserting, per document: the new section headings exist; the
+fourteen-upstream-contract classification subsection exists and names
+`contract-metadata` and `gateway-audit-event` explicitly; the
+`GatewayAuditEvent`-is-not-kernel-produced boundary statement is present in
+both documents (exact-phrase assertions, matched against the phrasing
+actually written into each document); and both documents cross-reference
+`docs/operation-aware-model.md`/`docs/operation-aware-evaluation-semantics.md`.
+
+Validation: focused `tests/test_governance_docs.py` is 23/23 passed (14
+pre-existing + 9 new). Focused
+`tests/test_public_api.py tests/test_backward_compatibility.py
+tests/test_contract_snapshots.py tests/test_schema_versioning.py` is
+222/222 passed. `tests/operation_aware` is 3098 passed, 86 skipped
+(unchanged from PR 41's reported baseline — this PR adds no operation-aware
+test and changes no runtime behavior). The full repository suite is 3953
+passed, 86 skipped (PR 41's reported baseline of 3944 passed, plus exactly
+the 9 new governance tests this PR adds — no other test count changed).
+`ruff check .` passes clean. `ruff format --check src tests` reports 111
+files formatted, clean (one formatting pass was applied to the new test
+class before this state). `mypy --cache-dir=/dev/null src`: `Success: no
+issues found in 44 source files`. `git diff --check` passes clean. Files
+touched: `docs/breaking-change-discipline.md`, `docs/schema-versioning.md`,
+`tests/test_governance_docs.py`, and this roadmap document's own status
+note. No `src/`, fixture, snapshot, public API, dependency, or
+runtime-behavior change — confirmed by `git diff --name-only -- src` and
+`git diff --name-only -- tests/fixtures` both returning empty, and
+`git diff -- pyproject.toml src/basis_core/__init__.py` returning empty.
+
 Objective: add the fourteen new operation-aware contract surfaces to the
 governed-surfaces table in `docs/breaking-change-discipline.md` and the
 schema-versioning discussion in `docs/schema-versioning.md`, so future
