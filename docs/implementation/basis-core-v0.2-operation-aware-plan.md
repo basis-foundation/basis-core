@@ -3536,13 +3536,133 @@ Blocked by architecture decision: no, unless the readiness review itself
 surfaces one — in which case that decision blocks PR 44, not this PR.
 
 **PR 44 — Version bump and release preparation.**
+**Status: complete at the implementation level, pending review/merge**
+(branch `release/v0.2.0`, based on `main` tip `65f6e51`, "docs: review
+basis-core v0.2 release readiness (#68)", PR 43). Bumps `pyproject.toml`'s
+`version` and `src/basis_core/__init__.py`'s `__version__` from `0.1.0` to
+`0.2.0` — confirmed to agree with each other, both by direct inspection and
+by this PR's own new readiness tests and explicit version-synchronization
+script.
+
+One correction to this roadmap's own prior assumption: `CHANGELOG.md`
+already existed on `main` (committed at `b3cd69e`, PR 28), contrary to PR
+43's readiness review, which stated no changelog existed. In practice the
+file had an `## [Unreleased]` section covering only the earliest
+operation-aware work (roadmap PRs 3–7) and had been abandoned since —
+36 subsequent roadmap PRs added no changelog entry. Per this PR's own
+instruction to establish "a concise changelog beginning with v0.2.0" rather
+than a granular per-PR narrative, this PR replaces the stale `Unreleased`
+section with a concise `## [0.2.0]` section (Added / Compatibility /
+Architecture and boundaries / Validation, matching this PR's own required
+structure) and leaves the existing, accurate `## [0.1.0] - 2026-05-27`
+section unchanged. `README.md`'s documentation index gains one line linking
+`CHANGELOG.md`. `docs/public-api.md`'s operation-aware section header
+sentence ("stabilized on `main` for the forthcoming v0.2.0 release") is
+corrected to state the release has occurred, since "forthcoming" became
+inaccurate the moment this PR's version bump landed — the only
+release-facing current-version correction this PR's repository-wide audit
+found necessary; every other `0.1.0`/`0.2.0` match (historical readiness
+reviews, the `v0.1.0` `PolicyRule` naming-collision note, ADR-0006's title,
+the vendored `basis-schemas` `v0.2.0`/`v0.2.1`/`v0.2.2` snapshot fixtures,
+and this roadmap's own historical PR entries) is contract-specific or
+historical and was left unchanged.
+
+`tests/test_readiness.py` gains a fourth section, `TestV020ReleaseState`
+(11 tests): `pyproject.toml` declares `0.2.0`; `basis_core.__version__` is
+`0.2.0`; the two agree; both are valid `MAJOR.MINOR.PATCH` semantic
+versions; `docs/v0.2-readiness-review.md` exists and still recommends
+proceeding; `CHANGELOG.md` exists, has a `## [0.2.0]` heading, does not
+describe `GatewayAuditEvent` as kernel-produced, and does not imply
+`basis-schemas` is a runtime dependency. A `_pyproject_version()` helper
+prefers stdlib `tomllib` (Python 3.11+) and falls back to the existing
+source-line match on Python 3.10 (this project's floor), per this PR's own
+"prefer `tomllib` when supported" instruction. No existing readiness test
+was rewritten or weakened.
+
+Validation (this PR's own run, not copied from PR 43): focused
+`tests/test_readiness.py tests/test_governance_docs.py` is 47/47 passed
+(36 pre-existing plus 11 new). Focused `tests/test_public_api.py
+tests/test_backward_compatibility.py tests/test_contract_snapshots.py
+tests/test_schema_versioning.py tests/test_import_boundaries.py` is
+247/247 passed, unchanged. `tests/operation_aware/test_canonical_vectors.py`
+is 16/16 passed. `tests/operation_aware` is 3098 passed, 86 skipped,
+unchanged. The full repository suite is 3964 passed, 86 skipped (PR 43's
+3953 baseline plus this PR's 11 new tests). `ruff check .` passes clean.
+`ruff format --check src tests` reports 111 files already formatted, clean.
+`mypy --cache-dir=/dev/null src`: `Success: no issues found in 44 source
+files`. `git diff --check` passes clean. The explicit version-synchronization
+script (`tomllib`-via-backport in this session's Python 3.10 environment)
+confirms `pyproject.toml` and `basis_core.__version__` both report `0.2.0`.
+
+**Amendment:** packaging-artifact validation, initially reported incomplete
+(no `build`/`hatchling` available offline in the session's default
+environment), was subsequently completed in an isolated, network-enabled
+build environment (`python3 -m venv` plus `pip install build`, per this
+PR's own amendment instructions — `build`/`hatchling` were installed only
+into that throwaway venv, never added to `pyproject.toml`). `python -m
+build` produced `basis_core-0.2.0-py3-none-any.whl` and
+`basis_core-0.2.0.tar.gz` from a clean `dist/`. Both artifacts' metadata
+(`METADATA` in the wheel, `PKG-INFO` in the sdist) report `Version: 0.2.0`;
+`Requires-Dist` lists only `pydantic>=2.0` plus the `dev` extras
+(`jsonschema`, `mypy`, `pytest`, `pytest-cov`, `pyyaml`, `ruff`) — no
+`basis-schemas` dependency. One nuance: the literal substring
+`basis-schemas` *does* appear in both `METADATA` and `PKG-INFO`, because
+hatchling embeds the full `README.md` as the long description, and the
+README's documentation index mentions the vendored `basis-schemas` test
+fixture by name; this is prose, not a `Requires-Dist` entry, and does not
+indicate a runtime dependency. The wheel was installed with `pip install
+dist/*.whl` into a second, separate clean venv, and a public-import smoke
+test (`basis_core`, `AuditEvent`/`AuditEvidence`/`EvaluationTrace` from
+`audit`, `DecisionRequest`/`OperationAwareDecisionRequest` from
+`decisions`, `EnforcementPoint`/`OperationAwareEnforcementPoint` from
+`enforcement`, `OperationAwarePolicyRule`/`PolicyBundle`/`PolicyRule` from
+`policy`) ran from `/tmp`, outside the checkout, confirming
+`basis_core.__version__ == "0.2.0"` from the installed artifact rather than
+the source tree. `dist/` and `build/` were then removed (via
+`allow_cowork_file_delete`, since the mounted repository folder blocks
+direct deletion of newly-created files); `git status --short` after cleanup
+shows only the tracked source-file diffs below — no wheel, sdist, or
+`egg-info` remains.
+
+Tag convention discovered: `v0.1.0` is an **annotated** tag (`git cat-file
+-t v0.1.0` → `tag`; tagger `Brandon <brandon.m.helmer@gmail.com>`; message
+"basis-core v0.1.0"; dated 2026-05-27). This PR recommends the matching
+annotated-tag convention for `v0.2.0` and prepares, but does not run, the
+exact post-merge commands (see this document's own release-process
+note below and the PR's final report). No tag was created or pushed by
+this PR.
+
+`docs/v0.2-readiness-review.md` also gains a small factual correction,
+discovered through this PR's own release-history inspection: its "Version
+and release state" section originally claimed no `CHANGELOG.md` existed at
+PR 43's review time. That was wrong — see this PR's own changelog
+correction above. The review's point-in-time facts that were accurate
+remain unchanged and unrewritten: the package was still `0.1.0`, release
+metadata remained pending PR 44, no tag existed, and PR 43 did not itself
+perform release preparation, write release notes, or introduce a
+changelog entry. The review is not rewritten as though it occurred after
+the version bump — only the one factual claim about `CHANGELOG.md`'s
+prior existence is corrected, with the correction itself labeled as
+added during PR 44.
+
+No `src/` file other than `src/basis_core/__init__.py` changed, and the
+only change to that file is the version string — confirmed by `git diff
+--name-only -- src` returning exactly that one path. No fixture, snapshot,
+public API export, dependency, schema constant, condition operator, reason
+code, or evaluation-semantics behavior changed. Packaging validation has
+now passed (see the amendment above). All 44 roadmap PRs are complete once
+this PR merges.
+
 Objective: the single PR in this roadmap that touches `pyproject.toml`'s
 `version` field (`0.1.0` → `0.2.0`) and `src/basis_core/__init__.py`'s
 `__version__`; adds a `CHANGELOG.md` if the readiness review (PR 43)
 recommends introducing one (none exists today — Section 2.13), or a release
 notes document following whatever convention PR 43 established.
-Files: `pyproject.toml`, `src/basis_core/__init__.py`, possibly
-`CHANGELOG.md`.
+Files: `pyproject.toml`, `src/basis_core/__init__.py`, `CHANGELOG.md`
+(existing file, `Unreleased` section replaced with a concise `0.2.0`
+section), `tests/test_readiness.py`, `docs/public-api.md` (one sentence),
+`docs/v0.2-readiness-review.md` (one factual correction),
+`README.md` (one line), and this roadmap document's own status note.
 Non-goals: no new runtime dependency (the version bump itself does not
 require one — Section 4 confirmed `basis-schemas` is never a runtime
 dependency).

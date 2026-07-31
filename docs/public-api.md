@@ -199,7 +199,7 @@ See `docs/extension-contracts.md` and `docs/adapter-contracts.md` for the full b
 
 ## Operation-aware public API (v0.2.0)
 
-The following additive surface is stabilized on `main` for the forthcoming v0.2.0 release.
+The following additive surface is stabilized as of the `basis-core` v0.2.0 release.
 
 The operation-aware API is a purely additive family of typed models, sitting alongside the v0.1 stable public API documented above. Every existing v0.1 stable and extension symbol listed above remains supported, unmodified, and at its existing import path — nothing in this section renames, replaces, subclasses, or reinterprets any v0.1 symbol. `OperationAwareDecisionRequest` coexists with `DecisionRequest`; `OperationAwareEnforcementPoint` coexists with `EnforcementPoint`; `AuditEvidence`/`EvaluationTrace`/`TraceRuleEvidence` coexist with `AuditEvent`/`DecisionTrace`/`RuleEvaluation`. This is not a migration path and not a deprecation of v0.1 — both families are expected to be used, independently, for as long as their respective consumers need them.
 
