@@ -3439,6 +3439,86 @@ Compatibility risk: none.
 Blocked by architecture decision: no.
 
 **PR 43 — v0.2.0 release-readiness review document.**
+**Status: complete at the implementation level, pending review/merge**
+(`docs/v0-2-readiness-review`). Delivers `docs/v0.2-readiness-review.md`,
+mirroring `docs/v0.1-readiness-review.md`'s structural precedent (scope
+statement, evidence style, tables, checklist organization, release-gate
+conclusion, known-limitations treatment, validation reporting) while
+covering the additional operation-aware ground Section 16 requires:
+typed-representation inventory, deterministic-evaluation pipeline coverage,
+condition-semantics status, canonical-scenario conformance, invalid-policy
+protection, deny precedence, default-deny/`NOT_APPLICABLE` distinctness,
+trace/evidence provenance, response/trace/audit agreement, the enforcement
+boundary, public API, extension contracts, import boundaries, v0.1
+compatibility, documentation/governance, and version/release state.
+
+Every readiness claim in the document was checked directly against this
+checkout — re-running the validation suite, re-inspecting `__all__` per
+package against `docs/public-api.md`, and grepping `src/basis_core/` for
+`GatewayAuditEvent`/`ContractMetadata` to confirm neither is implemented —
+rather than copying test totals, module counts, or status statements from
+this roadmap document's own historical sections, per this PR's own
+instruction. No discrepancy was found between what earlier PRs' status
+notes claimed and what the current checkout actually contains; the one
+place current state had already moved past this plan's own earlier framing
+was the active vendored-snapshot pointer (`v0.2.2`, confirmed again here,
+already reconciled by PR 42's own status note).
+
+The review's overall conclusion: implementation readiness **Ready**,
+compatibility readiness **Ready**, governance readiness **Ready**,
+documentation readiness **Ready**, release metadata readiness **Pending PR
+44**, recommendation **Proceed to PR 44**. No blocking finding was
+identified. Every Section 16 Definition-of-Done item is addressed in the
+review's Section 2 table with a concrete pointer to the module, test, or
+document that satisfies it; none was omitted as inconvenient. The
+known-limitations section (exact-match-only bundle scope, no
+policy-version negotiation, no `AuditEvidence` persistence/no
+`GatewayAuditEvent`, no performance SLA, no executable extension point, no
+external authentication/protocol communication, no topology discovery,
+unsupported internal evaluation APIs, and the still-unbumped package
+version) reproduces only limitations already documented elsewhere in this
+repository's own governance and model documents — none was invented, and no
+unresolved correctness defect was reclassified as a limitation.
+
+`tests/test_readiness.py` and `tests/test_governance_docs.py` were
+inspected and left unmodified. Neither test's existing pattern extends
+naturally to a readiness-review document the way it does to the
+operation-aware model/semantics docs (PR 41) or the governance
+cross-reference sections (PR 42): `docs/v0.1-readiness-review.md` — the
+structural precedent this review mirrors — has no comparable existence or
+required-section test protecting it today (confirmed: no test file
+references `v0.1-readiness-review` anywhere in `tests/`), so there is no
+established pattern to extend for its v0.2 counterpart. Per this PR's own
+"leave tests unchanged and explain why" instruction, no new test was added.
+
+`README.md` was inspected and left unmodified. `docs/v0.1-readiness-review.md`
+is not linked from `README.md`'s "Documentation" section or anywhere else
+in it (confirmed directly), so readiness reviews are not part of this
+repository's existing documentation index. Per this PR's own instruction,
+`README.md` was not altered solely to add a link that has no precedent for
+its predecessor document.
+
+Validation: focused `tests/test_readiness.py tests/test_governance_docs.py`
+is 36/36 passed. Focused `tests/test_public_api.py
+tests/test_backward_compatibility.py tests/test_contract_snapshots.py
+tests/test_schema_versioning.py tests/test_import_boundaries.py` is
+247/247 passed. `tests/operation_aware/test_canonical_vectors.py` is 16/16
+passed. `tests/operation_aware` is 3098 passed, 86 skipped (unchanged from
+PR 42's reported baseline — this PR adds no test and changes no runtime
+behavior). The full repository suite is 3953 passed, 86 skipped (unchanged
+from PR 42's reported baseline). `ruff check .` passes clean. `ruff format
+--check src tests` reports 111 files already formatted, clean. `mypy
+--cache-dir=/dev/null src`: `Success: no issues found in 44 source files`.
+`git diff --check` passes clean. Files touched:
+`docs/v0.2-readiness-review.md` (new) and this roadmap document's own
+status note. No `src/`, fixture, snapshot, public API, dependency, package
+version, schema constant, or runtime-behavior change — confirmed by
+`git diff --name-only -- src` and `git diff --name-only -- tests/fixtures`
+both returning empty, and `git diff -- pyproject.toml
+src/basis_core/__init__.py` returning empty. The package version remains
+`0.1.0` in both files; PR 44 remains the sole roadmap PR authorized to
+change it.
+
 Objective: `docs/v0.2-readiness-review.md`, mirroring
 `docs/v0.1-readiness-review.md`'s structure, checked directly against
 Section 16 (Definition of Done) of this plan.
