@@ -4,6 +4,41 @@ Notable changes to `basis-core` are documented here. The format is loosely
 based on [Keep a Changelog](https://keepachangelog.com/); breaking vs.
 additive classification follows `docs/breaking-change-discipline.md`.
 
+## [0.2.1]
+
+### Added
+
+- Added `OperationAwareEnforcementPoint.for_bundle(bundle)` as the supported
+  public downstream construction path. The factory constructs the internal
+  `OperationAwareEvaluationEngine` inside `basis-core`, so downstream
+  consumers no longer need to import `basis_core.evaluation.*`.
+
+### Documentation
+
+- Clarified the operation-aware downstream import boundary in
+  `docs/import-boundaries.md`.
+- Documented the public factory in `docs/public-api.md`.
+- Clarified that the evaluation engine remains an internal implementation
+  dependency.
+
+### Compatibility
+
+- No policy, evaluation, aggregation, trace, evidence, disposition, or
+  failure semantics changed.
+- The existing direct constructor
+  (`OperationAwareEnforcementPoint(engine=..., bundle=...)`) remains
+  available and unchanged for internal use and advanced testing.
+- This is an additive, backward-compatible correction to the public
+  construction path introduced in `v0.2.0`; no migration is required.
+
+### Validation
+
+- The focused public-factory suite
+  (`tests/operation_aware/test_operation_aware_enforcement_point_public_factory.py`)
+  passes (18 passed).
+- The full repository test suite passes (3982 passed, 86 skipped).
+- `ruff check`, `ruff format --check`, and `mypy --strict` all pass clean.
+
 ## [0.2.0]
 
 ### Added
