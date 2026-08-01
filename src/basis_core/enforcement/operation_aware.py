@@ -191,6 +191,50 @@ class OperationAwareEnforcementPoint:
         self._engine = engine
         self._bundle = bundle
 
+    @classmethod
+    def for_bundle(cls, bundle: PolicyBundle) -> OperationAwareEnforcementPoint:
+        """
+        The supported public downstream construction path (upstream
+        correction, `fix/public-operation-aware-enforcement-factory`).
+
+        `OperationAwareEnforcementPoint` is the documented public
+        downstream entry point (`docs/public-api.md`), but its constructor
+        requires an `OperationAwareEvaluationEngine`, which belongs to the
+        internal `basis_core.evaluation` package and is not itself part of
+        the public downstream contract. A downstream consumer (e.g.
+        `basis-gateway`) that only imports `basis_core.enforcement` and
+        `basis_core.policy` therefore had no compliant way to construct the
+        public enforcement point.
+
+        `for_bundle()` closes that gap: it constructs the internal
+        `OperationAwareEvaluationEngine` here, inside `basis-core`, and
+        returns a fully-constructed `OperationAwareEnforcementPoint`. The
+        engine itself is never returned or exported, and is not part of the
+        supported downstream public API — it remains an internal
+        implementation dependency behind the enforcement point, reachable
+        only through the enforcement point's own `evaluate()`. Every call to
+        `for_bundle()` creates a fresh engine instance; this factory
+        performs no caching and shares no engine or state across the
+        enforcement points it constructs.
+
+        This factory performs no policy evaluation, no additional semantic
+        validation beyond what `__init__` already does (none), and does not
+        mutate `bundle`. The existing `__init__(engine=..., bundle=...)`
+        constructor remains fully supported for internal use and advanced
+        testing (e.g. injecting a stub engine, as
+        `tests/operation_aware/test_operation_aware_enforcement_point.py`
+        does) — it is simply not the recommended downstream path.
+
+        Args:
+            bundle: an already-constructed, public `PolicyBundle`
+                (`basis_core.policy`).
+
+        Returns:
+            A new `OperationAwareEnforcementPoint` configured with a fresh
+            internal evaluation engine and the given `bundle`.
+        """
+        return cls(engine=OperationAwareEvaluationEngine(), bundle=bundle)
+
     def evaluate(
         self,
         *,
