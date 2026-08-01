@@ -7,8 +7,8 @@ minimally functional as a distributable library:
   1. Version exposure     — basis_core.__version__ is present and matches pyproject.toml.
   2. Package import       — all six public subpackages are importable without error.
   3. Example execution    — the basic_evaluation example runs end-to-end without raising.
-  4. v0.2.0 release state — the package version and release artifacts (readiness
-                            review, changelog) agree that v0.2.0 is the current release.
+  4. v0.2.1 release state — the package version and release artifacts (readiness
+                            review, changelog) agree that v0.2.1 is the current release.
 
 These tests are intentionally minimal. They do not retest contracts already
 covered by test_public_api.py, test_contract_snapshots.py, or test_evaluation_semantics.py.
@@ -162,29 +162,29 @@ class TestExampleExecution:
         )
 
 
-# ── 4. v0.2.0 release-state readiness ─────────────────────────────────────────
+# ── 4. v0.2.1 release-state readiness ─────────────────────────────────────────
 
 
-class TestV020ReleaseState:
+class TestV021ReleaseState:
     """The current release's version and release artifacts must agree.
 
-    These checks are release-specific (they assert v0.2.0, not a general
+    These checks are release-specific (they assert v0.2.1, not a general
     version-agreement rule — that's TestVersionExposure's job). They exist so
     that a future release bump that forgets to update the changelog, or that
     leaves the readiness review claiming release preparation is still pending,
     fails loudly here rather than shipping silently.
     """
 
-    def test_pyproject_declares_0_2_0(self) -> None:
-        assert _pyproject_version() == "0.2.0", (
-            f"pyproject.toml declares version {_pyproject_version()!r}, expected '0.2.0'."
+    def test_pyproject_declares_0_2_1(self) -> None:
+        assert _pyproject_version() == "0.2.1", (
+            f"pyproject.toml declares version {_pyproject_version()!r}, expected '0.2.1'."
         )
 
-    def test_runtime_version_is_0_2_0(self) -> None:
+    def test_runtime_version_is_0_2_1(self) -> None:
         import basis_core
 
-        assert basis_core.__version__ == "0.2.0", (
-            f"basis_core.__version__ is {basis_core.__version__!r}, expected '0.2.0'."
+        assert basis_core.__version__ == "0.2.1", (
+            f"basis_core.__version__ is {basis_core.__version__!r}, expected '0.2.1'."
         )
 
     def test_metadata_and_runtime_versions_agree(self) -> None:
@@ -227,9 +227,9 @@ class TestV020ReleaseState:
             "CHANGELOG.md is missing. Every release must have a changelog entry."
         )
 
-    def test_changelog_has_0_2_0_heading(self) -> None:
+    def test_changelog_has_0_2_1_heading(self) -> None:
         content = (REPO_ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-        assert "## [0.2.0]" in content, "CHANGELOG.md is missing a '## [0.2.0]' release heading."
+        assert "## [0.2.1]" in content, "CHANGELOG.md is missing a '## [0.2.1]' release heading."
 
     def test_changelog_does_not_claim_gateway_audit_event_is_kernel_owned(self) -> None:
         """GatewayAuditEvent is basis-gateway's artifact, never basis-core's.
