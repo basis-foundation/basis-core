@@ -282,8 +282,20 @@ The operation-aware enforcement boundary. `EnforcementPoint` above is unaffected
 | Symbol | Import path | Category | Responsibility | Compatibility |
 |---|---|---|---|---|
 | `OperationAwareEnforcementPoint` | `basis_core.enforcement` | Stable entry point | Fail-closed operation-aware enforcement orchestration; `evaluate()` never raises. Composes evaluation, response assembly, and audit-evidence assembly. | New in v0.2.0 |
+| `OperationAwareEnforcementPoint.for_bundle()` | `basis_core.enforcement` | Stable factory | The supported downstream construction path: `OperationAwareEnforcementPoint.for_bundle(bundle)` constructs the internal evaluation engine inside `basis-core` and returns a fully-constructed enforcement point. Downstream consumers (e.g. `basis-gateway`) should use this instead of the direct constructor, which requires an internal `basis_core.evaluation.operation_aware.engine.OperationAwareEvaluationEngine`. The direct constructor remains available for internal use and advanced testing (e.g. injecting a stub engine). | New in v0.2.1 |
 | `OperationAwareEnforcementResult` | `basis_core.enforcement` | Stable enforcement result | Immutable carrier binding one evaluation's `OperationAwareDecisionResponse`, optional `AuditEvidence`, and `EnforcementDisposition` together. | New in v0.2.0 |
 | `EnforcementDisposition` | `basis_core.enforcement` | Stable model — vocabulary | Closed, two-value (`allow`/`deny`) enforcement-only vocabulary. Distinct from the three-value kernel authorization outcome. | New in v0.2.0 |
+
+**Downstream construction (v0.2.1).** Downstream repositories should construct `OperationAwareEnforcementPoint` through `for_bundle()`, not the direct constructor:
+
+```python
+from basis_core.enforcement import OperationAwareEnforcementPoint
+from basis_core.policy import PolicyBundle
+
+enforcement_point = OperationAwareEnforcementPoint.for_bundle(bundle)
+```
+
+`for_bundle()` constructs the internal `OperationAwareEvaluationEngine` on the caller's behalf — downstream consumers should never import `basis_core.evaluation.*` to obtain one. The evaluation-orchestration package remains internal (see above); this factory is the one supported way to reach it indirectly. The existing `OperationAwareEnforcementPoint(engine=..., bundle=...)` constructor remains available and unchanged for internal use and advanced testing, but is not the recommended downstream path.
 
 Preferred import style:
 
