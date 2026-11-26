@@ -36,11 +36,19 @@ These are added by applications and services that use the library.
 
 ## Installation
 
-```
-pip install basis-core
+Install from a clone of this repository:
+
+```bash
+git clone https://github.com/basis-foundation/basis-core.git
+cd basis-core
+python -m pip install .
 ```
 
 Requires Python 3.10+. Runtime dependency: [pydantic](https://docs.pydantic.dev/) ≥ 2.0.
+
+> **Do not use `pip install basis-core`.** `basis-core` is not currently published by the Basis Foundation on PyPI. The `basis-core` distribution currently present on PyPI is an unrelated project. Installing by name from PyPI will not install this repository.
+
+For a development install, see [Development](#development).
 
 ## Quick start
 
